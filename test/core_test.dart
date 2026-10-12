@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medut_phone/core/accounts.dart';
 import 'package:medut_phone/core/settings.dart';
+import 'package:medut_phone/sip/quality.dart';
 import 'package:medut_phone/sip/sip_service.dart';
 
 void main() {
@@ -67,6 +68,22 @@ void main() {
     test('user part of a From header', () {
       expect(SipService.userPart('"Sara" <sip:204@pbx.example.com>;tag=1'), '204');
       expect(SipService.userPart('sip:+201005550192@carrier.net'), '+201005550192');
+    });
+  });
+
+  group('call quality (Echo grade)', () {
+    test('checking until a sample', () => expect(callQualityLevel(), 0));
+    test('excellent needs a high MOS and clean network', () {
+      expect(callQualityLevel(mos: 4.4, rttMs: 40, jitterMs: 5, lossPct: 0), 4);
+      expect(callQualityLevel(rttMs: 40, jitterMs: 5, lossPct: 0), 3);
+    });
+    test('one missed target drops to fair, a bad one to poor', () {
+      expect(callQualityLevel(mos: 4.4, rttMs: 200, jitterMs: 5, lossPct: 0), 2);
+      expect(callQualityLevel(mos: 4.4, rttMs: 40, jitterMs: 5, lossPct: 3), 1);
+    });
+    test('MOS caps the grade', () {
+      expect(callQualityLevel(mos: 3.8, rttMs: 40, jitterMs: 5, lossPct: 0), 3);
+      expect(callQualityLevel(mos: 2.5), 1);
     });
   });
 }

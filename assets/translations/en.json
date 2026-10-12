@@ -279,5 +279,10 @@
   "customHeaders": "Custom SIP headers",
   "shareAccount": "Share as QR code",
   "shareAccountWarn": "This code contains the account password. Show it only to people you trust.",
-  "autoAnswerDelayValue": "Answer after {s} s"
+  "autoAnswerDelayValue": "Answer after {s} s",
+  "signalExcellent": "Excellent",
+  "signalGood": "Good",
+  "signalFair": "Fair",
+  "signalPoor": "Poor",
+  "signalChecking": "Checking…"
 }

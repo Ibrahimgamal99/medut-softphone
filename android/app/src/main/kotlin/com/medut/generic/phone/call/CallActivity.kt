@@ -81,7 +81,10 @@ class CallActivity : Activity() {
     private lateinit var call: LinearLayout
     private lateinit var minimize: ImageView
     private lateinit var account: TextView
-    private lateinit var mosPill: TextView
+    private lateinit var mosPill: LinearLayout
+    private lateinit var qualityBars: QualityBars
+    private lateinit var qualityWord: TextView
+    private lateinit var mosText: TextView
     private lateinit var secondBanner: LinearLayout
     private lateinit var secondText: TextView
     private lateinit var secondSwap: TextView
@@ -218,17 +221,21 @@ class CallActivity : Activity() {
         status.text = s.status.ifBlank { s.number }
         updateTimer()
 
-        // MOS pill
-        if (s.mos.isNotBlank()) {
+        // Quality pill: Echo's 3 bars + word, MOS beside it, tap for details.
+        if (s.qualityWord.isNotBlank()) {
             mosPill.visibility = View.VISIBLE
-            val (fg, bgc) = when (s.quality) {
-                "poor" -> p.danger to (p.danger and 0x00FFFFFF or 0x22000000)
-                "fair" -> p.warn to p.warnSoft
-                else -> p.success to p.successSoft
+            val fg = when (s.qualityLevel) {
+                4, 3 -> p.success
+                2 -> p.warn
+                1 -> p.danger
+                else -> p.text2
             }
-            mosPill.text = s.mos + if (detailsOpen) "  ▴" else "  ▾"
-            mosPill.setTextColor(fg)
-            mosPill.background = pill(bgc, 16f)
+            mosPill.background = pill(fg and 0x00FFFFFF or 0x1F000000, 16f)
+            qualityBars.setQuality(s.qualityLevel, fg, p.text2 and 0x00FFFFFF or 0x40000000)
+            qualityWord.text = s.qualityWord
+            qualityWord.setTextColor(fg)
+            mosText.text = (if (s.mos.isNotBlank()) s.mos + " " else "") + if (detailsOpen) "▴" else "▾"
+            mosText.setTextColor(fg)
         } else {
             mosPill.visibility = View.INVISIBLE
         }
@@ -503,8 +510,17 @@ class CallActivity : Activity() {
             setOnClickListener { MainActivity.open(this@CallActivity) }
         }
         account = text(12f).apply { layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
-        mosPill = text(11f, mono = true).apply {
-            setPadding(dp(10), dp(6), dp(10), dp(6))
+        qualityBars = QualityBars(this)
+        qualityWord = text(12f, bold = true).apply { setPadding(dp(7), 0, dp(6), 0) }
+        mosText = text(11f, mono = true)
+        mosPill = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            minimumHeight = dp(32)
+            addView(qualityBars)
+            addView(qualityWord)
+            addView(mosText)
             setOnClickListener {
                 detailsOpen = !detailsOpen
                 render(snap)

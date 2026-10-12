@@ -64,7 +64,10 @@ final class CallViewController: UIViewController {
   private let stack = UIStackView()
   private let minimize = UIButton(type: .system)
   private let account = UILabel()
-  private let mosPill = UIButton(type: .system)
+  private let mosPill = UIStackView()
+  private let qualityBars = QualityBarsView()
+  private let qualityWord = UILabel()
+  private let mosText = UILabel()
   private let secondBanner = UIStackView()
   private let secondText = UILabel()
   private let secondSwap = UIButton(type: .system)
@@ -125,15 +128,19 @@ final class CallViewController: UIViewController {
     statusLabel.text = s.status.isEmpty ? s.number : s.status
     updateTimer()
 
-    if s.mos.isEmpty {
+    // Quality pill: Echo's 3 bars + word, MOS beside it, tap for details.
+    if s.qualityWord.isEmpty {
       mosPill.isHidden = true
     } else {
       mosPill.isHidden = false
-      let (fg, bg): (UIColor, UIColor) = s.quality == "poor" ? (p.danger, p.danger.withAlphaComponent(0.14))
-        : s.quality == "fair" ? (p.warn, p.warnSoft) : (p.success, p.successSoft)
-      mosPill.setTitle(s.mos + (detailsOpen ? "  ▴" : "  ▾"), for: .normal)
-      mosPill.setTitleColor(fg, for: .normal)
-      mosPill.backgroundColor = bg
+      let fg: UIColor = [3, 4].contains(s.qualityLevel) ? p.success
+        : s.qualityLevel == 2 ? p.warn : s.qualityLevel == 1 ? p.danger : p.text2
+      mosPill.backgroundColor = fg.withAlphaComponent(0.12)
+      qualityBars.setQuality(level: s.qualityLevel, litColor: fg, offColor: p.text2.withAlphaComponent(0.25))
+      qualityWord.text = s.qualityWord
+      qualityWord.textColor = fg
+      mosText.text = (s.mos.isEmpty ? "" : s.mos + " ") + (detailsOpen ? "▴" : "▾")
+      mosText.textColor = fg
     }
 
     let rows = s.details
@@ -301,10 +308,19 @@ final class CallViewController: UIViewController {
     minimize.widthAnchor.constraint(equalToConstant: 44).isActive = true
     minimize.heightAnchor.constraint(equalToConstant: 44).isActive = true
     account.font = .systemFont(ofSize: 12)
-    mosPill.titleLabel?.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-    mosPill.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
-    mosPill.layer.cornerRadius = 15
-    mosPill.addTarget(self, action: #selector(tapMos), for: .touchUpInside)
+    mosPill.axis = .horizontal
+    mosPill.alignment = .center
+    mosPill.spacing = 6
+    mosPill.isLayoutMarginsRelativeArrangement = true
+    mosPill.layoutMargins = UIEdgeInsets(top: 7, left: 10, bottom: 7, right: 10)
+    mosPill.layer.cornerRadius = 16
+    mosPill.isUserInteractionEnabled = true
+    mosPill.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapMos)))
+    qualityWord.font = .systemFont(ofSize: 12, weight: .bold)
+    mosText.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+    mosPill.addArrangedSubview(qualityBars)
+    mosPill.addArrangedSubview(qualityWord)
+    mosPill.addArrangedSubview(mosText)
     header.addArrangedSubview(minimize)
     header.addArrangedSubview(account)
     header.addArrangedSubview(mosPill)
@@ -543,5 +559,44 @@ final class CallViewController: UIViewController {
     guard let first = parts.first else { return "?" }
     if !(first.first?.isLetter ?? false) { return String(first.suffix(2)) }
     return (String(first.prefix(1)) + (parts.count > 1 ? String(parts[1].prefix(1)) : "")).uppercased()
+  }
+}
+
+/// Three rising signal bars for call quality, as in Echo.
+final class QualityBarsView: UIView {
+  private let barWidth: CGFloat = 4
+  private var gap: CGFloat { barWidth * 0.7 }
+  private var level = 0
+  private var litColor = UIColor.clear
+  private var offColor = UIColor.gray.withAlphaComponent(0.25)
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    backgroundColor = .clear
+    isOpaque = false
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+  func setQuality(level: Int, litColor: UIColor, offColor: UIColor) {
+    self.level = max(0, min(3, level))
+    self.litColor = litColor
+    self.offColor = offColor
+    setNeedsDisplay()
+  }
+
+  override var intrinsicContentSize: CGSize {
+    CGSize(width: barWidth * 3 + gap * 2, height: barWidth * 1.75 + 2 * barWidth * 1.25)
+  }
+
+  override func draw(_ rect: CGRect) {
+    var x: CGFloat = 0
+    for i in 0..<3 {
+      let h = barWidth * 1.75 + CGFloat(i) * barWidth * 1.25
+      let r = CGRect(x: x, y: bounds.height - h, width: barWidth, height: h)
+      (i < level ? litColor : offColor).setFill()
+      UIBezierPath(roundedRect: r, cornerRadius: barWidth / 2).fill()
+      x += barWidth + gap
+    }
   }
 }

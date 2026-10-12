@@ -279,5 +279,10 @@
   "customHeaders": "ترويسات SIP مخصصة",
   "shareAccount": "مشاركة كرمز QR",
   "shareAccountWarn": "يحتوي هذا الرمز على كلمة مرور الحساب. اعرضه فقط لمن تثق به.",
-  "autoAnswerDelayValue": "الرد بعد {s} ث"
+  "autoAnswerDelayValue": "الرد بعد {s} ث",
+  "signalExcellent": "ممتازة",
+  "signalGood": "جيدة",
+  "signalFair": "مقبولة",
+  "signalPoor": "ضعيفة",
+  "signalChecking": "جارٍ الفحص…"
 }

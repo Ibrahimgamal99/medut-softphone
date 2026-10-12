@@ -37,6 +37,8 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val routes: List<Map<String, Any?>> get() = (raw["routes"] as? List<Map<String, Any?>>) ?: emptyList()
     val mos: String get() = raw["mos"] as? String ?: ""
     val quality: String get() = raw["quality"] as? String ?: ""
+    val qualityLevel: Int get() = (raw["qualityLevel"] as? Number)?.toInt() ?: 0
+    val qualityWord: String get() = raw["qualityWord"] as? String ?: ""
     val dark: Boolean get() = raw["dark"] == true
     val rtl: Boolean get() = raw["rtl"] == true
 

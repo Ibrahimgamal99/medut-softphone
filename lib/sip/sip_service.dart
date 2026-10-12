@@ -12,6 +12,7 @@ import '../core/accounts.dart';
 import '../core/db.dart';
 import '../core/settings.dart';
 import 'native_bridge.dart';
+import 'quality.dart';
 import 'tones.dart';
 
 enum RegStatus { off, registering, registered, reconnecting, failed }
@@ -1079,6 +1080,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     final s = settings.showCallQuality ? f.stats : null;
     final mos = s?.mosLq ?? 0;
     String fmt(double v, [int d = 0]) => v.toStringAsFixed(d);
+    var level = s == null
+        ? 0
+        : callQualityLevel(mos: s.mosLq, rttMs: s.rttMs, jitterMs: s.jitterMs, lossPct: s.lossPctRx);
+    if (f.link != 'ok') level = 1;
     Map<String, Object?>? second;
     if (other != null) {
       if (other.phase == Phase.incoming) {
@@ -1126,8 +1131,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'vibrate': settings.vibrate,
       'recording': f.recording,
       'silent': settings.effectiveStatus() == MyStatus.silent,
-      'mos': s == null ? '' : 'MOS ${fmt(mos, 1)}',
-      'quality': s == null ? '' : (f.link != 'ok' || mos < 3.5 ? 'poor' : (mos >= 4.0 ? 'good' : 'fair')),
+      'mos': s == null ? '' : fmt(mos, 1),
+      // Echo's 3-bar grade. "Checking…" until the first sample, a link in
+      // trouble (reconnecting, stalled media) is never better than poor.
+      'qualityLevel': level,
+      'qualityWord': settings.showCallQuality && f.phase == Phase.active ? tr(qualityWordKey(level)) : '',
+      'quality': switch (level) { >= 3 => 'good', 2 => 'fair', 1 => 'poor', _ => '' },
       'details': s == null
           ? <List<String>>[]
           : [

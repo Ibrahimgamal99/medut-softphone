@@ -24,6 +24,8 @@ struct CallSnapshot {
   var canRecord: Bool { raw["canRecord"] as? Bool ?? true }
   var mos: String { raw["mos"] as? String ?? "" }
   var quality: String { raw["quality"] as? String ?? "" }
+  var qualityLevel: Int { (raw["qualityLevel"] as? NSNumber)?.intValue ?? 0 }
+  var qualityWord: String { raw["qualityWord"] as? String ?? "" }
   var dark: Bool { raw["dark"] as? Bool ?? false }
   var rtl: Bool { raw["rtl"] as? Bool ?? false }
   var outgoing: Bool { raw["outgoing"] as? Bool ?? false }
