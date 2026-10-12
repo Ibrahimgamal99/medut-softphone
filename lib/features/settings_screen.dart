@@ -170,11 +170,12 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('autoAnswerDelay'.tr()),
-              trailing: DropdownButton<int>(
-                value: s.autoAnswerDelay,
-                underline: const SizedBox.shrink(),
-                items: [for (final d in [0, 1, 3, 5, 10]) DropdownMenuItem(value: d, child: Text('${d}s'))],
-                onChanged: (v) => s.autoAnswerDelay = v ?? 3,
+              subtitle: Text('autoAnswerDelayValue'.tr(namedArgs: {'s': '${s.autoAnswerDelay}'})),
+              trailing: Icon(Icons.chevron_right, color: t.text2),
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                showDragHandle: true,
+                builder: (_) => const _AutoAnswerDelaySheet(),
               ),
             ),
           SwitchListTile(
@@ -648,6 +649,40 @@ class IceServersScreen extends ConsumerWidget {
             ),
           ),
       ]),
+    );
+  }
+}
+
+class _AutoAnswerDelaySheet extends ConsumerStatefulWidget {
+  const _AutoAnswerDelaySheet();
+
+  @override
+  ConsumerState<_AutoAnswerDelaySheet> createState() => _AutoAnswerDelaySheetState();
+}
+
+class _AutoAnswerDelaySheetState extends ConsumerState<_AutoAnswerDelaySheet> {
+  late double _value = ref.read(settingsProvider).autoAnswerDelay.toDouble();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('autoAnswerDelay'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('autoAnswerDelayValue'.tr(namedArgs: {'s': '${_value.round()}'})),
+          Slider(
+            value: _value,
+            min: 0,
+            max: 30,
+            divisions: 30,
+            label: '${_value.round()}s',
+            onChanged: (v) => setState(() => _value = v),
+            onChangeEnd: (v) => ref.read(settingsProvider).autoAnswerDelay = v.round(),
+          ),
+        ]),
+      ),
     );
   }
 }

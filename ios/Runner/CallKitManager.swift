@@ -27,6 +27,8 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
   private var pendingDecline = false
   private var pendingTimer: Timer?
   private var connectedOutgoing: Set<String> = []
+  /// Incoming calls CallKit already knows are answered.
+  private var answered: Set<String> = []
 
   private(set) var pushToken: String?
 
@@ -100,6 +102,14 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
       if let uuid = uuids[next.callId], next.outgoing, !connectedOutgoing.contains(next.callId) {
         connectedOutgoing.insert(next.callId)
         provider.reportOutgoingCall(with: uuid, connectedAt: Date())
+      } else if let uuid = uuids[next.callId], !next.outgoing, !answered.contains(next.callId) {
+        // Answered by Medut itself (auto-answer, or the in-app button), not on
+        // CallKit's screen: tell CallKit, so its card stops ringing, shows the
+        // call connected and runs its timer.
+        answered.insert(next.callId)
+        controller.request(CXTransaction(action: CXAnswerCallAction(call: uuid))) { error in
+          if let error = error { NSLog("MEDUT_CALLKIT answer sync failed: \(error.localizedDescription)") }
+        }
       }
     case "ended", "idle":
       endAll(except: next.isLive ? next.callId : nil)
@@ -156,6 +166,7 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
       provider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
       uuids.removeValue(forKey: callId)
       connectedOutgoing.remove(callId)
+      answered.remove(callId)
     }
   }
 
@@ -190,6 +201,8 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
 
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     if let id = callId(for: action.callUUID) {
+      answered.insert(id)
+      // Dart ignores this when the call is already answered (the sync above).
       MedutBridge.shared.action("answer", callId: id)
     } else if action.callUUID == pendingPush {
       pendingAnswer = true  // the INVITE is still on its way

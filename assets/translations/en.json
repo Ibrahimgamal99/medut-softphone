@@ -278,5 +278,6 @@
   "plusReplace": "Replace + with",
   "customHeaders": "Custom SIP headers",
   "shareAccount": "Share as QR code",
-  "shareAccountWarn": "This code contains the account password. Show it only to people you trust."
+  "shareAccountWarn": "This code contains the account password. Show it only to people you trust.",
+  "autoAnswerDelayValue": "Answer after {s} s"
 }

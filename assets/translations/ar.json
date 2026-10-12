@@ -278,5 +278,6 @@
   "plusReplace": "استبدال + بـ",
   "customHeaders": "ترويسات SIP مخصصة",
   "shareAccount": "مشاركة كرمز QR",
-  "shareAccountWarn": "يحتوي هذا الرمز على كلمة مرور الحساب. اعرضه فقط لمن تثق به."
+  "shareAccountWarn": "يحتوي هذا الرمز على كلمة مرور الحساب. اعرضه فقط لمن تثق به.",
+  "autoAnswerDelayValue": "الرد بعد {s} ث"
 }
