@@ -158,6 +158,58 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => s.ringback = v,
           ),
         ]),
+        section('callsSection'.tr(), [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('autoAnswer'.tr()),
+            subtitle: Text('autoAnswerSub'.tr()),
+            value: s.autoAnswer,
+            onChanged: (v) => s.autoAnswer = v,
+          ),
+          if (s.autoAnswer)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('autoAnswerDelay'.tr()),
+              trailing: DropdownButton<int>(
+                value: s.autoAnswerDelay,
+                underline: const SizedBox.shrink(),
+                items: [for (final d in [0, 1, 3, 5, 10]) DropdownMenuItem(value: d, child: Text('${d}s'))],
+                onChanged: (v) => s.autoAnswerDelay = v ?? 3,
+              ),
+            ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('showCallQuality'.tr()),
+            subtitle: Text('showCallQualitySub'.tr()),
+            value: s.showCallQuality,
+            onChanged: (v) => s.showCallQuality = v,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('blockedNumbers'.tr()),
+            subtitle: Text('${s.blocked.length}'),
+            trailing: Icon(Icons.chevron_right, color: t.text2),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BlockedScreen())),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('clearHistory'.tr(), style: TextStyle(color: t.danger)),
+            onTap: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('clearHistory'.tr()),
+                  content: Text('clearHistoryConfirm'.tr()),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('cancel'.tr())),
+                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('delete'.tr())),
+                  ],
+                ),
+              );
+              if (ok == true) await ref.read(dbProvider).clearCalls();
+            },
+          ),
+        ]),
         section('reachability'.tr(), [
           if (Platform.isAndroid)
             SwitchListTile(
@@ -184,6 +236,25 @@ class SettingsScreen extends ConsumerWidget {
                 DropdownMenuItem(value: 2, child: Text('aecWebrtc'.tr())),
               ],
               onChanged: (v) => s.aecMode = v ?? 2,
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('jitterBuffer'.tr()),
+            subtitle: Text(switch (s.jitterMode) {
+              'low' => 'jitterLowSub'.tr(),
+              'robust' => 'jitterRobustSub'.tr(),
+              _ => 'jitterAutoSub'.tr(),
+            }),
+            trailing: DropdownButton<String>(
+              value: s.jitterMode,
+              underline: const SizedBox.shrink(),
+              items: [
+                DropdownMenuItem(value: 'auto', child: Text('jitterAuto'.tr())),
+                DropdownMenuItem(value: 'low', child: Text('jitterLow'.tr())),
+                DropdownMenuItem(value: 'robust', child: Text('jitterRobust'.tr())),
+              ],
+              onChanged: (v) => s.jitterMode = v ?? 'auto',
             ),
           ),
           SwitchListTile(
@@ -220,7 +291,59 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ]),
+        section('network'.tr(), [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('iceServers'.tr()),
+            subtitle: Text(s.iceServers.isEmpty ? 'iceServersNone'.tr() : '${s.iceServers.length}'),
+            trailing: Icon(Icons.chevron_right, color: t.text2),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IceServersScreen())),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('forceRelay'.tr()),
+            subtitle: Text('forceRelaySub'.tr()),
+            value: s.forceRelay,
+            onChanged: (v) => s.forceRelay = v,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('regExpires'.tr()),
+            subtitle: Text('restartApp'.tr()),
+            trailing: DropdownButton<int>(
+              value: s.regExpires,
+              underline: const SizedBox.shrink(),
+              items: [for (final v in [60, 120, 300, 600, 1800, 3600]) DropdownMenuItem(value: v, child: Text('${v}s'))],
+              onChanged: (v) => s.regExpires = v ?? 300,
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('keepalive'.tr()),
+            subtitle: Text('restartApp'.tr()),
+            trailing: DropdownButton<int>(
+              value: s.keepaliveSec,
+              underline: const SizedBox.shrink(),
+              items: [for (final v in [15, 30, 60, 120]) DropdownMenuItem(value: v, child: Text('${v}s'))],
+              onChanged: (v) => s.keepaliveSec = v ?? 30,
+            ),
+          ),
+        ]),
         section('diagnostics'.tr(), [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('debugLogging'.tr()),
+            subtitle: Text('restartApp'.tr()),
+            value: s.debugLogging,
+            onChanged: (v) => s.debugLogging = v,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('connectionLog'.tr()),
+            trailing: Icon(Icons.chevron_right, color: t.text2),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => LogScreen(title: 'connectionLog'.tr(), read: (r) => r.read(sipProvider).connLog))),
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text('sipTrace'.tr()),
@@ -232,7 +355,8 @@ class SettingsScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: Text('sipLog'.tr()),
             trailing: Icon(Icons.chevron_right, color: t.text2),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SipLogScreen())),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => LogScreen(title: 'sipLog'.tr(), read: (r) => r.read(sipProvider).sipLog))),
           ),
         ]),
         section('about'.tr(), [
@@ -285,17 +409,20 @@ class _PermissionTileState extends State<_PermissionTile> {
   }
 }
 
-/// Last SIP messages sent and received, for troubleshooting a PBX.
-class SipLogScreen extends ConsumerWidget {
-  const SipLogScreen({super.key});
+/// SIP messages, or the connection log, for troubleshooting a PBX.
+class LogScreen extends ConsumerWidget {
+  const LogScreen({super.key, required this.title, required this.read});
+  final String title;
+  final List<String> Function(WidgetRef ref) read;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
-    final log = ref.watch(sipProvider).sipLog.reversed.toList();
+    ref.watch(sipProvider);
+    final log = read(ref).reversed.toList();
     return Scaffold(
       appBar: AppBar(
-        title: Text('sipLog'.tr()),
+        title: Text(title),
         actions: [
           IconButton(
             tooltip: 'share'.tr(),
@@ -386,6 +513,140 @@ class _RingtoneScreenState extends ConsumerState<RingtoneScreen> {
             ]),
           ),
         ),
+      ]),
+    );
+  }
+}
+
+class BlockedScreen extends ConsumerWidget {
+  const BlockedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+    final list = s.blocked.toList()..sort();
+    return Scaffold(
+      appBar: AppBar(title: Text('blockedNumbers'.tr())),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'add'.tr(),
+        backgroundColor: t.accent,
+        foregroundColor: t.onAccent,
+        onPressed: () async {
+          final c = TextEditingController();
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text('blockNumber'.tr()),
+              content: TextField(controller: c, keyboardType: TextInputType.phone, autofocus: true),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('cancel'.tr())),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('add'.tr())),
+              ],
+            ),
+          );
+          if (ok == true && c.text.trim().isNotEmpty) s.blocked = {...s.blocked, c.text.trim()};
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: list.isEmpty
+          ? Center(child: Text('blockedNone'.tr(), style: TextStyle(color: t.text2)))
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              for (final n in list)
+                ListTile(
+                  leading: Icon(Icons.block, color: t.danger),
+                  title: Text(n),
+                  trailing: IconButton(
+                    tooltip: 'unblock'.tr(),
+                    icon: const Icon(Icons.close),
+                    onPressed: () => s.blocked = s.blocked.where((x) => x != n).toSet(),
+                  ),
+                ),
+            ]),
+    );
+  }
+}
+
+/// Extra STUN / TURN servers for every account (Settings → Network).
+class IceServersScreen extends ConsumerWidget {
+  const IceServersScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+    final list = s.iceServers;
+
+    Future<void> edit([int? index]) async {
+      final cur = index == null ? <String, String>{} : list[index];
+      final url = TextEditingController(text: cur['url'] ?? '');
+      final user = TextEditingController(text: cur['user'] ?? '');
+      final pass = TextEditingController(text: cur['pass'] ?? '');
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(index == null ? 'addServer'.tr() : 'edit'.tr()),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: url, decoration: const InputDecoration(labelText: 'URL', hintText: 'turn:turn.example.com:3478')),
+            const SizedBox(height: 10),
+            TextField(controller: user, decoration: InputDecoration(labelText: 'turnUser'.tr())),
+            const SizedBox(height: 10),
+            TextField(controller: pass, obscureText: true, decoration: InputDecoration(labelText: 'turnPass'.tr())),
+            const SizedBox(height: 6),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () => url.text = 'stun:stun.l.google.com:19302',
+                child: Text('addPresetStun'.tr()),
+              ),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('cancel'.tr())),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('save'.tr())),
+          ],
+        ),
+      );
+      if (ok != true || url.text.trim().isEmpty) return;
+      final entry = {'url': url.text.trim(), 'user': user.text.trim(), 'pass': pass.text};
+      final next = [...list];
+      index == null ? next.add(entry) : next[index] = entry;
+      s.iceServers = next;
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text('iceServers'.tr())),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'addServer'.tr(),
+        backgroundColor: t.accent,
+        foregroundColor: t.onAccent,
+        onPressed: edit,
+        child: const Icon(Icons.add),
+      ),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        Text('iceServersHint'.tr(), style: TextStyle(color: t.text2, fontSize: 13)),
+        const SizedBox(height: 12),
+        for (var i = 0; i < list.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ECard(
+              onTap: () => edit(i),
+              padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(list[i]['url'] ?? '', style: mono(context, size: 12, color: t.text)),
+                    if ((list[i]['user'] ?? '').isNotEmpty) Text(list[i]['user']!, style: mono(context)),
+                  ]),
+                ),
+                IconButton(
+                  tooltip: 'delete'.tr(),
+                  icon: Icon(Icons.delete_outline, color: t.danger),
+                  onPressed: () => s.iceServers = [...list]..removeAt(i),
+                ),
+              ]),
+            ),
+          ),
       ]),
     );
   }

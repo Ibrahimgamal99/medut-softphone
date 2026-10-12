@@ -646,6 +646,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  proximity_screen_lock:
+    dependency: "direct main"
+    description:
+      name: proximity_screen_lock
+      sha256: d330e5e47d98a7b2aedb294c3c207f9447ae2fc774c6f7e893b171f4d18524af
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
+  proximity_screen_lock_android:
+    dependency: transitive
+    description:
+      name: proximity_screen_lock_android
+      sha256: "4f09ea21c90633c0952dce5501340569bf87f16ef2de3f351f81113918223ccc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
+  proximity_screen_lock_ios:
+    dependency: transitive
+    description:
+      name: proximity_screen_lock_ios
+      sha256: e2bf684bee9241cace301569d24152b598df7a582d3300829bf809bcac168c13
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
+  proximity_screen_lock_platform_interface:
+    dependency: transitive
+    description:
+      name: proximity_screen_lock_platform_interface
+      sha256: a3788e743298fb8c8f74ebde520a6b7ec93d5f80393263ac011d20169e93a4b9
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
   pub_semver:
     dependency: transitive
     description:
@@ -654,6 +686,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.1"
+  qr:
+    dependency: transitive
+    description:
+      name: qr
+      sha256: "5a1d2586170e172b8a8c8470bbbffd5eb0cd38a66c0d77155ea138d3af3a4445"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
+  qr_flutter:
+    dependency: "direct main"
+    description:
+      name: qr_flutter
+      sha256: "5095f0fc6e3f71d08adef8feccc8cea4f12eec18a2e31c2e8d82cb6019f4b097"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.0"
   record_use:
     dependency: transitive
     description:

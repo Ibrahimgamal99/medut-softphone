@@ -118,7 +118,34 @@ class AppSettings extends ChangeNotifier {
   bool get ringback => _b('ringback', true);
   set ringback(bool v) => _set('ringback', v);
 
+  // Calls
+  bool get autoAnswer => _b('autoAnswer', false);
+  set autoAnswer(bool v) => _set('autoAnswer', v);
+  int get autoAnswerDelay => _prefs.getInt('autoAnswerDelay') ?? 3;
+  set autoAnswerDelay(int v) => _set('autoAnswerDelay', v);
+  bool get showCallQuality => _b('showCallQuality', true);
+  set showCallQuality(bool v) => _set('showCallQuality', v);
+  Set<String> get blocked => (jsonDecode(_s('blocked', '[]')) as List).cast<String>().toSet();
+  set blocked(Set<String> v) => _set('blocked', jsonEncode(v.toList()));
+
+  // Network (applies to every account)
+  /// Extra STUN / TURN servers: [{url, user, pass}].
+  List<Map<String, String>> get iceServers => (jsonDecode(_s('iceServers', '[]')) as List)
+      .map((e) => Map<String, String>.from(e as Map))
+      .toList();
+  set iceServers(List<Map<String, String>> v) => _set('iceServers', jsonEncode(v));
+  /// Media only through TURN (ICE relay policy): for networks that block P2P.
+  bool get forceRelay => _b('forceRelay', false);
+  set forceRelay(bool v) => _set('forceRelay', v);
+  int get regExpires => _prefs.getInt('regExpires') ?? 300;
+  set regExpires(int v) => _set('regExpires', v);
+  int get keepaliveSec => _prefs.getInt('keepaliveSec') ?? 30;
+  set keepaliveSec(int v) => _set('keepaliveSec', v);
+
   // Audio
+  /// auto (the stack's adaptive defaults) | low (20–150 ms) | robust (60–500 ms)
+  String get jitterMode => _s('jitterMode', 'auto');
+  set jitterMode(String v) => _set('jitterMode', v);
   int get aecMode => _prefs.getInt('aecMode') ?? 2; // 0 off, 1 suppressor, 2 webrtc
   set aecMode(int v) => _set('aecMode', v);
   bool get noiseSuppression => _b('ns', true);
@@ -132,6 +159,8 @@ class AppSettings extends ChangeNotifier {
   set recordingMode(String v) => _set('recordingMode', v);
 
   // Diagnostics
+  bool get debugLogging => _b('debugLogging', false);
+  set debugLogging(bool v) => _set('debugLogging', v);
   bool get traceSip => _b('traceSip', true);
   set traceSip(bool v) => _set('traceSip', v);
 

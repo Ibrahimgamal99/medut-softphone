@@ -34,6 +34,9 @@ class SipAccountConfig {
     this.dtmf = 'rfc4733',
     this.voicemail = '*97',
     this.recordCalls = true,
+    this.dialPrefix = '',
+    this.plusReplace = '',
+    this.headers = '',
   });
 
   final String id, name, user, domain, password, transport;
@@ -50,6 +53,15 @@ class SipAccountConfig {
 
   /// Whether "Record every call" applies to this account.
   final bool recordCalls;
+
+  /// Added in front of outside numbers (7+ digits), e.g. 9 for a line out.
+  final String dialPrefix;
+
+  /// What a leading + becomes (e.g. 00); empty keeps the +.
+  final String plusReplace;
+
+  /// Extra SIP headers on this account's requests, one "Name: value" per line.
+  final String headers;
 
   /// `user@domain[:port]`, as Medut-SDK expects the AOR.
   String get aor => port > 0 ? '$user@$domain:$port' : '$user@$domain';
@@ -80,6 +92,9 @@ class SipAccountConfig {
     String? dtmf,
     String? voicemail,
     bool? recordCalls,
+    String? dialPrefix,
+    String? plusReplace,
+    String? headers,
   }) =>
       SipAccountConfig(
         id: id,
@@ -107,6 +122,9 @@ class SipAccountConfig {
         dtmf: dtmf ?? this.dtmf,
         voicemail: voicemail ?? this.voicemail,
         recordCalls: recordCalls ?? this.recordCalls,
+        dialPrefix: dialPrefix ?? this.dialPrefix,
+        plusReplace: plusReplace ?? this.plusReplace,
+        headers: headers ?? this.headers,
       );
 
   /// Everything except the password.
@@ -134,6 +152,9 @@ class SipAccountConfig {
         'dtmf': dtmf,
         'voicemail': voicemail,
         'recordCalls': recordCalls,
+        'dialPrefix': dialPrefix,
+        'plusReplace': plusReplace,
+        'headers': headers,
       };
 
   factory SipAccountConfig.fromJson(Map<String, dynamic> j, {String password = '', String turnPass = ''}) =>
@@ -163,7 +184,31 @@ class SipAccountConfig {
         dtmf: j['dtmf'] as String? ?? 'rfc4733',
         voicemail: j['voicemail'] as String? ?? '*97',
         recordCalls: j['recordCalls'] as bool? ?? true,
+        dialPrefix: j['dialPrefix'] as String? ?? '',
+        plusReplace: j['plusReplace'] as String? ?? '',
+        headers: j['headers'] as String? ?? '',
       );
+
+  /// The provisioning JSON (Medut-SDK account format) for sharing this
+  /// account as a QR code. Includes the password.
+  String toProvisioning() => jsonEncode({
+        'name': name,
+        'uri': aor,
+        'password': password,
+        'display_name': displayName,
+        'transport': transport,
+        if (serverUrl.isNotEmpty) 'server_url': serverUrl,
+        if (authUser.isNotEmpty) 'auth_user': authUser,
+        if (outboundProxy.isNotEmpty) 'outbound_proxy': outboundProxy,
+        'media_enc': switch (mediaEnc) { 'dtls' => 'dtls_srtp', 'sdes' => 'sdes', _ => 'none' },
+        'ice_enabled': ice,
+        if (stun.isNotEmpty) 'stun_server': stun,
+        if (turn.isNotEmpty) 'turn_server': turn,
+        if (turnUser.isNotEmpty) 'turn_user': turnUser,
+        if (turnPass.isNotEmpty) 'turn_pass': turnPass,
+        'audio_codecs': codecs,
+        'verify_tls': verifyTls,
+      });
 
   static String newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 

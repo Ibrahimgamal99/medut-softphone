@@ -48,6 +48,8 @@ dependencies:
   google_fonts: ^9.0.0
   just_audio: ^0.10.6
   audio_session: ^0.2.4
+  proximity_screen_lock: ^2.3.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

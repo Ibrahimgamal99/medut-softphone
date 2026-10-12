@@ -284,7 +284,8 @@ class CallActivity : Activity() {
         setControl("message", R.drawable.ic_message, s.label("message", "Message"), false)
 
         keypadHide.text = s.label("hide", "Hide")
-        setProximity(s.route == "earpiece" && (s.phase == "active" || s.phase == "outgoing"))
+        // Screen-off at the ear is driven from Dart (proximity_screen_lock), so it
+        // also works while the Flutter app is in front during a call.
     }
 
     private fun updateTimer() {

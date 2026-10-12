@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/accounts.dart';
 import '../core/providers.dart';
@@ -41,12 +42,15 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
   late final _turnUser = TextEditingController(text: _a.turnUser);
   late final _turnPass = TextEditingController(text: _a.turnPass);
   late final _voicemail = TextEditingController(text: _a.voicemail);
+  late final _prefix = TextEditingController(text: _a.dialPrefix);
+  late final _plus = TextEditingController(text: _a.plusReplace);
+  late final _headers = TextEditingController(text: _a.headers);
   bool _advanced = false;
   bool _showPass = false;
 
   @override
   void dispose() {
-    for (final c in [_name, _user, _pass, _domain, _port, _wsUrl, _authUser, _display, _proxy, _stun, _turn, _turnUser, _turnPass, _voicemail]) {
+    for (final c in [_name, _user, _pass, _domain, _port, _wsUrl, _authUser, _display, _proxy, _stun, _turn, _turnUser, _turnPass, _voicemail, _prefix, _plus, _headers]) {
       c.dispose();
     }
     super.dispose();
@@ -113,6 +117,9 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
       turnUser: _turnUser.text.trim(),
       turnPass: _turnPass.text,
       voicemail: _voicemail.text.trim().isEmpty ? '*97' : _voicemail.text.trim(),
+      dialPrefix: _prefix.text.trim(),
+      plusReplace: _plus.text.trim(),
+      headers: _headers.text.trim(),
       enabled: true,
     );
     await ref.read(accountsProvider).save(a);
@@ -120,6 +127,30 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
     // in the background needs notifications.
     await [Permission.microphone, Permission.notification].request();
     if (mounted) Navigator.pop(context);
+  }
+
+  /// Show the account as a provisioning QR, to set up another phone.
+  Future<void> _shareQr() async {
+    final t = context.t;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('shareAccount'.tr()),
+        content: SizedBox(
+          width: 260,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(8),
+              child: QrImageView(data: _a.copyWith(password: _pass.text).toProvisioning(), size: 240),
+            ),
+            const SizedBox(height: 10),
+            Text('shareAccountWarn'.tr(), style: TextStyle(fontSize: 12, color: t.danger)),
+          ]),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('close'.tr()))],
+      ),
+    );
   }
 
   Future<void> _delete() async {
@@ -155,6 +186,8 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
         title: Text(widget.existing == null ? 'addAccount'.tr() : 'editAccount'.tr(),
             style: const TextStyle(fontWeight: FontWeight.w700)),
         actions: [
+          if (widget.existing != null)
+            IconButton(tooltip: 'shareAccount'.tr(), icon: const Icon(Icons.qr_code_2), onPressed: _shareQr),
           if (widget.existing != null)
             IconButton(tooltip: 'deleteAccount'.tr(), icon: Icon(Icons.delete_outline, color: t.danger), onPressed: _delete),
         ],
@@ -310,6 +343,32 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
                     const SizedBox(width: 10),
                     Expanded(child: TextFormField(controller: _voicemail, decoration: InputDecoration(labelText: 'voicemail'.tr()))),
                   ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _prefix,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(labelText: 'dialPrefix'.tr(), hintText: '9'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _plus,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(labelText: 'plusReplace'.tr(), hintText: '00'),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _headers,
+                    minLines: 2,
+                    maxLines: 5,
+                    style: mono(context, size: 12, color: t.text),
+                    decoration: InputDecoration(labelText: 'customHeaders'.tr(), hintText: 'Privacy: id\nX-Department: sales'),
+                  ),
                   const SizedBox(height: 6),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,

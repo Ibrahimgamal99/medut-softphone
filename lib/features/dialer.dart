@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../core/db.dart';
 import '../core/providers.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
@@ -37,6 +38,47 @@ class DialerScreen extends ConsumerStatefulWidget {
 class _DialerScreenState extends ConsumerState<DialerScreen> {
   String _number = '';
   String? _accountId;
+  List<CallRecord> _recent = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+    ref.read(dbProvider).addListener(_loadRecent);
+  }
+
+  @override
+  void dispose() {
+    ref.read(dbProvider).removeListener(_loadRecent);
+    super.dispose();
+  }
+
+  Future<void> _loadRecent() async {
+    final r = await ref.read(dbProvider).calls(limit: 200);
+    if (mounted) setState(() => _recent = r);
+  }
+
+  /// Colleagues, contacts and recent numbers containing what is typed.
+  List<(String, String)> _suggestions(String q) {
+    if (q.length < 2) return const [];
+    final out = <String, String>{};
+    void add(String number, String name) {
+      if (out.length < 6 && number != q && !out.containsKey(number)) out[number] = name;
+    }
+
+    for (final w in ref.read(settingsProvider).watched) {
+      if (w.ext.contains(q)) add(w.ext, w.name);
+    }
+    for (final c in _recent) {
+      if (c.number.contains(q)) add(c.number, c.name);
+    }
+    for (final c in ref.read(contactsProvider).contacts) {
+      for (final n in c.numbers) {
+        if (n.replaceAll(RegExp(r'[^\d+]'), '').contains(q)) add(n, c.name);
+      }
+    }
+    return out.entries.map((e) => (e.key, e.value)).toList();
+  }
 
   static const _keys = [
     ('1', ''), ('2', 'ABC'), ('3', 'DEF'), ('4', 'GHI'), ('5', 'JKL'), ('6', 'MNO'),
@@ -181,6 +223,26 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
               ),
             ),
             const SizedBox(height: 6),
+            if (match == null && _suggestions(_number).isNotEmpty)
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    for (final (n, name) in _suggestions(_number))
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Pill(
+                          label: name.isEmpty ? n : '$name · $n',
+                          selected: false,
+                          onTap: () => setState(() => _number = n),
+                        ),
+                      ),
+                  ],
+                ),
+              )
+            else
             SizedBox(
               height: 34,
               child: match == null

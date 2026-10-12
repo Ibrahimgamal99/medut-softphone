@@ -272,6 +272,14 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
+              final s = ref.read(settingsProvider);
+              s.blocked = {...s.blocked, c.number};
+            },
+            child: Text('blockNumber'.tr(), style: TextStyle(color: t.danger)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
               if (c.id != null) ref.read(dbProvider).deleteCall(c.id!);
             },
             child: Text('deleteFromHistory'.tr(), style: TextStyle(color: t.danger)),

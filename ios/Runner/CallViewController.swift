@@ -97,10 +97,6 @@ final class CallViewController: UIViewController {
   }
 
 
-  override func viewWillDisappear(_ animated: Bool) {
-    super.viewWillDisappear(animated)
-    UIDevice.current.isProximityMonitoringEnabled = false
-  }
 
   deinit {
     timer?.invalidate()
@@ -188,8 +184,7 @@ final class CallViewController: UIViewController {
     }
     setControl("message", "message", s.label("message", "Message"), on: false)
     keypadHide.setTitle(s.label("hide", "Hide"), for: .normal)
-    // Screen off at the ear only when the sound comes out of the earpiece.
-    UIDevice.current.isProximityMonitoringEnabled = s.route == "earpiece" && keypad.isHidden
+    // Screen-off at the ear is driven from Dart (proximity_screen_lock).
   }
 
   private func updateTimer() {

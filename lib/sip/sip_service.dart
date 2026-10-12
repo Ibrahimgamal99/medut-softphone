@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:medut/medut.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:proximity_screen_lock/proximity_screen_lock.dart';
 
 import '../core/accounts.dart';
 import '../core/db.dart';
@@ -63,6 +64,11 @@ class ActiveCall {
   MediaStats? stats;
   String crypto = '';
 
+  /// Media path health: ok | reconnecting (network change, ICE restart) |
+  /// weak (media stalled, quality alert).
+  String link = 'ok';
+  Timer? autoAnswer;
+
   /// Set on the consult call of an attended transfer: the held call to hand over.
   ActiveCall? transferOf;
 
@@ -92,6 +98,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   ActiveCall? focused;
   final Map<String, PresenceStatus> presence = {};
   final List<String> sipLog = [];
+
+  /// Registration, network and SDK log lines for Settings → Connection log.
+  final List<String> connLog = [];
+  bool _proximityOn = false;
   final _notices = StreamController<String>.broadcast();
   Stream<String> get notices => _notices.stream;
 
@@ -148,6 +158,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       sdk.networkSetHandoverPolicy(true, false);
     } catch (_) {}
     sdk.events.listen(_onGlobalEvent);
+    _applyAudioPrefs();
     MedutPlatform.onAudioRoutesChanged = _refreshRoutes;
 
     await _applyRingtone();
@@ -162,7 +173,6 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   // Mobile tuning carried over from Echo.
   MedutConfig _medutConfig() => MedutConfig(
         userAgent: 'Medut/0.1 (${Platform.operatingSystem})',
-        regExpires: 300,
         iceGatheringTimeoutMs: 800,
         statsIntervalMs: 2000,
         mediaStallMs: 3000,
@@ -175,6 +185,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         opusExpectedLossPct: 10,
         // Fail a dead INVITE in 10 s, not RFC 3261's 32 s.
         sipTimerBMs: 10000,
+        regExpires: settings.regExpires,
+        keepaliveIntervalMs: settings.keepaliveSec * 1000,
+        logLevel: settings.debugLogging ? 2 : 1,
         // iOS: the app-owned VoiceProcessingIO engine arms when CallKit
         // activates the session, so media never starts before CallKit.
         appOwnedAudio: Platform.isIOS,
@@ -245,14 +258,34 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(_applyRingtone());
     _syncKeepAlive();
     _publishStatus();
+    _applyAudioPrefs();
+    _scheduleApply(); // network settings (ICE servers, relay) live on the accounts
+    _syncSubscriptions();
+    _push();
+  }
+
+  void _applyAudioPrefs() {
     final sdk = _sdk;
-    if (sdk != null) {
+    if (sdk == null) return;
+    try {
       sdk.setAecMode(AecMode.values[settings.aecMode.clamp(0, 2)]);
       sdk.setNs(settings.noiseSuppression);
       sdk.setAgc(settings.autoGain);
-    }
-    _syncSubscriptions();
-    _push();
+      sdk.setJitterBufferType(JitterBufferType.adaptive);
+      switch (settings.jitterMode) {
+        case 'low':
+          sdk.setJitterBuffer(20, 150);
+        case 'robust':
+          sdk.setJitterBuffer(60, 500);
+      }
+    } catch (_) {}
+  }
+
+  void _log(String line) {
+    final t = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    connLog.add('${two(t.hour)}:${two(t.minute)}:${two(t.second)}  $line');
+    if (connLog.length > 500) connLog.removeRange(0, connLog.length - 500);
   }
 
   // ── Accounts ──────────────────────────────────────────────────────────────
@@ -263,7 +296,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   String _signature(SipAccountConfig c) =>
-      '${c.toJson()}|${c.password}|${c.turnPass}|${c.push ? _pushProvider.name : ''}';
+      '${c.toJson()}|${c.password}|${c.turnPass}|${c.push ? _pushProvider.name : ''}'
+      '|${settings.iceServers}|${settings.forceRelay}';
 
   Future<void> applyAccounts() async {
     if (_sdk == null) return;
@@ -323,6 +357,11 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
           turnServer: opt(c.turn),
           turnUser: opt(c.turnUser),
           turnPass: opt(c.turnPass),
+          iceServers: [
+            for (final s in settings.iceServers)
+              if ((s['url'] ?? '').isNotEmpty) IceServer(s['url']!, user: opt(s['user'] ?? ''), pass: opt(s['pass'] ?? '')),
+          ],
+          iceTransportPolicy: settings.forceRelay ? IceTransportPolicy.relay : IceTransportPolicy.all,
           verifyTls: c.verifyTls,
           pushProvider: usePush ? _pushProvider : PushProvider.none,
           pushToken: usePush ? _pushToken : null,
@@ -335,6 +374,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         ),
       );
       rt.account = acct;
+      for (final line in c.headers.split('\n')) {
+        final i = line.indexOf(':');
+        if (i > 0) acct.addHeader(line.substring(0, i).trim(), line.substring(i + 1).trim());
+      }
       rt.sub = acct.events.listen((e) => _onAccountEvent(rt, e));
       acct.register();
     } catch (e) {
@@ -365,6 +408,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         };
         rt.error = e.errorStr ?? '';
         rt.retryInMs = e.retryDelayMs;
+        _log('${rt.cfg.label}: ${e.state.name}${rt.error.isNotEmpty ? ' — ${rt.error}' : ''}'
+            '${e.retryDelayMs > 0 ? ' (retry ${e.retryDelayMs ~/ 1000}s)' : ''}');
         final code = RegExp(r'\b([3-6]\d\d)\b').firstMatch(rt.error)?.group(1);
         rt.sipCode = int.tryParse(code ?? '') ?? 0;
         if (rt.status == RegStatus.registered) {
@@ -486,6 +531,29 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         final ac = _find(e.call);
         if (ac != null && ac.phase == Phase.held) _resume(ac);
         _notices.add('${tr('transferFailed')}: ${e.reason}');
+      case NetworkEvent():
+        _log('network ${e.stage.name}${e.localAddr.isNotEmpty ? ' ${e.localAddr}' : ''}');
+        final ac = e.call == null ? null : _find(e.call!);
+        if (ac != null) {
+          final link = switch (e.stage) {
+            NetworkStage.callMigrating || NetworkStage.callDeferred || NetworkStage.callIceStale => 'reconnecting',
+            NetworkStage.callMigrated || NetworkStage.callMigrateAccepted => 'ok',
+            NetworkStage.callMigrationFailed || NetworkStage.callIceFailed => 'weak',
+            _ => ac.link,
+          };
+          if (link != ac.link) {
+            ac.link = link;
+            _push();
+          }
+        }
+      case QualityAlertEvent():
+        final ac = _find(e.call);
+        if (ac != null && e.issue == QualityIssue.mediaStall) {
+          ac.link = e.recovering ? 'ok' : 'weak';
+          _push();
+        }
+      case LogEvent():
+        if (settings.debugLogging) _log(e.message.trim());
       case SipTraceEvent():
         sipLog.add('${e.direction == MediaDirection.tx ? '→' : '←'} ${e.transport} ${e.remoteAddr}\n${e.rawMessage}');
         if (sipLog.length > 400) sipLog.removeRange(0, sipLog.length - 400);
@@ -509,6 +577,11 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     final shown = (e.displayName ?? '').trim();
     final name = nameFor(number).isNotEmpty ? nameFor(number) : (shown == number ? '' : shown);
 
+    if (settings.blocked.contains(number)) {
+      e.call.reject(statusCode: 603, reason: 'Decline');
+      _log('blocked call from $number');
+      return;
+    }
     if (calls.length >= 2) {
       e.call.reject(statusCode: 486, reason: 'Busy Here');
       return;
@@ -545,6 +618,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     focused ??= ac;
     _push();
     notifyListeners();
+    // Auto-answer (not over another call). It still rings, so it can be declined.
+    if (settings.autoAnswer && focused == ac) {
+      ac.autoAnswer = Timer(Duration(seconds: settings.autoAnswerDelay), () {
+        if (ac.phase == Phase.incoming && calls.contains(ac)) answer(ac);
+      });
+    }
     if (Platform.isAndroid && _foreground && focused == ac) _bridge.openCallScreen();
   }
 
@@ -560,7 +639,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case CallState.established:
         Tones.stopRingback();
         final first = ac.answeredAt == null;
-        if (first) unawaited(_refreshRoutes());
+        if (first) unawaited(_initCallRoute());
         ac.answeredAt ??= DateTime.now();
         ac.phase = Phase.active;
         if (first && settings.recordingMode == 'always' && ac.runtime.cfg.recordCalls && !ac.recording) {
@@ -582,6 +661,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _finish(ActiveCall ac, {bool failed = false, String? reason}) async {
     calls.remove(ac);
+    ac.autoAnswer?.cancel();
     if (!calls.any((c) => c.phase == Phase.outgoing)) Tones.stopRingback();
     if (calls.isEmpty) {
       _routes = const [];
@@ -742,6 +822,21 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _push();
   }
 
+  /// When a call connects: a connected headset wins, otherwise the earpiece.
+  Future<void> _initCallRoute() async {
+    await _refreshRoutes();
+    if (_routes.isEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await _refreshRoutes();
+    }
+    final headset = _ofKind(AudioRouteKind.bluetooth) ?? _ofKind(AudioRouteKind.wired);
+    if (headset != null && !headset.isActive) {
+      await selectRoute(headset.id);
+    } else if (headset == null && _route == 'speaker') {
+      await setRoute('earpiece');
+    }
+  }
+
   AudioRoute? _ofKind(AudioRouteKind k) => _routes.where((r) => r.kind == k).firstOrNull;
 
   /// Off the loudspeaker means back to the best headset, not the earpiece:
@@ -846,6 +941,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     var s = input.trim().replaceFirst(RegExp(r'^sips?:'), '');
     if (s.contains('@')) return s;
     s = s.replaceAll(RegExp(r'[\s\-().]'), '');
+    if (s.startsWith('+') && cfg.plusReplace.isNotEmpty) s = cfg.plusReplace + s.substring(1);
+    // The line-out prefix is for outside numbers, not extensions or codes.
+    if (cfg.dialPrefix.isNotEmpty && RegExp(r'^\+?\d{7,}$').hasMatch(s)) s = cfg.dialPrefix + s;
     return cfg.port > 0 ? '$s@${cfg.domain}:${cfg.port}' : '$s@${cfg.domain}';
   }
 
@@ -941,7 +1039,27 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
 
   // ── Snapshot for the native screens ───────────────────────────────────────
 
-  void _push() => _bridge.callState(snapshot());
+  void _push() {
+    _bridge.callState(snapshot());
+    // Screen off at the ear, whichever screen is showing: a live call on the
+    // earpiece. Off for speaker, headsets, ringing and idle.
+    final live = calls.any((c) => c.phase != Phase.incoming);
+    unawaited(_setProximity(live && _route == 'earpiece'));
+  }
+
+  Future<void> _setProximity(bool on) async {
+    if (_proximityOn == on) return;
+    _proximityOn = on;
+    try {
+      if (on && !await ProximityScreenLock.isProximityLockSupported()) {
+        _proximityOn = false;
+        return;
+      }
+      await ProximityScreenLock.setActive(on);
+    } catch (_) {
+      _proximityOn = false;
+    }
+  }
 
   static const _labelKeys = [
     'incomingOn', 'incomingCall', 'answer', 'decline', 'busy', 'message', 'mute', 'unmute', 'keypad',
@@ -958,7 +1076,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     final f = focused ?? (calls.isEmpty ? null : calls.first);
     if (f == null) return {...base, 'phase': 'idle'};
     final other = calls.where((c) => c != f).firstOrNull;
-    final s = f.stats;
+    final s = settings.showCallQuality ? f.stats : null;
     final mos = s?.mosLq ?? 0;
     String fmt(double v, [int d = 0]) => v.toStringAsFixed(d);
     Map<String, Object?>? second;
@@ -981,8 +1099,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'status': switch (f.phase) {
         Phase.outgoing => f.remoteRinging ? tr('ringing') : tr('calling'),
         Phase.held => tr('onHold'),
-        // Shown while recording, so it is never silent that a call is recorded.
-        _ => f.recording ? tr('recordingNow') : '',
+        _ => f.link == 'reconnecting'
+            ? tr('reconnecting')
+            : f.link == 'weak'
+                ? tr('poorConnection')
+                // Shown while recording, so it is never silent that a call is recorded.
+                : (f.recording ? tr('recordingNow') : ''),
       },
       'canRecord': settings.recordingMode != 'off' || f.recording,
       'startedAt': f.answeredAt?.millisecondsSinceEpoch ?? 0,
@@ -1005,7 +1127,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'recording': f.recording,
       'silent': settings.effectiveStatus() == MyStatus.silent,
       'mos': s == null ? '' : 'MOS ${fmt(mos, 1)}',
-      'quality': s == null ? '' : (mos >= 4.0 ? 'good' : (mos >= 3.5 ? 'fair' : 'poor')),
+      'quality': s == null ? '' : (f.link != 'ok' || mos < 3.5 ? 'poor' : (mos >= 4.0 ? 'good' : 'fair')),
       'details': s == null
           ? <List<String>>[]
           : [

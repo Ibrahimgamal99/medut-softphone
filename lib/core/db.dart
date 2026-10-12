@@ -153,6 +153,11 @@ class LocalDb extends ChangeNotifier {
     return ((r.first['c'] as int?) ?? 0) > 0;
   }
 
+  Future<void> clearCalls() async {
+    await _db.delete('calls');
+    notifyListeners();
+  }
+
   Future<void> deleteCall(int id) async {
     await _db.delete('calls', where: 'id = ?', whereArgs: [id]);
     notifyListeners();
