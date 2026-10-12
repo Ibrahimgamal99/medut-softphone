@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medut_phone/core/accounts.dart';
+import 'package:medut_phone/core/db.dart';
 import 'package:medut_phone/core/settings.dart';
 import 'package:medut_phone/sip/quality.dart';
 import 'package:medut_phone/sip/sip_service.dart';
@@ -85,5 +86,28 @@ void main() {
       expect(callQualityLevel(mos: 3.8, rttMs: 40, jitterMs: 5, lossPct: 0), 3);
       expect(callQualityLevel(mos: 2.5), 1);
     });
+  });
+
+  group('call record', () {
+    final start = DateTime(2026, 10, 12, 10, 0, 0);
+    final rec = CallRecord(
+      accountId: 'a', accountName: 'Office', number: '204', name: 'Sara',
+      direction: CallDirection.outgoing, result: CallResult.answered,
+      startedAt: start, answeredAt: start.add(const Duration(seconds: 8)),
+      endedAt: start.add(const Duration(seconds: 128)), durationSec: 120,
+      mos: 4.2, mosMin: 3.9, mosRx: 4.1, rttMs: 60, jitterMs: 6, lossPct: 0.2, packetsLost: 3,
+      codec: 'opus', transport: 'TLS', encryption: 'AES_CM_128_HMAC_SHA1_80', icePath: 'host → host',
+      remoteMedia: '10.0.0.5:4000', callId: 'abc@pbx', remoteUri: 'sip:204@pbx', localUri: 'sip:201@pbx',
+      setupMs: 850, endReason: 'BYE', sipCode: 200, endedBy: 'local', recordingPath: '/rec/1.wav',
+    );
+
+    test('every field survives the database row', () {
+      final back = CallRecord.fromRow({...rec.toRow(), 'id': 1});
+      expect(back.toRow(), rec.toRow());
+      expect(back.ringSec, 8);
+      expect(back.totalSec, 128);
+    });
+
+    test('CSV row matches the header', () => expect(rec.toCsv().length, CallRecord.csvHeader.length));
   });
 }

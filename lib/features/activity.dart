@@ -231,8 +231,11 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (ctx) => SafeArea(
-      child: Padding(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
@@ -258,6 +261,8 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
             const SizedBox(height: 12),
             _RecordingPlayer(path: c.recordingPath),
           ],
+          const SizedBox(height: 8),
+          _CallInfoTable(c),
           const SizedBox(height: 16),
           Row(children: [
             Expanded(
@@ -298,6 +303,7 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
             child: Text('deleteFromHistory'.tr(), style: TextStyle(color: t.danger)),
           ),
         ]),
+        ),
       ),
     ),
   );
@@ -419,4 +425,60 @@ class _ConversationList extends ConsumerWidget {
       ),
     ]);
   }
+}
+
+/// Everything stored about a call, for troubleshooting with the PBX.
+class _CallInfoTable extends StatelessWidget {
+  const _CallInfoTable(this.c);
+  final CallRecord c;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    String time(DateTime? d) => d == null ? '—' : DateFormat.yMMMd().add_Hms().format(d);
+    String n(num? v, [int digits = 0, String unit = '']) => v == null ? '—' : '${v.toStringAsFixed(digits)}$unit';
+    final rows = <(String, String)>[
+      ('infoStarted'.tr(), time(c.startedAt)),
+      ('infoAnswered'.tr(), time(c.answeredAt)),
+      ('infoEnded'.tr(), time(c.endedAt)),
+      ('infoRing'.tr(), _duration(c.ringSec)),
+      ('infoTalk'.tr(), _duration(c.durationSec)),
+      ('infoTotal'.tr(), _duration(c.totalSec)),
+      ('infoEndedBy'.tr(), c.endedBy == 'local' ? 'endedByMe'.tr() : (c.endedBy.isEmpty ? '—' : 'endedByThem'.tr())),
+      ('infoReason'.tr(), [if (c.sipCode != null) '${c.sipCode}', if (c.endReason.isNotEmpty) c.endReason].join(' · ').ifEmpty('—')),
+      ('MOS', '${n(c.mos, 2)} (${'infoMin'.tr()} ${n(c.mosMin, 2)})'),
+      ('infoTheyHeard'.tr(), n(c.mosRx, 2)),
+      ('RTT', n(c.rttMs, 0, ' ms')),
+      ('Jitter', n(c.jitterMs, 0, ' ms')),
+      ('Loss', '${n(c.lossPct, 1, ' %')} · ${c.packetsLost ?? '—'} pkts'),
+      ('Codec', c.codec.ifEmpty('—')),
+      ('SRTP', c.encryption.ifEmpty('—')),
+      ('ICE', c.icePath.ifEmpty('—')),
+      ('RTP', c.remoteMedia.ifEmpty('—')),
+      ('infoTransport'.tr(), c.transport.ifEmpty('—')),
+      ('infoAccount'.tr(), c.accountName),
+      ('infoRemote'.tr(), c.remoteUri.ifEmpty(c.number)),
+      ('infoLocal'.tr(), c.localUri.ifEmpty('—')),
+      ('Call-ID', c.callId.ifEmpty('—')),
+      ('infoSetup'.tr(), n(c.setupMs, 0, ' ms')),
+      if (c.recordingPath.isNotEmpty) ('infoRecording'.tr(), c.recordingPath),
+    ];
+    return ECard(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Column(children: [
+        for (final (k, v) in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(width: 110, child: Text(k, style: TextStyle(fontSize: 12, color: t.text2))),
+              Expanded(child: SelectableText(v, style: mono(context, size: 11, color: t.text))),
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
+extension on String {
+  String ifEmpty(String other) => isEmpty ? other : this;
 }

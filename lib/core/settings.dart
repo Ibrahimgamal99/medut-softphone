@@ -158,6 +158,12 @@ class AppSettings extends ChangeNotifier {
   String get recordingMode => _s('recordingMode', 'manual');
   set recordingMode(String v) => _set('recordingMode', v);
 
+  /// shared (visible in the Files app) | private (inside the app) | custom
+  String get recordingDir => _s('recordingDir', 'shared');
+  set recordingDir(String v) => _set('recordingDir', v);
+  String get recordingCustomDir => _s('recordingCustomDir', '');
+  set recordingCustomDir(String v) => _set('recordingCustomDir', v);
+
   // Diagnostics
   bool get debugLogging => _b('debugLogging', false);
   set debugLogging(bool v) => _set('debugLogging', v);

@@ -10,7 +10,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../core/db.dart';
 import '../sip/native_bridge.dart';
+import '../sip/sip_service.dart';
 import '../sip/tones.dart';
 import '../ui/widgets.dart';
 
@@ -194,6 +196,26 @@ class SettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
+            title: Text('exportHistory'.tr()),
+            subtitle: Text('exportHistorySub'.tr()),
+            trailing: Icon(Icons.ios_share, color: t.text2),
+            onTap: () async {
+              final calls = await ref.read(dbProvider).calls(limit: 100000);
+              String cell(Object? v) {
+                final text = v?.toString() ?? '';
+                return text.contains(RegExp(r'[",\n]')) ? '"${text.replaceAll('"', '""')}"' : text;
+              }
+              final csv = [
+                CallRecord.csvHeader.join(','),
+                for (final c in calls) c.toCsv().map(cell).join(','),
+              ].join('\n');
+              final f = File('${(await getTemporaryDirectory()).path}/medut-calls-${DateTime.now().millisecondsSinceEpoch}.csv');
+              await f.writeAsString(csv);
+              await Share.shareXFiles([XFile(f.path)]);
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             title: Text('clearHistory'.tr(), style: TextStyle(color: t.danger)),
             onTap: () async {
               final ok = await showDialog<bool>(
@@ -289,6 +311,24 @@ class SettingsScreen extends ConsumerWidget {
                 DropdownMenuItem(value: 'always', child: Text('recAlways'.tr())),
               ],
               onChanged: (v) => s.recordingMode = v ?? 'manual',
+            ),
+          ),
+          FutureBuilder<Directory>(
+            future: SipService.recordingsDir(s),
+            builder: (_, snap) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('recordingsFolder'.tr()),
+              subtitle: Text(
+                '${switch (s.recordingDir) {
+                  'private' => 'folderPrivate'.tr(),
+                  'custom' => 'folderCustom'.tr(),
+                  _ => 'folderShared'.tr(),
+                }}\n${snap.data?.path ?? ''}',
+                style: TextStyle(fontSize: 12, color: t.text2),
+              ),
+              isThreeLine: true,
+              trailing: Icon(Icons.chevron_right, color: t.text2),
+              onTap: () => showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => const _RecordingFolderSheet()),
             ),
           ),
         ]),
@@ -682,6 +722,78 @@ class _AutoAnswerDelaySheetState extends ConsumerState<_AutoAnswerDelaySheet> {
             onChangeEnd: (v) => ref.read(settingsProvider).autoAnswerDelay = v.round(),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+/// Settings → Recording → Save recordings in.
+class _RecordingFolderSheet extends ConsumerWidget {
+  const _RecordingFolderSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+
+    Future<void> pickCustom() async {
+      final dir = await FilePicker.platform.getDirectoryPath();
+      if (dir == null) return;
+      // The recorder writes the file natively, so the folder must be
+      // writable as a plain path; test before switching to it.
+      try {
+        final probe = File('$dir/.medut-write-test');
+        await probe.writeAsString('ok');
+        await probe.delete();
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('folderNotWritable'.tr())));
+        }
+        return;
+      }
+      s.recordingCustomDir = dir;
+      s.recordingDir = 'custom';
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: RadioGroup<String>(
+          groupValue: s.recordingDir,
+          onChanged: (v) {
+            if (v == 'custom') {
+              pickCustom();
+            } else if (v != null) {
+              s.recordingDir = v;
+            }
+          },
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('recordingsFolder'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            RadioListTile<String>(
+              value: 'shared',
+              activeColor: t.accent,
+              title: Text('folderShared'.tr()),
+              subtitle: Text(Platform.isIOS ? 'folderSharedIos'.tr() : 'folderSharedAndroid'.tr()),
+            ),
+            RadioListTile<String>(
+              value: 'private',
+              activeColor: t.accent,
+              title: Text('folderPrivate'.tr()),
+              subtitle: Text('folderPrivateSub'.tr()),
+            ),
+            if (Platform.isAndroid)
+              RadioListTile<String>(
+                value: 'custom',
+                activeColor: t.accent,
+                title: Text('folderCustom'.tr()),
+                subtitle: Text(s.recordingCustomDir.isEmpty ? 'folderCustomSub'.tr() : s.recordingCustomDir),
+                secondary: TextButton(onPressed: pickCustom, child: Text('chooseFile'.tr())),
+              ),
+            const SizedBox(height: 6),
+            Text('folderNote'.tr(), style: TextStyle(fontSize: 12, color: t.text2)),
+          ]),
+        ),
       ),
     );
   }

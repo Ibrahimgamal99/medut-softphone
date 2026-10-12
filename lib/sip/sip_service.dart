@@ -69,6 +69,12 @@ class ActiveCall {
   /// weak (media stalled, quality alert).
   String link = 'ok';
 
+  /// SIP details, read while the call is up (they are gone once it ends).
+  CallInfo? info;
+
+  /// This phone hung up / declined (vs the other side or the network).
+  bool endedLocally = false;
+
   // Running sums for the call's average network figures (history grade).
   double rttSum = 0, jitterSum = 0, lossSum = 0;
   int samples = 0;
@@ -650,6 +656,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case CallState.established:
         Tones.stopRingback();
         final first = ac.answeredAt == null;
+        ac.info = ac.call.info() ?? ac.info;
         if (first) unawaited(_initCallRoute());
         ac.answeredAt ??= DateTime.now();
         ac.phase = Phase.active;
@@ -661,7 +668,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case CallState.ended:
       case CallState.cancelled:
       case CallState.failed:
-        _finish(ac, failed: e.state == CallState.failed, reason: e.reason);
+        _finish(ac, failed: e.state == CallState.failed, reason: e.reason, state: e.state);
         return;
       default:
         break;
@@ -670,7 +677,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> _finish(ActiveCall ac, {bool failed = false, String? reason}) async {
+  Future<void> _finish(ActiveCall ac, {bool failed = false, String? reason, CallState? state}) async {
+    try {
+      ac.info = ac.call.info() ?? ac.info; // last chance for the final SIP status
+    } catch (_) {}
     calls.remove(ac);
     ac.autoAnswer?.cancel();
     if (!calls.any((c) => c.phase == Phase.outgoing)) Tones.stopRingback();
@@ -693,6 +703,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         ? (answered ? CallResult.answered : (ac.userDeclined ? CallResult.declined : CallResult.missed))
         : (failed && !answered ? CallResult.failed : CallResult.answered);
     final s = ac.stats;
+    final info = ac.info;
+    final now = DateTime.now();
+    final sipCode = (info?.sipStatus ?? 0) > 0
+        ? info!.sipStatus
+        : int.tryParse(RegExp(r'\b([3-6]\d\d)\b').firstMatch(reason ?? '')?.group(1) ?? '');
+    final iceKind = s == null ? '' : '${s.iceLocalType.name} → ${s.iceRemoteType.name}';
     await db.addCall(CallRecord(
       accountId: ac.runtime.cfg.id,
       accountName: ac.runtime.cfg.label,
@@ -701,8 +717,23 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       direction: ac.direction,
       result: result,
       startedAt: ac.createdAt,
-      durationSec: answered ? DateTime.now().difference(ac.answeredAt!).inSeconds : 0,
+      answeredAt: ac.answeredAt,
+      endedAt: now,
+      durationSec: answered ? now.difference(ac.answeredAt!).inSeconds : 0,
       mos: s?.mosLqAvg ?? s?.mosLq,
+      mosMin: s == null || s.mosLqMin <= 0 ? null : s.mosLqMin,
+      mosRx: s == null || s.mosLqRx <= 0 ? null : s.mosLqRx,
+      packetsLost: s?.packetsLostRx,
+      encryption: ac.crypto.isNotEmpty ? ac.crypto : (ac.runtime.cfg.mediaEnc == 'none' ? 'none' : ac.runtime.cfg.mediaEnc),
+      icePath: iceKind,
+      remoteMedia: s?.remoteAddr ?? '',
+      callId: info?.callId.isNotEmpty == true ? info!.callId : ac.id,
+      remoteUri: info?.peerUri ?? '',
+      localUri: info?.localUri ?? '',
+      setupMs: info == null || info.setupDuration == Duration.zero ? null : info.setupDuration.inMilliseconds,
+      endReason: (reason ?? '').isNotEmpty ? reason! : (state?.name ?? ''),
+      sipCode: sipCode,
+      endedBy: ac.endedLocally || ac.userDeclined ? 'local' : 'remote',
       rttMs: ac.samples == 0 ? null : ac.rttSum / ac.samples,
       jitterMs: ac.samples == 0 ? null : ac.jitterSum / ac.samples,
       lossPct: ac.samples == 0 ? null : ac.lossSum / ac.samples,
@@ -778,6 +809,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void hangup(ActiveCall ac) {
+    ac.endedLocally = true;
     if (ac.phase == Phase.incoming) {
       decline(ac);
     } else {
@@ -937,7 +969,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       ac.call.recordStop();
       ac.recording = false;
     } else {
-      final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/recordings');
+      final dir = await recordingsDir(settings);
       await dir.create(recursive: true);
       final safe = ac.number.replaceAll(RegExp(r'[^\w+]'), '_');
       ac.recordingPath = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_$safe.wav';
@@ -945,6 +977,25 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     }
     _push();
     notifyListeners();
+  }
+
+  /// Where recordings go (Settings → Recording → Save recordings in):
+  /// shared — Android: the app folder under Android/data, seen in Files and
+  /// over USB; iOS: Documents/Recordings, seen in the Files app;
+  /// private — inside the app only; custom — an Android folder of your choice.
+  static Future<Directory> recordingsDir(AppSettings settings) async {
+    switch (settings.recordingDir) {
+      case 'custom' when settings.recordingCustomDir.isNotEmpty:
+        return Directory(settings.recordingCustomDir);
+      case 'private':
+        return Directory('${(await getApplicationSupportDirectory()).path}/recordings');
+      default:
+        if (Platform.isAndroid) {
+          final ext = await getExternalStorageDirectory();
+          if (ext != null) return Directory('${ext.path}/Recordings');
+        }
+        return Directory('${(await getApplicationDocumentsDirectory()).path}/Recordings');
+    }
   }
 
   // ── Placing calls and transfers ───────────────────────────────────────────
