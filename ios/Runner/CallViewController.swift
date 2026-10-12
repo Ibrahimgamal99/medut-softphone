@@ -186,6 +186,10 @@ final class CallViewController: UIViewController {
     setControl("record", "record.circle",
                s.recording ? s.label("stopRecord", "Stop rec") : s.label("record", "Record"),
                on: s.recording, danger: true)
+    if let (b, l) = controls["record"] {
+      b.isHidden = !s.canRecord
+      l.isHidden = !s.canRecord
+    }
     setControl("message", "message", s.label("message", "Message"), on: false)
     keypadHide.setTitle(s.label("hide", "Hide"), for: .normal)
   }

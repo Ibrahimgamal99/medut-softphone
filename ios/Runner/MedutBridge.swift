@@ -21,6 +21,7 @@ struct CallSnapshot {
   var route: String { raw["route"] as? String ?? "earpiece" }
   var bluetooth: Bool { raw["bluetooth"] as? Bool ?? false }
   var recording: Bool { raw["recording"] as? Bool ?? false }
+  var canRecord: Bool { raw["canRecord"] as? Bool ?? true }
   var mos: String { raw["mos"] as? String ?? "" }
   var quality: String { raw["quality"] as? String ?? "" }
   var dark: Bool { raw["dark"] as? Bool ?? false }

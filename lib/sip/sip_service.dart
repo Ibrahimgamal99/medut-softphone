@@ -529,8 +529,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case CallState.ringing:
         ac.remoteRinging = true;
       case CallState.established:
+        final first = ac.answeredAt == null;
         ac.answeredAt ??= DateTime.now();
         ac.phase = Phase.active;
+        if (first && settings.recordingMode == 'always' && ac.runtime.cfg.recordCalls && !ac.recording) {
+          toggleRecord(ac);
+        }
       case CallState.held:
         ac.phase = Phase.held;
       case CallState.ended:
@@ -705,6 +709,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> toggleRecord(ActiveCall ac) async {
+    if (!ac.recording && settings.recordingMode == 'off') return;
     if (ac.recording) {
       ac.call.recordStop();
       ac.recording = false;
@@ -862,8 +867,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'status': switch (f.phase) {
         Phase.outgoing => f.remoteRinging ? tr('ringing') : tr('calling'),
         Phase.held => tr('onHold'),
-        _ => '',
+        // Shown while recording, so it is never silent that a call is recorded.
+        _ => f.recording ? tr('recordingNow') : '',
       },
+      'canRecord': settings.recordingMode != 'off' || f.recording,
       'startedAt': f.answeredAt?.millisecondsSinceEpoch ?? 0,
       'outgoing': f.direction == CallDirection.outgoing,
       'muted': f.muted,

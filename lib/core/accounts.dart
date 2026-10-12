@@ -33,6 +33,7 @@ class SipAccountConfig {
     this.push = true,
     this.dtmf = 'rfc4733',
     this.voicemail = '*97',
+    this.recordCalls = true,
   });
 
   final String id, name, user, domain, password, transport;
@@ -46,6 +47,9 @@ class SipAccountConfig {
 
   /// What the voicemail button dials (PBX feature code, e.g. *97).
   final String voicemail;
+
+  /// Whether "Record every call" applies to this account.
+  final bool recordCalls;
 
   /// `user@domain[:port]`, as Medut-SDK expects the AOR.
   String get aor => port > 0 ? '$user@$domain:$port' : '$user@$domain';
@@ -75,6 +79,7 @@ class SipAccountConfig {
     bool? push,
     String? dtmf,
     String? voicemail,
+    bool? recordCalls,
   }) =>
       SipAccountConfig(
         id: id,
@@ -101,6 +106,7 @@ class SipAccountConfig {
         push: push ?? this.push,
         dtmf: dtmf ?? this.dtmf,
         voicemail: voicemail ?? this.voicemail,
+        recordCalls: recordCalls ?? this.recordCalls,
       );
 
   /// Everything except the password.
@@ -127,6 +133,7 @@ class SipAccountConfig {
         'push': push,
         'dtmf': dtmf,
         'voicemail': voicemail,
+        'recordCalls': recordCalls,
       };
 
   factory SipAccountConfig.fromJson(Map<String, dynamic> j, {String password = '', String turnPass = ''}) =>
@@ -155,6 +162,7 @@ class SipAccountConfig {
         push: j['push'] as bool? ?? true,
         dtmf: j['dtmf'] as String? ?? 'rfc4733',
         voicemail: j['voicemail'] as String? ?? '*97',
+        recordCalls: j['recordCalls'] as bool? ?? true,
       );
 
   static String newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);

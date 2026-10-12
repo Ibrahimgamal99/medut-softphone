@@ -28,6 +28,7 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val bluetooth: Boolean get() = raw["bluetooth"] == true
     val recording: Boolean get() = raw["recording"] == true
     val silent: Boolean get() = raw["silent"] == true
+    val canRecord: Boolean get() = raw["canRecord"] != false
     val mos: String get() = raw["mos"] as? String ?: ""
     val quality: String get() = raw["quality"] as? String ?: ""
     val dark: Boolean get() = raw["dark"] == true

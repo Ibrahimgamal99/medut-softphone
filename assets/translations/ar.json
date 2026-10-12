@@ -217,5 +217,16 @@
   "sendTo": "حوّل إلى {b}",
   "targetHint": "الاسم أو الرقم الداخلي أو عنوان SIP",
   "someone": "الطرف الآخر",
-  "addCallTitle": "إضافة مكالمة"
+  "addCallTitle": "إضافة مكالمة",
+  "recording": "التسجيل",
+  "callRecording": "تسجيل المكالمات",
+  "recOff": "متوقف",
+  "recManual": "يدوي",
+  "recAlways": "كل مكالمة",
+  "recOffSub": "زر التسجيل مخفي",
+  "recManualSub": "اضغط تسجيل أثناء المكالمة",
+  "recAlwaysSub": "تُسجَّل المكالمات عند الاتصال. تبقى التسجيلات على هذا الهاتف.",
+  "recordThisAccount": "تسجيل مكالمات هذا الحساب",
+  "recordThisAccountSub": "يُطبّق عند ضبط تسجيل المكالمات على كل مكالمة",
+  "recordingNow": "يتم تسجيل هذه المكالمة"
 }

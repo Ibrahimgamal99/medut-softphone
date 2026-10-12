@@ -175,6 +175,27 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => s.autoGain = v,
           ),
         ]),
+        section('recording'.tr(), [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('callRecording'.tr()),
+            subtitle: Text(switch (s.recordingMode) {
+              'off' => 'recOffSub'.tr(),
+              'always' => 'recAlwaysSub'.tr(),
+              _ => 'recManualSub'.tr(),
+            }),
+            trailing: DropdownButton<String>(
+              value: s.recordingMode,
+              underline: const SizedBox.shrink(),
+              items: [
+                DropdownMenuItem(value: 'off', child: Text('recOff'.tr())),
+                DropdownMenuItem(value: 'manual', child: Text('recManual'.tr())),
+                DropdownMenuItem(value: 'always', child: Text('recAlways'.tr())),
+              ],
+              onChanged: (v) => s.recordingMode = v ?? 'manual',
+            ),
+          ),
+        ]),
         section('diagnostics'.tr(), [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

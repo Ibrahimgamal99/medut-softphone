@@ -20,6 +20,9 @@ in the app.
   DTMF keypad, local WAV recording, two calls with swap, call waiting,
   blind transfer, attended transfer ("talk first" → Complete), and following a
   transfer the far end sends us (incoming REFER).
+- Call recording to a WAV file on the phone. Settings → Recording: Off (no
+  Record button), Manual (tap Record), or Every call (starts on connect, can
+  be turned off per account). The call screen says when a call is recorded.
 - Live call quality: MOS both ways, jitter, loss, RTT, codec, SRTP suite, ICE
   path, jitter buffer.
 - Team: your status (Available / Silent / Do not disturb) published with SIP

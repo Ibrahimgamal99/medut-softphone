@@ -325,6 +325,14 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
                     onChanged: (v) => setState(() => _a = _a.copyWith(push: v)),
                   ),
                 ],
+                if (ref.watch(settingsProvider).recordingMode == 'always')
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('recordThisAccount'.tr()),
+                    subtitle: Text('recordThisAccountSub'.tr()),
+                    value: _a.recordCalls,
+                    onChanged: (v) => setState(() => _a = _a.copyWith(recordCalls: v)),
+                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text('setDefault'.tr()),

@@ -276,6 +276,11 @@ class CallActivity : Activity() {
         setControl("record", R.drawable.ic_record,
             if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record"),
             s.recording, danger = true)
+        controls["record"]?.let { (img, t) ->
+            val v = if (s.canRecord) View.VISIBLE else View.INVISIBLE
+            img.visibility = v
+            t.visibility = v
+        }
         setControl("message", R.drawable.ic_message, s.label("message", "Message"), false)
 
         keypadHide.text = s.label("hide", "Hide")

@@ -115,6 +115,11 @@ class AppSettings extends ChangeNotifier {
   bool get autoGain => _b('agc', true);
   set autoGain(bool v) => _set('agc', v);
 
+  /// off: no Record button · manual: the button · always: every call on an
+  /// account with "Record calls" on starts recording once connected.
+  String get recordingMode => _s('recordingMode', 'manual');
+  set recordingMode(String v) => _set('recordingMode', v);
+
   // Diagnostics
   bool get traceSip => _b('traceSip', true);
   set traceSip(bool v) => _set('traceSip', v);

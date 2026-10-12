@@ -217,5 +217,16 @@
   "sendTo": "Send to {b}",
   "targetHint": "Name, extension or SIP address",
   "someone": "them",
-  "addCallTitle": "Add call"
+  "addCallTitle": "Add call",
+  "recording": "Recording",
+  "callRecording": "Call recording",
+  "recOff": "Off",
+  "recManual": "Manual",
+  "recAlways": "Every call",
+  "recOffSub": "The Record button is hidden",
+  "recManualSub": "Tap Record during a call",
+  "recAlwaysSub": "Calls are recorded once connected. Recordings stay on this phone.",
+  "recordThisAccount": "Record calls on this account",
+  "recordThisAccountSub": "Applies when Call recording is set to Every call",
+  "recordingNow": "This call is being recorded"
 }
