@@ -68,6 +68,10 @@ class ActiveCall {
   /// Media path health: ok | reconnecting (network change, ICE restart) |
   /// weak (media stalled, quality alert).
   String link = 'ok';
+
+  // Running sums for the call's average network figures (history grade).
+  double rttSum = 0, jitterSum = 0, lossSum = 0;
+  int samples = 0;
   Timer? autoAnswer;
 
   /// Set on the consult call of an attended transfer: the held call to hand over.
@@ -505,6 +509,12 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         final ac = _find(e.call);
         if (ac != null) {
           ac.stats = e.stats;
+          if (ac.phase == Phase.active || ac.phase == Phase.held) {
+            ac.rttSum += e.stats.rttMs;
+            ac.jitterSum += e.stats.jitterMs;
+            ac.lossSum += e.stats.lossPctRx;
+            ac.samples++;
+          }
           _push();
         }
       case SdpNegotiationEvent():
@@ -693,6 +703,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       startedAt: ac.createdAt,
       durationSec: answered ? DateTime.now().difference(ac.answeredAt!).inSeconds : 0,
       mos: s?.mosLqAvg ?? s?.mosLq,
+      rttMs: ac.samples == 0 ? null : ac.rttSum / ac.samples,
+      jitterMs: ac.samples == 0 ? null : ac.jitterSum / ac.samples,
+      lossPct: ac.samples == 0 ? null : ac.lossSum / ac.samples,
       codec: s?.codec ?? '',
       transport: ac.runtime.cfg.transport.toUpperCase(),
       recordingPath: ac.recordingPath,

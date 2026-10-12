@@ -19,6 +19,9 @@ class CallRecord {
     required this.startedAt,
     this.durationSec = 0,
     this.mos,
+    this.rttMs,
+    this.jitterMs,
+    this.lossPct,
     this.codec = '',
     this.transport = '',
     this.recordingPath = '',
@@ -31,7 +34,12 @@ class CallRecord {
   final DateTime startedAt;
   final int durationSec;
   final double? mos;
+
+  /// Averages over the call, for the quality grade in the history.
+  final double? rttMs, jitterMs, lossPct;
   final String codec, transport, recordingPath;
+
+  bool get hasQos => mos != null || rttMs != null || jitterMs != null || lossPct != null;
 
   String get title => name.isNotEmpty ? name : number;
 
@@ -45,6 +53,9 @@ class CallRecord {
         'started_at': startedAt.millisecondsSinceEpoch,
         'duration': durationSec,
         'mos': mos,
+        'rtt': rttMs,
+        'jitter': jitterMs,
+        'loss': lossPct,
         'codec': codec,
         'transport': transport,
         'recording': recordingPath,
@@ -61,6 +72,9 @@ class CallRecord {
         startedAt: DateTime.fromMillisecondsSinceEpoch(r['started_at'] as int? ?? 0),
         durationSec: r['duration'] as int? ?? 0,
         mos: (r['mos'] as num?)?.toDouble(),
+        rttMs: (r['rtt'] as num?)?.toDouble(),
+        jitterMs: (r['jitter'] as num?)?.toDouble(),
+        lossPct: (r['loss'] as num?)?.toDouble(),
         codec: r['codec'] as String? ?? '',
         transport: r['transport'] as String? ?? '',
         recordingPath: r['recording'] as String? ?? '',
@@ -111,12 +125,20 @@ class LocalDb extends ChangeNotifier {
   static Future<LocalDb> open() async {
     final db = await openDatabase(
       p.join(await getDatabasesPath(), 'medut.db'),
-      version: 1,
+      version: 2,
+      onUpgrade: (db, from, to) async {
+        if (from < 2) {
+          for (final c in ['rtt', 'jitter', 'loss']) {
+            await db.execute('ALTER TABLE calls ADD COLUMN $c REAL');
+          }
+        }
+      },
       onCreate: (db, _) async {
         await db.execute('''CREATE TABLE calls(
           id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT, account_name TEXT,
           number TEXT, name TEXT, direction TEXT, result TEXT, started_at INTEGER,
-          duration INTEGER, mos REAL, codec TEXT, transport TEXT, recording TEXT)''');
+          duration INTEGER, mos REAL, rtt REAL, jitter REAL, loss REAL,
+          codec TEXT, transport TEXT, recording TEXT)''');
         await db.execute('''CREATE TABLE messages(
           id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT, peer TEXT, body TEXT,
           outgoing INTEGER, at INTEGER, read INTEGER)''');

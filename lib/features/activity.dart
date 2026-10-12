@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../sip/quality.dart';
+
 import '../core/db.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
@@ -173,10 +175,11 @@ class _CallRow extends ConsumerWidget {
       },
       '${'via'.tr()} ${c.accountName}',
     ].join(' · ');
-    final poor = (c.mos ?? 5) < 3.5;
-    final tech = c.mos == null
+    final level = callQualityLevel(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct);
+    final poor = c.hasQos && level <= 2;
+    final tech = !c.hasQos
         ? ''
-        : 'MOS ${c.mos!.toStringAsFixed(1)} · ${c.codec} · ${c.transport}${poor ? ' · ${'poorLine'.tr()}' : ''}';
+        : '${c.mos != null ? 'MOS ${c.mos!.toStringAsFixed(1)} · ' : ''}${c.codec} · ${c.transport}${poor ? ' · ${'poorLine'.tr()}' : ''}';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -201,7 +204,13 @@ class _CallRow extends ConsumerWidget {
               if (tech.isNotEmpty) Text(tech, style: mono(context, color: poor ? t.warn : t.text2)),
             ]),
           ),
-          Text(DateFormat.Hm().format(c.startedAt), style: TextStyle(fontSize: 12, color: t.text2)),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(DateFormat.Hm().format(c.startedAt), style: TextStyle(fontSize: 12, color: t.text2)),
+            if (c.hasQos) ...[
+              const SizedBox(height: 6),
+              QualityBars(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct, barWidth: 3),
+            ],
+          ]),
           const SizedBox(width: 6),
           RoundIcon(
             icon: Icons.call,
@@ -236,10 +245,14 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
               ]),
             ),
           ]),
-          if (c.mos != null) ...[
-            const SizedBox(height: 12),
-            Text('MOS ${c.mos!.toStringAsFixed(2)} · ${c.codec} · ${c.transport} · ${_duration(c.durationSec)}',
-                style: mono(context, size: 12)),
+          if (c.hasQos) ...[
+            const SizedBox(height: 14),
+            ECard(
+              padding: const EdgeInsets.all(12),
+              child: QualityMetricsRow(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct),
+            ),
+            const SizedBox(height: 8),
+            Text('${c.codec} · ${c.transport} · ${_duration(c.durationSec)}', style: mono(context, size: 12)),
           ],
           if (c.recordingPath.isNotEmpty) ...[
             const SizedBox(height: 12),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:medut/medut.dart' show PresenceStatus;
 
 import '../core/theme.dart';
+import '../sip/quality.dart';
 import '../sip/sip_service.dart';
 
 String initials(String s) {
@@ -239,3 +240,80 @@ String presenceText(PresenceStatus? s) => switch (s) {
       PresenceStatus.closed => 'presenceClosed'.tr(),
       _ => 'presenceUnknown'.tr(),
     };
+
+/// Colour of a call quality grade (bars, word): green / amber / red / grey.
+Color qualityColor(Tokens t, int level) => switch (level) {
+      4 || 3 => t.success,
+      2 => t.warn,
+      1 => t.danger,
+      _ => t.grey,
+    };
+
+/// Echo's 3-bar Voice Quality Indicator for a finished or live call.
+class QualityBars extends StatelessWidget {
+  const QualityBars({super.key, this.mos, this.rttMs, this.jitterMs, this.lossPct, this.barWidth = 4});
+  final double? mos, rttMs, jitterMs, lossPct;
+  final double barWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final level = callQualityLevel(mos: mos, rttMs: rttMs, jitterMs: jitterMs, lossPct: lossPct);
+    final color = qualityColor(t, level);
+    final lit = level > 3 ? 3 : level;
+    return Semantics(
+      label: qualityWordKey(level).tr(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(3, (i) {
+          return Container(
+            margin: EdgeInsets.symmetric(horizontal: barWidth * 0.35),
+            width: barWidth,
+            height: barWidth * 1.75 + i * barWidth * 1.25,
+            decoration: BoxDecoration(
+              color: i < lit ? color : t.text2.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(barWidth / 2),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// Call detail row: the bars, then MOS / RTT / jitter / loss, each green when
+/// it meets its target and red when it does not (as in Echo).
+class QualityMetricsRow extends StatelessWidget {
+  const QualityMetricsRow({super.key, this.mos, this.rttMs, this.jitterMs, this.lossPct});
+  final double? mos, rttMs, jitterMs, lossPct;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    Widget chip(String label, String value, bool ok) => Expanded(
+          child: Column(children: [
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: ok ? t.success : t.danger,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                )),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: t.text2, fontSize: 11)),
+          ]),
+        );
+    String fmt(double? v, String unit, {int digits = 0}) => v == null ? '—' : '${v.toStringAsFixed(digits)}$unit';
+    return Row(children: [
+      QualityBars(mos: mos, rttMs: rttMs, jitterMs: jitterMs, lossPct: lossPct),
+      const SizedBox(width: 16),
+      chip('MOS', mos?.toStringAsFixed(1) ?? '—', mos == null || callQualityLevel(mos: mos) >= 3),
+      chip('RTT', fmt(rttMs, ' ms'), (rttMs ?? 0) < 150),
+      chip('Jitter', fmt(jitterMs, ' ms'), (jitterMs ?? 0) < 20),
+      chip('Loss', fmt(lossPct, '%', digits: 1), (lossPct ?? 0) < 1),
+    ]);
+  }
+}
