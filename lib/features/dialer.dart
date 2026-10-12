@@ -58,26 +58,57 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
     if (mounted) setState(() => _recent = r);
   }
 
-  /// Colleagues, contacts and recent numbers containing what is typed.
-  List<(String, String)> _suggestions(String q) {
-    if (q.length < 2) return const [];
-    final out = <String, String>{};
-    void add(String number, String name) {
-      if (out.length < 6 && number != q && !out.containsKey(number)) out[number] = name;
+  // Memoized: build() re-runs for reasons unrelated to the query (status
+  // ticks, presence), so only rescan when the query or the lists change.
+  String? _matchSig;
+  List<_Match> _matchCache = const [];
+
+  /// Echo-style live matches while dialing: colleagues (extensions), the
+  /// phone's contacts and recent numbers whose NUMBER contains the typed
+  /// digits. When the list is long each source keeps a fair share.
+  List<_Match> _matches(String query) {
+    final digits = query.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return const [];
+    final watched = ref.read(settingsProvider).watched;
+    final contacts = ref.read(contactsProvider).contacts;
+    final sig = '$digits|${watched.length}|${contacts.length}|${_recent.length}';
+    if (sig == _matchSig) return _matchCache;
+
+    final seen = <String>{};
+    final team = <_Match>[], phone = <_Match>[], recent = <_Match>[];
+    bool hit(String n) => n.replaceAll(RegExp(r'\D'), '').contains(digits);
+    void add(List<_Match> l, String name, String number, _Source src) {
+      final key = number.replaceAll(RegExp(r'[^\d+]'), '');
+      if (key.isEmpty || l.length >= 30 || !seen.add(key)) return;
+      l.add(_Match(name: name, number: number, source: src));
     }
 
-    for (final w in ref.read(settingsProvider).watched) {
-      if (w.ext.contains(q)) add(w.ext, w.name);
+    for (final w in watched) {
+      if (hit(w.ext)) add(team, w.name, w.ext, _Source.team);
     }
-    for (final c in _recent) {
-      if (c.number.contains(q)) add(c.number, c.name);
-    }
-    for (final c in ref.read(contactsProvider).contacts) {
+    for (final c in contacts) {
       for (final n in c.numbers) {
-        if (n.replaceAll(RegExp(r'[^\d+]'), '').contains(q)) add(n, c.name);
+        if (hit(n)) add(phone, c.name, n, _Source.contact);
       }
     }
-    return out.entries.map((e) => (e.key, e.value)).toList();
+    for (final c in _recent) {
+      if (hit(c.number)) add(recent, c.name, c.number, _Source.recent);
+    }
+
+    const maxTotal = 40;
+    final groups = [team, phone, recent].where((g) => g.isNotEmpty).toList();
+    final out = <_Match>[];
+    if (groups.length > 1) {
+      final share = maxTotal ~/ groups.length;
+      for (final g in groups) {
+        out.addAll(g.take(share));
+      }
+    } else if (groups.isNotEmpty) {
+      out.addAll(groups.first.take(maxTotal));
+    }
+    _matchSig = sig;
+    _matchCache = out;
+    return out;
   }
 
   static const _keys = [
@@ -121,6 +152,8 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
     final rt = selected == null ? null : sip.runtimes[selected.id];
     final status = settings.effectiveStatus();
     final match = _matchFor(_number);
+    ref.watch(contactsProvider); // contacts join the matches once loaded
+    final matches = _number.isEmpty ? const <_Match>[] : _matches(_number);
 
     return Column(children: [
       // Header: your status, the account and its live state, voicemail.
@@ -207,12 +240,25 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                 ),
               ),
       ),
-      // Number + who it is.
+      // Matches (Echo style) above the number, then the number itself.
       Expanded(
         child: GestureDetector(
           onLongPress: _paste,
           behavior: HitTestBehavior.opaque,
-          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+          child: Column(children: [
+            Expanded(
+              child: matches.isEmpty
+                  ? const SizedBox.shrink()
+                  : _MatchList(
+                      matches: matches,
+                      query: _number.replaceAll(RegExp(r'\D'), ''),
+                      onFill: (n) => setState(() => _number = n),
+                      onCall: (m) async {
+                        await placeCall(context, ref, m.number, accountId: _accountId, name: m.name);
+                        if (mounted) setState(() => _number = '');
+                      },
+                    ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: FittedBox(
@@ -222,42 +268,19 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                     style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w600, letterSpacing: 1)),
               ),
             ),
-            const SizedBox(height: 6),
-            if (match == null && _suggestions(_number).isNotEmpty)
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    for (final (n, name) in _suggestions(_number))
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 8),
-                        child: Pill(
-                          label: name.isEmpty ? n : '$name · $n',
-                          selected: false,
-                          onTap: () => setState(() => _number = n),
-                        ),
-                      ),
-                  ],
-                ),
-              )
-            else
+            const SizedBox(height: 4),
             SizedBox(
-              height: 34,
-              child: match == null
-                  ? Text('dialHint'.tr(), style: TextStyle(fontSize: 13, color: t.text2))
-                  : Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                          color: t.surface, border: Border.all(color: t.border), borderRadius: BorderRadius.circular(16)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        if (match.$2 != null) ...[Dot(match.$2!), const SizedBox(width: 8)],
-                        Text(match.$1, style: TextStyle(fontSize: 13, color: t.text2)),
-                      ]),
-                    ),
+              height: 30,
+              child: match != null
+                  ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      if (match.$2 != null) ...[Dot(match.$2!), const SizedBox(width: 8)],
+                      Text(match.$1, style: TextStyle(fontSize: 13, color: t.text2)),
+                    ])
+                  : (_number.isEmpty
+                      ? Text('dialHint'.tr(), style: TextStyle(fontSize: 13, color: t.text2))
+                      : const SizedBox.shrink()),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
           ]),
         ),
       ),
@@ -370,5 +393,108 @@ class _Key extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+enum _Source { team, contact, recent }
+
+class _Match {
+  const _Match({required this.name, required this.number, required this.source});
+  final String name, number;
+  final _Source source;
+}
+
+/// Samsung / Echo-style list: tap a row to put its number in the field, tap
+/// the green handset to call it. The typed digits are highlighted.
+class _MatchList extends ConsumerWidget {
+  const _MatchList({required this.matches, required this.query, required this.onFill, required this.onCall});
+  final List<_Match> matches;
+  final String query;
+  final ValueChanged<String> onFill;
+  final ValueChanged<_Match> onCall;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final presence = ref.watch(sipProvider).presence;
+    return ListView.builder(
+      reverse: true, // closest to the number = best match
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      itemCount: matches.length,
+      itemBuilder: (_, i) {
+        final m = matches[i];
+        final label = m.name.isNotEmpty ? m.name : m.number;
+        final (tint, icon) = switch (m.source) {
+          _Source.team => (t.accent, Icons.badge_outlined),
+          _Source.contact => (t.success, null),
+          _Source.recent => (t.text2, Icons.history),
+        };
+        return InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => onFill(m.number),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(children: [
+              Stack(clipBehavior: Clip.none, children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: tint.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+                  child: icon != null
+                      ? Icon(icon, size: 18, color: tint)
+                      : Text(label.characters.first.toUpperCase(), style: TextStyle(color: tint, fontWeight: FontWeight.w700)),
+                ),
+                if (m.source == _Source.team)
+                  PositionedDirectional(
+                    end: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: presenceColor(t, presence[m.number]),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: t.bg, width: 2),
+                      ),
+                    ),
+                  ),
+              ]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (m.name.isNotEmpty) _highlight(context, m.number),
+                ]),
+              ),
+              IconButton(
+                tooltip: 'call'.tr(),
+                icon: Icon(Icons.call, size: 20, color: t.success),
+                onPressed: () => onCall(m),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  /// The number with the typed digits in bold.
+  Widget _highlight(BuildContext context, String number) {
+    final t = context.t;
+    final base = mono(context, size: 12);
+    final digitsOnly = number.replaceAll(RegExp(r'\D'), '');
+    final start = digitsOnly.indexOf(query);
+    if (query.isEmpty || start < 0) return Text(number, style: base);
+    // Map digit positions back onto the formatted number.
+    final spans = <TextSpan>[];
+    var d = 0;
+    for (final ch in number.characters) {
+      final isDigit = RegExp(r'\d').hasMatch(ch);
+      final on = isDigit && d >= start && d < start + query.length;
+      spans.add(TextSpan(text: ch, style: on ? base.copyWith(color: t.accent, fontWeight: FontWeight.w700) : base));
+      if (isDigit) d++;
+    }
+    return Text.rich(TextSpan(children: spans), textDirection: ui.TextDirection.ltr);
   }
 }
