@@ -71,15 +71,29 @@ object NativeBridge {
                         )
                         result.success(null)
                     }
-                    "missedCall" -> {
+                    "missedCalls" -> {
                         CallNotifications.showMissed(
                             appContext,
-                            call.argument<String>("name") ?: "",
-                            call.argument<String>("number") ?: "",
+                            call.argument<Int>("count") ?: 1,
+                            call.argument<String>("latest") ?: "",
                             call.argument<String>("title") ?: "Missed call",
                         )
                         result.success(null)
                     }
+                    "clearMissed" -> {
+                        CallNotifications.cancelMissed(appContext)
+                        result.success(null)
+                    }
+                    "messageNotification" -> {
+                        CallNotifications.showMessage(
+                            appContext,
+                            call.argument<String>("peer") ?: "",
+                            call.argument<String>("title") ?: "",
+                            call.argument<String>("body") ?: "",
+                        )
+                        result.success(null)
+                    }
+                    "setRingtone" -> result.success(null) // Android: sent in each call snapshot
                     "isBatteryExempt" -> result.success(isBatteryExempt())
                     "requestBatteryExemption" -> {
                         requestBatteryExemption()

@@ -20,6 +20,14 @@ in the app.
   DTMF keypad, local WAV recording, two calls with swap, call waiting,
   blind transfer, attended transfer ("talk first" → Complete), and following a
   transfer the far end sends us (incoming REFER).
+- Ringing like Echo: pick the phone's ringtone, Medut's own tones or a file
+  of your own (preview in Settings), vibrate on/off, ringback tone while the
+  far end rings. Android rings through Do not disturb; iOS CallKit rings with
+  the chosen tone. One "N missed calls" pop-up, message pop-ups, and a green
+  ongoing-call card with Mute and Speaker.
+- Speaker and headsets like Echo: one tap toggles the speaker (back to the
+  Bluetooth / wired headset when there is one), a picker with the device
+  names when a headset is connected; routes go through the SDK and Telecom.
 - Call recording to a WAV file on the phone. Settings → Recording: Off (no
   Record button), Manual (tap Record), or Every call (starts on connect, can
   be turned off per account). The call screen says when a call is recorded.

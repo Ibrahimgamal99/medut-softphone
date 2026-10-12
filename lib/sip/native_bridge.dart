@@ -73,8 +73,17 @@ class NativeBridge {
   Future<void> keepAlive({required bool enabled, required String title, required String text}) =>
       _invoke('keepAlive', {'enabled': enabled, 'title': title, 'text': text});
 
-  Future<void> missedCall({required String name, required String number, required String title}) =>
-      _invoke('missedCall', {'name': name, 'number': number, 'title': title});
+  /// One "N missed calls" notification, replaced on every new miss.
+  Future<void> missedCalls({required int count, required String latest, required String title}) =>
+      _invoke('missedCalls', {'count': count, 'latest': latest, 'title': title});
+
+  Future<void> clearMissed() => _invoke('clearMissed');
+
+  Future<void> messageNotification({required String peer, required String title, required String body}) =>
+      _invoke('messageNotification', {'peer': peer, 'title': title, 'body': body});
+
+  /// iOS: the sound CallKit rings with (a file path, or null for the default).
+  Future<void> setRingtone(String? path) => _invoke('setRingtone', {'path': path});
 
   /// True when native took the route change (Android Telecom call up).
   Future<bool> setRoute(String route) async => await _invoke<bool>('setRoute', {'route': route}) ?? false;

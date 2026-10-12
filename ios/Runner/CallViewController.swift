@@ -96,10 +96,6 @@ final class CallViewController: UIViewController {
     timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateTimer() }
   }
 
-  override func viewWillAppear(_ animated: Bool) {
-    super.viewWillAppear(animated)
-    UIDevice.current.isProximityMonitoringEnabled = true
-  }
 
   override func viewWillDisappear(_ animated: Bool) {
     super.viewWillDisappear(animated)
@@ -192,6 +188,8 @@ final class CallViewController: UIViewController {
     }
     setControl("message", "message", s.label("message", "Message"), on: false)
     keypadHide.setTitle(s.label("hide", "Hide"), for: .normal)
+    // Screen off at the ear only when the sound comes out of the earpiece.
+    UIDevice.current.isProximityMonitoringEnabled = s.route == "earpiece" && keypad.isHidden
   }
 
   private func updateTimer() {
@@ -246,15 +244,18 @@ final class CallViewController: UIViewController {
   }
 
   private func chooseRoute(_ s: CallSnapshot) {
-    guard s.bluetooth else {
-      MedutBridge.shared.action("route", extra: ["route": s.route == "speaker" ? "earpiece" : "speaker"])
+    // One tap toggles the speaker; with a headset connected, pick the output.
+    guard s.bluetooth, !s.routes.isEmpty else {
+      MedutBridge.shared.action("toggleSpeaker")
       return
     }
     let sheet = UIAlertController(title: s.label("audioOutput", "Audio output"), message: nil, preferredStyle: .actionSheet)
-    for (id, name) in [("earpiece", s.label("earpiece", "iPhone")), ("speaker", s.label("speaker", "Speaker")),
-                       ("bluetooth", s.label("bluetooth", "Bluetooth"))] {
-      sheet.addAction(UIAlertAction(title: (id == s.route ? "✓ " : "") + name, style: .default) { _ in
-        MedutBridge.shared.action("route", extra: ["route": id])
+    for r in s.routes {
+      let id = r["id"] as? String ?? ""
+      let name = r["name"] as? String ?? id
+      let active = (r["kind"] as? String) == s.route
+      sheet.addAction(UIAlertAction(title: (active ? "✓ " : "") + name, style: .default) { _ in
+        MedutBridge.shared.action("route", extra: ["routeId": id])
       })
     }
     sheet.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))

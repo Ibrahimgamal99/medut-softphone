@@ -31,6 +31,8 @@ struct CallSnapshot {
     (raw["details"] as? [[Any]])?.map { $0.map { "\($0)" } } ?? []
   }
   var second: [String: Any]? { raw["second"] as? [String: Any] }
+  /// Outputs offered during the call: [{id, kind, name}].
+  var routes: [[String: Any]] { raw["routes"] as? [[String: Any]] ?? [] }
 
   var title: String { name.isEmpty ? number : name }
   var isLive: Bool { phase != "idle" && phase != "ended" }
@@ -78,10 +80,19 @@ final class MedutBridge {
       result(nil)
     case "pushToken":
       result(CallKitManager.shared.pushTokenInfo)
-    case "missedCall":
-      showMissed(title: args["title"] as? String ?? "Missed call",
-                 body: (args["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                   ?? (args["number"] as? String ?? ""))
+    case "missedCalls":
+      notify(id: "medut.missed", title: args["title"] as? String ?? "Missed call",
+             body: args["latest"] as? String ?? "", badge: args["count"] as? Int)
+      result(nil)
+    case "clearMissed":
+      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["medut.missed"])
+      result(nil)
+    case "messageNotification":
+      let peer = args["peer"] as? String ?? ""
+      notify(id: "medut.msg.\(peer)", title: args["title"] as? String ?? peer, body: args["body"] as? String ?? "")
+      result(nil)
+    case "setRingtone":
+      CallKitManager.shared.setRingtone(path: args["path"] as? String)
       result(nil)
     case "keepAlive", "requestBatteryExemption", "openFullScreenIntentSettings":
       result(nil)  // Android only
@@ -142,7 +153,9 @@ final class MedutBridge {
     for (m, a) in items { ch.invokeMethod(m, arguments: a) }
   }
 
-  private func showMissed(title: String, body: String) {
+  /// A pop-up notification; the same [id] replaces the previous one
+  /// (one "N missed calls", one per conversation).
+  private func notify(id: String, title: String, body: String, badge: Int? = nil) {
     let center = UNUserNotificationCenter.current()
     center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
       guard granted else { return }
@@ -150,7 +163,8 @@ final class MedutBridge {
       content.title = title
       content.body = body
       content.sound = .default
-      center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+      if let badge = badge { content.badge = NSNumber(value: badge) }
+      center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
   }
 }

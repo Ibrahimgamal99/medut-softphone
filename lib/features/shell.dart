@@ -68,8 +68,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           if (route == 'reply') sip.decline(call, code: 486);
           Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(peer: call.number, title: call.title)));
         }
+      case final r when r.startsWith('chat:'):
+        final peer = r.substring(5);
+        final name = sip.nameFor(peer);
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(peer: peer, title: name.isNotEmpty ? name : peer)));
       case 'activity':
         setState(() => _tab = 1);
+        ref.read(settingsProvider).activitySeenAt = DateTime.now();
+        sip.missedSeen();
     }
   }
 
@@ -96,7 +102,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         index: _tab,
         onTap: (i) {
           setState(() => _tab = i);
-          if (i == 1) ref.read(settingsProvider).activitySeenAt = DateTime.now();
+          if (i == 1) {
+            ref.read(settingsProvider).activitySeenAt = DateTime.now();
+            ref.read(sipProvider).missedSeen();
+          }
         },
         tokens: t,
       ),

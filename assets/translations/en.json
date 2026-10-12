@@ -36,7 +36,7 @@
   "callDetails": "Call details",
   "audioOutput": "Audio output",
   "complete": "Complete",
-  "ringing": "Ringing…",
+  "ringing": "Ringing",
   "calling": "Calling…",
   "keepAliveConnecting": "Connecting your accounts…",
   "keepAliveOn": "Ready for calls · {n} connected",
@@ -228,5 +228,16 @@
   "recAlwaysSub": "Calls are recorded once connected. Recordings stay on this phone.",
   "recordThisAccount": "Record calls on this account",
   "recordThisAccountSub": "Applies when Call recording is set to Every call",
-  "recordingNow": "This call is being recorded"
+  "recordingNow": "This call is being recorded",
+  "ringtone": "Ringtone",
+  "ringSystem": "Phone ringtone",
+  "ringClassic": "Classic bell",
+  "ringSoft": "Soft",
+  "ringCustom": "My own file",
+  "chooseFile": "Choose",
+  "vibrate": "Vibrate",
+  "ringbackTone": "Ringback tone",
+  "ringbackSub": "Hear ringing while the other side's phone rings",
+  "missedCalls": "{n} missed calls",
+  "wired": "Headset"
 }

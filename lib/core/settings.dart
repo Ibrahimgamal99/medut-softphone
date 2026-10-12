@@ -107,6 +107,17 @@ class AppSettings extends ChangeNotifier {
     return (inDay && inHours) ? status : MyStatus.dnd;
   }
 
+  // Ringing
+  /// system (the phone's own ringtone) | classic | soft | custom
+  String get ringtoneId => _s('ringtone', 'system');
+  set ringtoneId(String v) => _set('ringtone', v);
+  String get customRingtonePath => _s('customRingtone', '');
+  set customRingtonePath(String v) => _set('customRingtone', v);
+  bool get vibrate => _b('vibrate', true);
+  set vibrate(bool v) => _set('vibrate', v);
+  bool get ringback => _b('ringback', true);
+  set ringback(bool v) => _set('ringback', v);
+
   // Audio
   int get aecMode => _prefs.getInt('aecMode') ?? 2; // 0 off, 1 suppressor, 2 webrtc
   set aecMode(int v) => _set('aecMode', v);

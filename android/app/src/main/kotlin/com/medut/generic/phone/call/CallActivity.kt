@@ -335,21 +335,19 @@ class CallActivity : Activity() {
         }
     }
 
+    /** One tap toggles the speaker; with a headset connected, pick the output. */
     private fun chooseRoute(s: CallSnapshot) {
-        if (!s.bluetooth) {
-            NativeBridge.action("route", mapOf("route" to if (s.route == "speaker") "earpiece" else "speaker"))
+        val routes = s.routes
+        if (!s.bluetooth || routes.isEmpty()) {
+            NativeBridge.action("toggleSpeaker")
             return
         }
-        val ids = arrayOf("earpiece", "speaker", "bluetooth")
-        val names = arrayOf(
-            s.label("earpiece", "Phone"),
-            s.label("speaker", "Speaker"),
-            s.label("bluetooth", "Bluetooth"),
-        )
+        val names = routes.map { it["name"] as? String ?: "" }.toTypedArray()
+        val current = routes.indexOfFirst { it["kind"] == s.route }.coerceAtLeast(0)
         AlertDialog.Builder(this)
             .setTitle(s.label("audioOutput", "Audio output"))
-            .setSingleChoiceItems(names, ids.indexOf(s.route).coerceAtLeast(0)) { d, which ->
-                NativeBridge.action("route", mapOf("route" to ids[which]))
+            .setSingleChoiceItems(names, current) { d, which ->
+                NativeBridge.action("route", mapOf("routeId" to routes[which]["id"]))
                 d.dismiss()
             }
             .show()

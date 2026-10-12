@@ -11,6 +11,7 @@ import '../core/accounts.dart';
 import '../core/db.dart';
 import '../core/settings.dart';
 import 'native_bridge.dart';
+import 'tones.dart';
 
 enum RegStatus { off, registering, registered, reconnecting, failed }
 
@@ -98,8 +99,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   PushProvider _pushProvider = PushProvider.none;
   bool _foreground = true;
   bool _started = false;
+  /// Audio outputs the platform offers during a call, and the active one.
+  List<AudioRoute> _routes = const [];
   String _route = 'earpiece';
-  bool _bluetooth = false;
+  String _ringtoneSource = 'system';
   Timer? _statusTimer;
   Timer? _applyDebounce;
   final Set<String> _subscribed = {};
@@ -120,9 +123,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _bridge.voipPushes.listen((_) => _reRegisterAll());
     _bridge.pushTokens.listen((t) => _setPushToken(t?['token'] as String?, _provider(t?['provider'] as String?)));
     _bridge.audioRoutes.listen((r) {
+      // Telecom moved the audio (headset plugged in, car, watch): re-read it.
       _route = r['route'] as String? ?? _route;
-      _bluetooth = r['bluetooth'] == true;
-      _push();
+      unawaited(_refreshRoutes());
     });
     await _bridge.ready();
 
@@ -139,9 +142,15 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       sdk = await Medut.start(config: _medutConfig(), manageAudioSession: !Platform.isIOS, reattachIfRunning: false);
     }
     _sdk = sdk;
+    // On a network change, move calls to the new path (re-INVITE) and never
+    // hang up because the move failed.
+    try {
+      sdk.networkSetHandoverPolicy(true, false);
+    } catch (_) {}
     sdk.events.listen(_onGlobalEvent);
     MedutPlatform.onAudioRoutesChanged = _refreshRoutes;
 
+    await _applyRingtone();
     await applyAccounts();
     store.addListener(_scheduleApply);
     settings.addListener(_onSettings);
@@ -150,10 +159,25 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _push();
   }
 
+  // Mobile tuning carried over from Echo.
   MedutConfig _medutConfig() => MedutConfig(
         userAgent: 'Medut/0.1 (${Platform.operatingSystem})',
-        statsIntervalMs: 3000,
+        regExpires: 300,
+        iceGatheringTimeoutMs: 800,
+        statsIntervalMs: 2000,
+        mediaStallMs: 3000,
         mosAlertThreshold: 3.5,
+        // DSCP EF for media, CS3 for signalling.
+        dscpRtp: 46,
+        dscpSip: 26,
+        // Opus hardened for weak mobile networks.
+        opus: const OpusConfig(fec: true, dtx: true),
+        opusExpectedLossPct: 10,
+        // Fail a dead INVITE in 10 s, not RFC 3261's 32 s.
+        sipTimerBMs: 10000,
+        // iOS: the app-owned VoiceProcessingIO engine arms when CallKit
+        // activates the session, so media never starts before CallKit.
+        appOwnedAudio: Platform.isIOS,
         traceSip: settings.traceSip,
         aecMode: AecMode.values[settings.aecMode.clamp(0, 2)],
         noiseSuppression: settings.noiseSuppression,
@@ -218,6 +242,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _onSettings() {
+    unawaited(_applyRingtone());
     _syncKeepAlive();
     _publishStatus();
     final sdk = _sdk;
@@ -355,7 +380,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         final peer = userPart(e.fromUri);
         db.addMessage(ChatMessage(accountId: rt.cfg.id, peer: peer, body: e.body, outgoing: false, at: DateTime.now()));
         if (!_foreground) {
-          _bridge.missedCall(name: nameFor(peer), number: '$peer: ${e.body}', title: tr('newMessage'));
+          final who = nameFor(peer);
+          _bridge.messageNotification(peer: peer, title: who.isNotEmpty ? who : peer, body: e.body);
         }
         notifyListeners();
       case PresenceStateEvent():
@@ -528,8 +554,13 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     switch (e.state) {
       case CallState.ringing:
         ac.remoteRinging = true;
+        if (ac.direction == CallDirection.outgoing && settings.ringback && focused == ac) {
+          unawaited(Tones.startRingback());
+        }
       case CallState.established:
+        Tones.stopRingback();
         final first = ac.answeredAt == null;
+        if (first) unawaited(_refreshRoutes());
         ac.answeredAt ??= DateTime.now();
         ac.phase = Phase.active;
         if (first && settings.recordingMode == 'always' && ac.runtime.cfg.recordCalls && !ac.recording) {
@@ -551,6 +582,11 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _finish(ActiveCall ac, {bool failed = false, String? reason}) async {
     calls.remove(ac);
+    if (!calls.any((c) => c.phase == Phase.outgoing)) Tones.stopRingback();
+    if (calls.isEmpty) {
+      _routes = const [];
+      _route = 'earpiece';
+    }
     if (ac.recording) {
       try {
         ac.call.recordStop();
@@ -580,9 +616,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       transport: ac.runtime.cfg.transport.toUpperCase(),
       recordingPath: ac.recordingPath,
     ));
-    if (result == CallResult.missed && !_foreground) {
-      _bridge.missedCall(name: ac.name, number: ac.number, title: tr('missedCall'));
-    }
+    if (result == CallResult.missed) await _notifyMissed(ac.title);
     if (failed && reason != null && reason.isNotEmpty && _foreground) _notices.add(reason);
     _push();
     notifyListeners();
@@ -609,7 +643,16 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case 'unhold':
         if (ac != null) _resume(ac);
       case 'route':
-        await setRoute(a.args['route'] as String? ?? 'earpiece');
+        final id = a.args['routeId'] as String?;
+        if (id != null) {
+          await selectRoute(id);
+        } else {
+          await setRoute(a.args['route'] as String? ?? 'earpiece');
+        }
+      case 'toggleSpeaker':
+        await toggleSpeaker();
+      case 'toggleMute':
+        if (ac != null) setMute(ac, !ac.muted);
       case 'record':
         if (ac != null) await toggleRecord(ac);
       case 'dtmf':
@@ -679,34 +722,105 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     if (other != null) _resume(other);
   }
 
-  Future<void> setRoute(String route) async {
-    _route = route;
-    if (!await _bridge.setRoute(route)) {
-      if (route == 'speaker' || route == 'earpiece') {
-        await _sdk?.setSpeakerphone(route == 'speaker');
-      } else {
-        final routes = await MedutPlatform.listAudioRoutes();
-        final bt = routes.where((r) => r.kind == AudioRouteKind.bluetooth).firstOrNull;
-        if (bt != null) await MedutPlatform.setAudioRoute(bt.id);
-      }
-    }
-    _push();
-  }
-
-  Future<void> _refreshRoutes() async {
-    final routes = await MedutPlatform.listAudioRoutes();
-    _bluetooth = routes.any((r) => r.kind == AudioRouteKind.bluetooth);
-    final active = routes.where((r) => r.isActive).firstOrNull;
-    if (active != null) {
-      _route = switch (active.kind) {
+  static String _kindName(AudioRouteKind k) => switch (k) {
         AudioRouteKind.speaker => 'speaker',
         AudioRouteKind.bluetooth => 'bluetooth',
         AudioRouteKind.wired => 'wired',
         _ => 'earpiece',
       };
-    }
+
+  void _applyRoutes(List<AudioRoute> routes) {
+    _routes = routes;
+    final active = routes.where((r) => r.isActive).firstOrNull;
+    if (active != null) _route = _kindName(active.kind);
+  }
+
+  Future<void> _refreshRoutes() async {
+    try {
+      _applyRoutes(await MedutPlatform.listAudioRoutes());
+    } catch (_) {}
     _push();
   }
+
+  AudioRoute? _ofKind(AudioRouteKind k) => _routes.where((r) => r.kind == k).firstOrNull;
+
+  /// Off the loudspeaker means back to the best headset, not the earpiece:
+  /// Bluetooth, then wired, then the earpiece.
+  AudioRoute? _preferredNonSpeaker() =>
+      _ofKind(AudioRouteKind.bluetooth) ?? _ofKind(AudioRouteKind.wired) ?? _ofKind(AudioRouteKind.earpiece);
+
+  /// One-tap speaker button (call screen and the ongoing-call notification).
+  Future<void> toggleSpeaker() async {
+    final on = _route == 'speaker';
+    final target = on ? _preferredNonSpeaker() : _ofKind(AudioRouteKind.speaker);
+    if (target != null) return selectRoute(target.id);
+    // No routes enumerated yet (call just connected): plain toggle.
+    _route = on ? 'earpiece' : 'speaker';
+    _push();
+    try {
+      await _sdk?.setSpeakerphone(!on);
+    } catch (_) {}
+    await _bridge.setRoute(_route);
+  }
+
+  /// Route call audio to an output picked on the call screen. Goes through
+  /// the SDK, then through Telecom (Android) last, because while a Telecom
+  /// call is up Telecom owns the route and would undo the SDK's change.
+  Future<void> selectRoute(String id) async {
+    final route = _routes.where((r) => r.id == id).firstOrNull;
+    if (route != null) _route = _kindName(route.kind);
+    _push();
+    try {
+      _applyRoutes(await MedutPlatform.setAudioRoute(id));
+    } catch (_) {}
+    await _bridge.setRoute(_route);
+    _push();
+  }
+
+  /// Route by kind ("speaker", "bluetooth", …) when no id is known.
+  Future<void> setRoute(String kind) async {
+    final k = switch (kind) {
+      'speaker' => AudioRouteKind.speaker,
+      'bluetooth' => AudioRouteKind.bluetooth,
+      'wired' => AudioRouteKind.wired,
+      _ => AudioRouteKind.earpiece,
+    };
+    final r = _ofKind(k);
+    if (r != null) return selectRoute(r.id);
+    if (k == AudioRouteKind.speaker || k == AudioRouteKind.earpiece) {
+      _route = kind;
+      _push();
+      try {
+        await _sdk?.setSpeakerphone(k == AudioRouteKind.speaker);
+      } catch (_) {}
+      await _bridge.setRoute(kind);
+    }
+  }
+
+  // ── Ringtone & missed-call notifications ──────────────────────────────────
+
+  Future<void> _applyRingtone() async {
+    final src = await Tones.nativeSource(settings.ringtoneId, settings.customRingtonePath);
+    if (src != _ringtoneSource) {
+      _ringtoneSource = src;
+      _push();
+    }
+    // iOS: CallKit plays the ringtone itself, from a sound file it can find.
+    await _bridge.setRingtone(src == 'system' ? null : src);
+  }
+
+  Future<void> _notifyMissed(String latest) async {
+    final count = await db.missedSince(settings.activitySeenAt);
+    if (count <= 0) return;
+    await _bridge.missedCalls(
+      count: count,
+      latest: latest,
+      title: count > 1 ? tr('missedCalls').replaceAll('{n}', '$count') : tr('missedCall'),
+    );
+  }
+
+  /// The user looked at Activity: the missed-call notification goes away.
+  void missedSeen() => _bridge.clearMissed();
 
   Future<void> toggleRecord(ActiveCall ac) async {
     if (!ac.recording && settings.recordingMode == 'off') return;
@@ -876,7 +990,18 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'muted': f.muted,
       'held': f.phase == Phase.held,
       'route': _route,
-      'bluetooth': _bluetooth,
+      // A picker is only worth showing when a headset is there to choose.
+      'bluetooth': _routes.any((r) => r.kind == AudioRouteKind.bluetooth || r.kind == AudioRouteKind.wired),
+      'routes': [
+        for (final r in _routes)
+          {
+            'id': r.id,
+            'kind': _kindName(r.kind),
+            'name': r.name.isNotEmpty ? r.name : tr(_kindName(r.kind)),
+          },
+      ],
+      'ringtone': _ringtoneSource,
+      'vibrate': settings.vibrate,
       'recording': f.recording,
       'silent': settings.effectiveStatus() == MyStatus.silent,
       'mos': s == null ? '' : 'MOS ${fmt(mos, 1)}',

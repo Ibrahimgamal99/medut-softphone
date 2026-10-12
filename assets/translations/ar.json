@@ -36,7 +36,7 @@
   "callDetails": "تفاصيل المكالمة",
   "audioOutput": "مخرج الصوت",
   "complete": "إتمام",
-  "ringing": "يرن…",
+  "ringing": "الرنين",
   "calling": "جارٍ الاتصال…",
   "keepAliveConnecting": "جارٍ توصيل حساباتك…",
   "keepAliveOn": "جاهز للمكالمات · {n} متصل",
@@ -228,5 +228,16 @@
   "recAlwaysSub": "تُسجَّل المكالمات عند الاتصال. تبقى التسجيلات على هذا الهاتف.",
   "recordThisAccount": "تسجيل مكالمات هذا الحساب",
   "recordThisAccountSub": "يُطبّق عند ضبط تسجيل المكالمات على كل مكالمة",
-  "recordingNow": "يتم تسجيل هذه المكالمة"
+  "recordingNow": "يتم تسجيل هذه المكالمة",
+  "ringtone": "نغمة الرنين",
+  "ringSystem": "نغمة الهاتف",
+  "ringClassic": "جرس كلاسيكي",
+  "ringSoft": "هادئة",
+  "ringCustom": "ملف من اختياري",
+  "chooseFile": "اختيار",
+  "vibrate": "الاهتزاز",
+  "ringbackTone": "نغمة الانتظار",
+  "ringbackSub": "سماع الرنين أثناء رنين هاتف الطرف الآخر",
+  "missedCalls": "{n} مكالمات فائتة",
+  "wired": "سماعة سلكية"
 }

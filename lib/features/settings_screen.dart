@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../sip/native_bridge.dart';
+import '../sip/tones.dart';
 import '../ui/widgets.dart';
 
 /// Shown on the Accounts tab when something will make the phone miss calls:
@@ -132,6 +134,28 @@ class SettingsScreen extends ConsumerWidget {
               ],
               onChanged: (v) => context.setLocale(Locale(v ?? 'en')),
             ),
+          ),
+        ]),
+        section('ringing'.tr(), [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('ringtone'.tr()),
+            subtitle: Text(Tones.byId(s.ringtoneId).labelKey.tr()),
+            trailing: Icon(Icons.chevron_right, color: t.text2),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RingtoneScreen())),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('vibrate'.tr()),
+            value: s.vibrate,
+            onChanged: (v) => s.vibrate = v,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('ringbackTone'.tr()),
+            subtitle: Text('ringbackSub'.tr()),
+            value: s.ringback,
+            onChanged: (v) => s.ringback = v,
           ),
         ]),
         section('reachability'.tr(), [
@@ -294,6 +318,75 @@ class SipLogScreen extends ConsumerWidget {
               separatorBuilder: (_, _) => Divider(color: t.border),
               itemBuilder: (_, i) => SelectableText(log[i], style: mono(context, size: 11, color: t.text)),
             ),
+    );
+  }
+}
+
+/// Ringtone picker: the phone's own ringtone, Medut's tones, or a file of
+/// your own. Tapping a tone plays it.
+class RingtoneScreen extends ConsumerStatefulWidget {
+  const RingtoneScreen({super.key});
+
+  @override
+  ConsumerState<RingtoneScreen> createState() => _RingtoneScreenState();
+}
+
+class _RingtoneScreenState extends ConsumerState<RingtoneScreen> {
+  @override
+  void dispose() {
+    Tones.stopPreview();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    final r = await FilePicker.platform.pickFiles(type: FileType.audio);
+    final path = r?.files.single.path;
+    if (path == null) return;
+    final ext = path.contains('.') ? path.split('.').last : 'm4a';
+    final dir = await getApplicationSupportDirectory();
+    final dest = File('${dir.path}/tones/custom_ringtone.$ext');
+    await dest.parent.create(recursive: true);
+    await File(path).copy(dest.path);
+    final s = ref.read(settingsProvider);
+    s.customRingtonePath = dest.path;
+    s.ringtoneId = 'custom';
+    await Tones.preview('custom', dest.path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+    return Scaffold(
+      appBar: AppBar(title: Text('ringtone'.tr())),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        ECard(
+          padding: EdgeInsets.zero,
+          child: RadioGroup<String>(
+            groupValue: s.ringtoneId,
+            onChanged: (id) async {
+              if (id == null) return;
+              if (id == 'custom' && s.customRingtonePath.isEmpty) return _pickFile();
+              s.ringtoneId = id;
+              await Tones.preview(id, s.customRingtonePath);
+            },
+            child: Column(children: [
+              for (final r in Tones.all)
+                RadioListTile<String>(
+                  value: r.id,
+                  activeColor: t.accent,
+                  title: Text(r.labelKey.tr()),
+                  subtitle: r.id == 'custom' && s.customRingtonePath.isNotEmpty
+                      ? Text(s.customRingtonePath.split('/').last, style: TextStyle(color: t.text2))
+                      : null,
+                  secondary: r.id == 'custom'
+                      ? TextButton(onPressed: _pickFile, child: Text('chooseFile'.tr()))
+                      : null,
+                ),
+            ]),
+          ),
+        ),
+      ]),
     );
   }
 }

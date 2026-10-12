@@ -15,7 +15,7 @@ import UIKit
 final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate {
   static let shared = CallKitManager()
 
-  private let provider: CXProvider
+  private var provider: CXProvider
   private let controller = CXCallController()
   private var registry: PKPushRegistry?
 
@@ -40,7 +40,14 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
   }
 
   private override init() {
+    provider = CXProvider(configuration: CallKitManager.configuration(ringtone: nil))
+    super.init()
+    provider.setDelegate(self, queue: .main)
+  }
+
+  private static func configuration(ringtone: String?) -> CXProviderConfiguration {
     let config = CXProviderConfiguration()
+    config.ringtoneSound = ringtone
     config.supportsVideo = false
     config.maximumCallGroups = 2
     config.maximumCallsPerCallGroup = 1
@@ -49,9 +56,28 @@ final class CallKitManager: NSObject, CXProviderDelegate, PKPushRegistryDelegate
     if let icon = UIImage(systemName: "phone.fill")?.pngData() {
       config.iconTemplateImageData = icon
     }
-    provider = CXProvider(configuration: config)
-    super.init()
-    provider.setDelegate(self, queue: .main)
+    return config
+  }
+
+  /// The ringtone picked in Medut. Bundled tones ship in the app bundle as
+  /// medut_<id>.wav; a file of the user's own is copied to Library/Sounds.
+  func setRingtone(path: String?) {
+    var sound: String?
+    if let path = path {
+      let file = (path as NSString).lastPathComponent
+      if path.contains("/tones/"), Bundle.main.path(forResource: "medut_" + file, ofType: nil) != nil {
+        sound = "medut_" + file
+      } else if let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+        let dir = lib.appendingPathComponent("Sounds", isDirectory: true)
+        let dest = dir.appendingPathComponent("medut_custom." + (file as NSString).pathExtension)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: dest)
+        if (try? FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: dest)) != nil {
+          sound = dest.lastPathComponent
+        }
+      }
+    }
+    provider.configuration = CallKitManager.configuration(ringtone: sound)
   }
 
   func startPushKit() {

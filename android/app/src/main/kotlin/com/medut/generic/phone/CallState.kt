@@ -29,6 +29,12 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val recording: Boolean get() = raw["recording"] == true
     val silent: Boolean get() = raw["silent"] == true
     val canRecord: Boolean get() = raw["canRecord"] != false
+    /** File path of the chosen ringtone, or "system". */
+    val ringtone: String get() = raw["ringtone"] as? String ?: "system"
+    val vibrate: Boolean get() = raw["vibrate"] != false
+
+    @Suppress("UNCHECKED_CAST")
+    val routes: List<Map<String, Any?>> get() = (raw["routes"] as? List<Map<String, Any?>>) ?: emptyList()
     val mos: String get() = raw["mos"] as? String ?: ""
     val quality: String get() = raw["quality"] as? String ?: ""
     val dark: Boolean get() = raw["dark"] == true
@@ -93,7 +99,7 @@ object CallState {
         }
         // Stats arrive every few seconds; only touch the service notification
         // when something it shows has changed.
-        val serviceKey = "${next.callId}|${next.phase}|${next.title}|${next.startedAt}|${next.status}"
+        val serviceKey = "${next.callId}|${next.phase}|${next.title}|${next.startedAt}|${next.status}|${next.muted}"
         if (serviceKey != lastServiceKey) {
             lastServiceKey = serviceKey
             MedutService.sync(appContext)
@@ -111,7 +117,7 @@ object CallState {
                         // Telecom refused (no phone account on some OEMs): ring anyway.
                         CallNotifications.showIncoming(appContext, next)
                     }
-                    Ringer.start(appContext, next.silent)
+                    Ringer.start(appContext, next.ringtone, next.vibrate, next.silent)
                 }
             }
             "outgoing", "connecting" -> {
