@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medut_phone/core/accounts.dart';
 import 'package:medut_phone/core/db.dart';
@@ -98,7 +101,7 @@ void main() {
       mos: 4.2, mosMin: 3.9, mosRx: 4.1, rttMs: 60, jitterMs: 6, lossPct: 0.2, packetsLost: 3,
       codec: 'opus', transport: 'TLS', encryption: 'AES_CM_128_HMAC_SHA1_80', icePath: 'host → host',
       remoteMedia: '10.0.0.5:4000', callId: 'abc@pbx', remoteUri: 'sip:204@pbx', localUri: 'sip:201@pbx',
-      setupMs: 850, endReason: 'BYE', sipCode: 200, endedBy: 'local', recordingPath: '/rec/1.wav',
+      setupMs: 850, endReason: 'BYE', sipCode: 200, endedBy: 'local', recordingPath: '/rec/1.wav', recordingSec: 118,
     );
 
     test('every field survives the database row', () {
@@ -109,5 +112,17 @@ void main() {
     });
 
     test('CSV row matches the header', () => expect(rec.toCsv().length, CallRecord.csvHeader.length));
+  });
+
+  test('recording length comes from the WAV header', () async {
+    // 8 kHz, 16-bit mono = 16000 bytes/s; 3 s of silence.
+    final bytes = BytesBuilder()
+      ..add('RIFF'.codeUnits)..add(Uint8List(4))..add('WAVEfmt '.codeUnits)
+      ..add([16, 0, 0, 0, 1, 0, 1, 0, 0x40, 0x1F, 0, 0, 0x80, 0x3E, 0, 0, 2, 0, 16, 0])
+      ..add('data'.codeUnits)..add(Uint8List(4))..add(Uint8List(48000));
+    final f = File('${Directory.systemTemp.path}/medut_wav_test.wav')..writeAsBytesSync(bytes.toBytes());
+    expect(await SipService.wavSeconds(f.path), 3);
+    expect(await SipService.wavSeconds('${f.path}.missing'), isNull);
+    f.deleteSync();
   });
 }

@@ -317,5 +317,6 @@
   "infoRecording": "Recording",
   "play": "Play",
   "pause": "Pause",
-  "recordingMissing": "The recording file isn't there any more (moved or deleted)."
+  "recordingMissing": "The recording file isn't there any more (moved or deleted).",
+  "recorded": "Recorded"
 }

@@ -178,6 +178,9 @@ class _CallRow extends ConsumerWidget {
       },
       '${'via'.tr()} ${c.accountName}',
     ].join(' · ');
+    final recLabel = c.recordingPath.isEmpty
+        ? ''
+        : '${'recorded'.tr()}${c.recordingSec != null ? ' ${_duration(c.recordingSec!)}' : ''}';
     final level = callQualityLevel(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct);
     final poor = c.hasQos && level <= 2;
     final tech = !c.hasQos
@@ -204,6 +207,15 @@ class _CallRow extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: missed ? t.missed : t.text)),
               Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: t.text2)),
+              if (recLabel.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.mic, size: 13, color: t.warn),
+                    const SizedBox(width: 3),
+                    Text(recLabel, style: TextStyle(fontSize: 12, color: t.warn, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
               if (tech.isNotEmpty) Text(tech, style: mono(context, color: poor ? t.warn : t.text2)),
             ]),
           ),
@@ -536,7 +548,8 @@ class _CallInfoTable extends StatelessWidget {
       ('infoLocal'.tr(), c.localUri.ifEmpty('—')),
       ('Call-ID', c.callId.ifEmpty('—')),
       ('infoSetup'.tr(), n(c.setupMs, 0, ' ms')),
-      if (c.recordingPath.isNotEmpty) ('infoRecording'.tr(), c.recordingPath),
+      if (c.recordingPath.isNotEmpty)
+        ('infoRecording'.tr(), '${c.recordingSec != null ? '${_duration(c.recordingSec!)} · ' : ''}${c.recordingPath}'),
     ];
     return ECard(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),

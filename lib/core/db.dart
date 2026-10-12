@@ -41,6 +41,7 @@ class CallRecord {
     this.sipCode,
     this.endedBy = '',
     this.recordingPath = '',
+    this.recordingSec,
   });
 
   final int? id;
@@ -74,6 +75,9 @@ class CallRecord {
   /// "local" when this phone hung up / declined, "remote" otherwise.
   final String endedBy;
   final String recordingPath;
+
+  /// Length of the recording file, in seconds.
+  final int? recordingSec;
 
   bool get hasQos => mos != null || rttMs != null || jitterMs != null || lossPct != null;
   String get title => name.isNotEmpty ? name : number;
@@ -118,6 +122,7 @@ class CallRecord {
         'sip_code': sipCode,
         'ended_by': endedBy,
         'recording': recordingPath,
+        'rec_seconds': recordingSec,
       };
 
   factory CallRecord.fromRow(Map<String, Object?> r) => CallRecord(
@@ -152,13 +157,14 @@ class CallRecord {
         sipCode: r['sip_code'] as int?,
         endedBy: r['ended_by'] as String? ?? '',
         recordingPath: r['recording'] as String? ?? '',
+        recordingSec: r['rec_seconds'] as int?,
       );
 
   static const csvHeader = [
     'started_at', 'answered_at', 'ended_at', 'direction', 'result', 'number', 'name', 'account',
     'talk_seconds', 'ring_seconds', 'total_seconds', 'mos', 'mos_min', 'mos_they_heard', 'rtt_ms',
     'jitter_ms', 'loss_pct', 'packets_lost', 'codec', 'transport', 'encryption', 'ice', 'remote_media',
-    'call_id', 'remote_uri', 'local_uri', 'setup_ms', 'sip_code', 'end_reason', 'ended_by', 'recording',
+    'call_id', 'remote_uri', 'local_uri', 'setup_ms', 'sip_code', 'end_reason', 'ended_by', 'recording', 'recording_seconds',
   ];
 
   List<Object?> toCsv() => [
@@ -166,6 +172,7 @@ class CallRecord {
         direction.name, result.name, number, name, accountName, durationSec, ringSec, totalSec,
         mos, mosMin, mosRx, rttMs, jitterMs, lossPct, packetsLost, codec, transport, encryption, icePath,
         remoteMedia, callId, remoteUri, localUri, setupMs, sipCode, endReason, endedBy, recordingPath,
+        recordingSec,
       ];
 }
 
@@ -221,7 +228,7 @@ class LocalDb extends ChangeNotifier {
   static Future<LocalDb> open() async {
     final db = await openDatabase(
       p.join(await getDatabasesPath(), 'medut.db'),
-      version: 3,
+      version: 4,
       onUpgrade: (db, from, to) async {
         if (from < 2) {
           for (final c in ['rtt', 'jitter', 'loss']) {
@@ -233,6 +240,7 @@ class LocalDb extends ChangeNotifier {
             await db.execute('ALTER TABLE calls ADD COLUMN ${c.key} ${c.value}');
           }
         }
+        if (from < 4) await db.execute('ALTER TABLE calls ADD COLUMN rec_seconds INTEGER');
       },
       onCreate: (db, _) async {
         await db.execute('''CREATE TABLE calls(
@@ -240,7 +248,7 @@ class LocalDb extends ChangeNotifier {
           number TEXT, name TEXT, direction TEXT, result TEXT, started_at INTEGER,
           duration INTEGER, mos REAL, rtt REAL, jitter REAL, loss REAL,
           codec TEXT, transport TEXT, recording TEXT,
-          ${_v3Columns.entries.map((c) => '${c.key} ${c.value}').join(', ')})''');
+          ${_v3Columns.entries.map((c) => '${c.key} ${c.value}').join(', ')}, rec_seconds INTEGER)''');
         await db.execute('''CREATE TABLE messages(
           id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT, peer TEXT, body TEXT,
           outgoing INTEGER, at INTEGER, read INTEGER)''');

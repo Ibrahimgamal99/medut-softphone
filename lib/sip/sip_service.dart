@@ -740,6 +740,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       codec: s?.codec ?? '',
       transport: ac.runtime.cfg.transport.toUpperCase(),
       recordingPath: ac.recordingPath,
+      recordingSec: await wavSeconds(ac.recordingPath),
     ));
     if (result == CallResult.missed) await _notifyMissed(ac.title);
     if (failed && reason != null && reason.isNotEmpty && _foreground) _notices.add(reason);
@@ -977,6 +978,28 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     }
     _push();
     notifyListeners();
+  }
+
+  /// Length of a WAV file from its header (byte rate) and size; null if
+  /// there is no readable file.
+  static Future<int?> wavSeconds(String path) async {
+    if (path.isEmpty) return null;
+    try {
+      final f = File(path);
+      if (!await f.exists()) return null;
+      final raf = await f.open();
+      try {
+        final header = await raf.read(44);
+        if (header.length < 44) return null;
+        final byteRate = header[28] | header[29] << 8 | header[30] << 16 | header[31] << 24;
+        if (byteRate <= 0) return null;
+        return ((await f.length()) - 44) ~/ byteRate;
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Where recordings go (Settings → Recording → Save recordings in):
