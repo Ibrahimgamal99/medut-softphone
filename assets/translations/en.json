@@ -314,5 +314,8 @@
   "infoRemote": "Remote",
   "infoLocal": "Local",
   "infoSetup": "Setup time",
-  "infoRecording": "Recording"
+  "infoRecording": "Recording",
+  "play": "Play",
+  "pause": "Pause",
+  "recordingMissing": "The recording file isn't there any more (moved or deleted)."
 }

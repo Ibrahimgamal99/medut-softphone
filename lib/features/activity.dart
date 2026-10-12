@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:audio_session/audio_session.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,6 +207,12 @@ class _CallRow extends ConsumerWidget {
               if (tech.isNotEmpty) Text(tech, style: mono(context, color: poor ? t.warn : t.text2)),
             ]),
           ),
+          if (c.recordingPath.isNotEmpty)
+            IconButton(
+              tooltip: 'play'.tr(),
+              icon: Icon(Icons.play_circle_fill, color: t.warn, size: 30),
+              onPressed: () => _showDetail(context, ref, c, play: true),
+            ),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(DateFormat.Hm().format(c.startedAt), style: TextStyle(fontSize: 12, color: t.text2)),
             if (c.hasQos) ...[
@@ -226,7 +235,7 @@ class _CallRow extends ConsumerWidget {
   }
 }
 
-Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) async {
+Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c, {bool play = false}) async {
   final t = context.t;
   await showModalBottomSheet<void>(
     context: context,
@@ -259,7 +268,7 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
           ],
           if (c.recordingPath.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _RecordingPlayer(path: c.recordingPath),
+            _RecordingPlayer(path: c.recordingPath, autoplay: play),
           ],
           const SizedBox(height: 8),
           _CallInfoTable(c),
@@ -309,21 +318,47 @@ Future<void> _showDetail(BuildContext context, WidgetRef ref, CallRecord c) asyn
   );
 }
 
-class _RecordingPlayer extends StatefulWidget {
-  const _RecordingPlayer({required this.path});
+class _RecordingPlayer extends ConsumerStatefulWidget {
+  const _RecordingPlayer({required this.path, this.autoplay = false});
   final String path;
+  final bool autoplay;
 
   @override
-  State<_RecordingPlayer> createState() => _RecordingPlayerState();
+  ConsumerState<_RecordingPlayer> createState() => _RecordingPlayerState();
 }
 
-class _RecordingPlayerState extends State<_RecordingPlayer> {
+class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
   final _player = AudioPlayer();
+  bool _missing = false;
+  bool _ready = false;
+  double? _dragging;
 
   @override
   void initState() {
     super.initState();
-    _player.setFilePath(widget.path).catchError((_) => null);
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!await File(widget.path).exists()) {
+      if (mounted) setState(() => _missing = true);
+      return;
+    }
+    try {
+      // Play out loud: after a call the phone can still be routed to the
+      // earpiece. Media attributes put it on the speaker (or a headset).
+      // Never touch the session under a live call: it is the call's.
+      if (!ref.read(sipProvider).hasCall) {
+        final session = await AudioSession.instance;
+        await session.configure(const AudioSessionConfiguration.music());
+      }
+      await _player.setFilePath(widget.path);
+      if (!mounted) return;
+      setState(() => _ready = true);
+      if (widget.autoplay) await _player.play();
+    } catch (_) {
+      if (mounted) setState(() => _missing = true);
+    }
   }
 
   @override
@@ -332,42 +367,82 @@ class _RecordingPlayerState extends State<_RecordingPlayer> {
     super.dispose();
   }
 
+  String _fmt(Duration d) =>
+      '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    if (_missing) {
+      return ECard(
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Icon(Icons.error_outline, color: t.warn),
+          const SizedBox(width: 10),
+          Expanded(child: Text('recordingMissing'.tr(), style: TextStyle(color: t.text2, fontSize: 13))),
+        ]),
+      );
+    }
     return ECard(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       child: StreamBuilder<PlayerState>(
         stream: _player.playerStateStream,
-        builder: (_, s) {
-          final playing = s.data?.playing ?? false;
-          return Row(children: [
-            IconButton(
-              tooltip: playing ? 'hold'.tr() : 'listen'.tr(),
-              icon: Icon(playing ? Icons.pause_circle : Icons.play_circle, color: t.warn, size: 34),
-              onPressed: () => playing ? _player.pause() : _player.play(),
-            ),
-            Expanded(
-              child: StreamBuilder<Duration>(
-                stream: _player.positionStream,
-                builder: (_, p) {
-                  final total = _player.duration ?? Duration.zero;
-                  final pos = p.data ?? Duration.zero;
-                  return LinearProgressIndicator(
-                    value: total.inMilliseconds == 0 ? 0 : pos.inMilliseconds / total.inMilliseconds,
-                    color: t.warn,
-                    backgroundColor: t.surface2,
-                    minHeight: 4,
-                    borderRadius: BorderRadius.circular(2),
-                  );
-                },
+        builder: (_, st) {
+          final state = st.data;
+          final playing = state?.playing ?? false;
+          final done = state?.processingState == ProcessingState.completed;
+          return Column(children: [
+            Row(children: [
+              IconButton(
+                tooltip: playing ? 'pause'.tr() : 'play'.tr(),
+                icon: Icon(playing && !done ? Icons.pause_circle : Icons.play_circle, color: t.warn, size: 40),
+                onPressed: !_ready
+                    ? null
+                    : () async {
+                        if (done) await _player.seek(Duration.zero);
+                        playing && !done ? await _player.pause() : await _player.play();
+                      },
               ),
-            ),
-            IconButton(
-              tooltip: 'shareRecording'.tr(),
-              icon: Icon(Icons.ios_share, color: t.text2),
-              onPressed: () => Share.shareXFiles([XFile(widget.path)]),
-            ),
+              Expanded(
+                child: StreamBuilder<Duration>(
+                  stream: _player.positionStream,
+                  builder: (_, p) {
+                    final total = _player.duration ?? Duration.zero;
+                    final max = total.inMilliseconds.toDouble();
+                    final pos = (_dragging ?? (p.data ?? Duration.zero).inMilliseconds.toDouble()).clamp(0.0, max <= 0 ? 0.0 : max);
+                    return Column(children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(trackHeight: 3, overlayShape: SliderComponentShape.noOverlay),
+                        child: Slider(
+                          value: max <= 0 ? 0 : pos,
+                          max: max <= 0 ? 1 : max,
+                          activeColor: t.warn,
+                          inactiveColor: t.surface2,
+                          onChanged: max <= 0 ? null : (v) => setState(() => _dragging = v),
+                          onChangeEnd: (v) async {
+                            await _player.seek(Duration(milliseconds: v.round()));
+                            setState(() => _dragging = null);
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Row(children: [
+                          Text(_fmt(Duration(milliseconds: pos.round())), style: mono(context)),
+                          const Spacer(),
+                          Text(_fmt(total), style: mono(context)),
+                        ]),
+                      ),
+                    ]);
+                  },
+                ),
+              ),
+              IconButton(
+                tooltip: 'shareRecording'.tr(),
+                icon: Icon(Icons.ios_share, color: t.text2),
+                onPressed: () => Share.shareXFiles([XFile(widget.path)]),
+              ),
+            ]),
           ]);
         },
       ),

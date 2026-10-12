@@ -314,5 +314,8 @@
   "infoRemote": "الطرف البعيد",
   "infoLocal": "المحلي",
   "infoSetup": "زمن الإعداد",
-  "infoRecording": "التسجيل"
+  "infoRecording": "التسجيل",
+  "play": "تشغيل",
+  "pause": "إيقاف مؤقت",
+  "recordingMissing": "ملف التسجيل لم يعد موجوداً (نُقل أو حُذف)."
 }
