@@ -254,7 +254,11 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
     }
     if (!mounted) return;
     _saved = true;
-    await ref.read(accountsProvider).save(c);
+    // PBX type and status codes belong to the saved account (Status codes
+    // edits it directly): the draft's copy may be stale, and an import resets it.
+    final store = ref.read(accountsProvider);
+    final saved = store.byId(_id);
+    await store.save(saved == null ? c : c.copyWith(pbx: saved.pbx, codes: saved.codes));
     // Ask once, at the moment it makes sense: calls need the mic, and ringing
     // in the background needs notifications.
     await [Permission.microphone, Permission.notification].request();

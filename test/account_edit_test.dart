@@ -61,7 +61,7 @@ void main() {
     popped = null;
   });
 
-  Future<void> open(WidgetTester tester, RegProbe reply) async {
+  Future<void> open(WidgetTester tester, RegProbe reply, {SipAccountConfig? existing}) async {
     sip = _FakeSip(store, settings, reply);
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -76,8 +76,8 @@ void main() {
         theme: ThemeData(useMaterial3: true, extensions: const [Tokens.light]),
         home: Builder(
           builder: (context) => TextButton(
-            onPressed: () async => popped = await Navigator.of(context)
-                .push<bool>(MaterialPageRoute(builder: (_) => const AccountEditScreen(initial: _echo))),
+            onPressed: () async => popped = await Navigator.of(context).push<bool>(MaterialPageRoute(
+                builder: (_) => AccountEditScreen(existing: existing, initial: existing == null ? _echo : null))),
             child: const Text('open'),
           ),
         ),
@@ -122,6 +122,31 @@ void main() {
     await tester.tap(find.text('saveAnyway'));
     await tester.pumpAndSettle();
     expect(store.accounts, hasLength(1));
+  });
+
+  testWidgets('an import keeps the saved account\'s PBX type and status codes', (tester) async {
+    await store.save(_echo.copyWith(pbx: '3cx', codes: {'dndOn': '*11'}));
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') return {'text': '{"uri": "201@pbx.example.com", "transport": "tls"}'};
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    await open(tester, const RegProbe(RegStatus.registered), existing: store.accounts.single);
+
+    await tester.tap(find.text('paste'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('use'));
+    await tester.pumpAndSettle();
+    // Status codes, opened from this screen, saves to the account meanwhile.
+    await store.save(store.accounts.single.copyWith(codes: {'dndOn': '*12'}));
+    await tester.tap(find.text('saveConnect'));
+    await tester.pumpAndSettle();
+
+    final a = store.accounts.single;
+    expect([a.domain, a.transport], ['pbx.example.com', 'tls'], reason: 'the import was saved');
+    expect([a.pbx, a.codes], ['3cx', {'dndOn': '*12'}]);
+    expect(popped, isTrue);
   });
 
   testWidgets('choosing a web link on the Connection page brings DTLS and ICE', (tester) async {
