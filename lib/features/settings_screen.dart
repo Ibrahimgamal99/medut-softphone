@@ -15,6 +15,10 @@ import '../sip/native_bridge.dart';
 import '../sip/sip_service.dart';
 import '../sip/tones.dart';
 import '../ui/widgets.dart';
+import 'accounts.dart';
+import 'contacts_screen.dart' show StatusRulesScreen, officeHoursText;
+import 'status.dart';
+import 'status_codes.dart';
 
 /// Shown on the Accounts tab when something will make the phone miss calls:
 /// Android battery optimisation, or no full-screen ringing permission.
@@ -99,124 +103,155 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final s = ref.watch(settingsProvider);
-    final sip = ref.watch(sipProvider);
-
-    Widget section(String title, List<Widget> children) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SectionLabel(title),
-          ECard(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4), child: Column(children: children)),
-        ]);
+    final def = ref.watch(accountsProvider).defaultAccount;
+    final nav = Navigator.of(context);
+    void open(Widget page) => nav.push(MaterialPageRoute(builder: (_) => page));
+    final status = s.effectiveStatus();
+    final (statusLabel, statusColor, statusIcon) = statusLook(t, status);
 
     return Scaffold(
-      appBar: AppBar(title: Text('settings'.tr(), style: const TextStyle(fontWeight: FontWeight.w700))),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 32), children: [
-        section('appearance'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('theme'.tr()),
-            trailing: DropdownButton<String>(
-              value: s.themeMode,
-              underline: const SizedBox.shrink(),
-              items: [
-                DropdownMenuItem(value: 'system', child: Text('themeSystem'.tr())),
-                DropdownMenuItem(value: 'light', child: Text('themeLight'.tr())),
-                DropdownMenuItem(value: 'dark', child: Text('themeDark'.tr())),
-              ],
-              onChanged: (v) => s.themeMode = v ?? 'system',
+      appBar: AppBar(title: Text('settings'.tr(), style: const TextStyle(fontWeight: FontWeight.w800))),
+      body: ListView(padding: const EdgeInsets.only(bottom: 48), children: [
+        const _ProfileCard(),
+        SettingsSection(title: 'appearance'.tr(), children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SettingsTile(
+              icon: switch (s.themeMode) { 'light' => Icons.light_mode, 'dark' => Icons.dark_mode, _ => Icons.brightness_auto },
+              tint: t.warn,
+              title: 'theme'.tr(),
+              subtitle: switch (s.themeMode) { 'light' => 'themeLight'.tr(), 'dark' => 'themeDark'.tr(), _ => 'themeSystem'.tr() },
             ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('language'.tr()),
-            trailing: DropdownButton<String>(
-              value: context.locale.languageCode,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(value: 'en', child: Text('English')),
-                DropdownMenuItem(value: 'ar', child: Text('العربية')),
-              ],
-              onChanged: (v) => context.setLocale(Locale(v ?? 'en')),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: _ThemeSwatches(value: s.themeMode, onChanged: (v) => s.themeMode = v),
+            ),
+          ]),
+          SettingsTile(
+            icon: Icons.translate,
+            tint: t.info,
+            title: 'language'.tr(),
+            trailing: SizedBox(
+              width: 104,
+              child: PocketSegments(
+                options: const ['en', 'ar'],
+                labels: const ['EN', 'ع'],
+                value: Localizations.localeOf(context).languageCode,
+                onChanged: (v) => context.setLocale(Locale(v)),
+              ),
             ),
           ),
         ]),
-        section('ringing'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('ringtone'.tr()),
-            subtitle: Text(Tones.byId(s.ringtoneId).labelKey.tr()),
-            trailing: Icon(Icons.chevron_right, color: t.text2),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RingtoneScreen())),
+        SettingsSection(title: 'statusSection'.tr(), children: [
+          SettingsTile(
+            icon: statusIcon,
+            tint: statusColor,
+            title: 'yourStatus'.tr(),
+            subtitle: statusLabel,
+            onTap: () => showStatusSheet(context),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('vibrate'.tr()),
-            value: s.vibrate,
-            onChanged: (v) => s.vibrate = v,
+          SettingsTile(
+            icon: Icons.schedule,
+            tint: t.purple,
+            title: 'statusRules'.tr(),
+            subtitle: officeHoursText(s),
+            onTap: () => open(const StatusRulesScreen()),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('ringbackTone'.tr()),
-            subtitle: Text('ringbackSub'.tr()),
-            value: s.ringback,
-            onChanged: (v) => s.ringback = v,
+          SettingsTile(
+            icon: Icons.dialpad,
+            tint: t.accent,
+            title: 'statusCodes'.tr(),
+            subtitle: def == null ? 'statusCodesSub'.tr() : codesSummary(def),
+            onTap: () => open(const StatusCodesScreen()),
           ),
         ]),
-        section('callsSection'.tr(), [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('autoAnswer'.tr()),
-            subtitle: Text('autoAnswerSub'.tr()),
-            value: s.autoAnswer,
-            onChanged: (v) => s.autoAnswer = v,
+        SettingsSection(title: 'callsSection'.tr(), children: [
+          SettingsTile(
+            icon: Icons.notifications_active_outlined,
+            tint: t.purple,
+            title: 'ringtone'.tr(),
+            subtitle: Tones.byId(s.ringtoneId).labelKey.tr(),
+            onTap: () => open(const RingtoneScreen()),
           ),
+          _switch(context, Icons.vibration, t.info, 'vibrate'.tr(), null, s.vibrate, (v) => s.vibrate = v),
+          _switch(context, Icons.ring_volume_outlined, t.info, 'ringbackTone'.tr(), 'ringbackSub'.tr(), s.ringback,
+              (v) => s.ringback = v),
+          _switch(context, Icons.call_received, t.success, 'autoAnswer'.tr(), 'autoAnswerSub'.tr(), s.autoAnswer,
+              (v) => s.autoAnswer = v),
           if (s.autoAnswer)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('autoAnswerDelay'.tr()),
-              subtitle: Text('autoAnswerDelayValue'.tr(namedArgs: {'s': '${s.autoAnswerDelay}'})),
-              trailing: Icon(Icons.chevron_right, color: t.text2),
+            SettingsTile(
+              icon: Icons.timer_outlined,
+              tint: t.warn,
+              title: 'autoAnswerDelay'.tr(),
+              subtitle: 'autoAnswerDelayValue'.tr(namedArgs: {'s': '${s.autoAnswerDelay}'}),
               onTap: () => showModalBottomSheet<void>(
                 context: context,
                 showDragHandle: true,
                 builder: (_) => const _AutoAnswerDelaySheet(),
               ),
             ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('showCallQuality'.tr()),
-            subtitle: Text('showCallQualitySub'.tr()),
-            value: s.showCallQuality,
-            onChanged: (v) => s.showCallQuality = v,
+          SettingsTile(
+            icon: Icons.block,
+            tint: t.danger,
+            title: 'blockedNumbers'.tr(),
+            subtitle: '${s.blocked.length}',
+            onTap: () => open(const BlockedScreen()),
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('blockedNumbers'.tr()),
-            subtitle: Text('${s.blocked.length}'),
-            trailing: Icon(Icons.chevron_right, color: t.text2),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BlockedScreen())),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('exportHistory'.tr()),
-            subtitle: Text('exportHistorySub'.tr()),
-            trailing: Icon(Icons.ios_share, color: t.text2),
+          if (Platform.isAndroid)
+            _switch(context, Icons.wifi_tethering, t.info, 'stayReachable'.tr(), 'stayReachableSub'.tr(), s.keepAlive,
+                (v) => s.keepAlive = v),
+        ]),
+        if (Platform.isAndroid)
+          const Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, 0), child: ReachabilityBanner()),
+        SettingsSection(title: 'recording'.tr(), children: [
+          SettingsTile(
+            icon: Icons.fiber_manual_record,
+            tint: t.danger,
+            title: 'callRecording'.tr(),
+            subtitle: switch (s.recordingMode) {
+              'off' => 'recOffSub'.tr(),
+              'always' => 'recAlwaysSub'.tr(),
+              _ => 'recManualSub'.tr(),
+            },
             onTap: () async {
-              final calls = await ref.read(dbProvider).calls(limit: 100000);
-              String cell(Object? v) {
-                final text = v?.toString() ?? '';
-                return text.contains(RegExp(r'[",\n]')) ? '"${text.replaceAll('"', '""')}"' : text;
-              }
-              final csv = [
-                CallRecord.csvHeader.join(','),
-                for (final c in calls) c.toCsv().map(cell).join(','),
-              ].join('\n');
-              final f = File('${(await getTemporaryDirectory()).path}/medut-calls-${DateTime.now().millisecondsSinceEpoch}.csv');
-              await f.writeAsString(csv);
-              await Share.shareXFiles([XFile(f.path)]);
+              final v = await chooseOne(context, 'callRecording'.tr(), s.recordingMode, [
+                ('off', 'recOff'.tr(), 'recOffSub'.tr()),
+                ('manual', 'recManual'.tr(), 'recManualSub'.tr()),
+                ('always', 'recAlways'.tr(), 'recAlwaysSub'.tr()),
+              ]);
+              if (v != null) s.recordingMode = v;
             },
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('clearHistory'.tr(), style: TextStyle(color: t.danger)),
+          FutureBuilder<Directory>(
+            future: SipService.recordingsDir(s),
+            builder: (_, snap) => SettingsTile(
+              icon: Icons.folder_outlined,
+              tint: t.warn,
+              title: 'recordingsFolder'.tr(),
+              subtitle: '${switch (s.recordingDir) {
+                'private' => 'folderPrivate'.tr(),
+                'custom' => 'folderCustom'.tr(),
+                _ => 'folderShared'.tr(),
+              }}\n${snap.data?.path ?? ''}',
+              onTap: () => showModalBottomSheet<void>(
+                  context: context, showDragHandle: true, builder: (_) => const _RecordingFolderSheet()),
+            ),
+          ),
+        ]),
+        SettingsSection(title: 'historySection'.tr(), children: [
+          SettingsTile(
+            icon: Icons.ios_share,
+            tint: t.info,
+            title: 'exportHistory'.tr(),
+            subtitle: 'exportHistorySub'.tr(),
+            trailing: const SizedBox.shrink(),
+            onTap: () => _exportHistory(ref),
+          ),
+          SettingsTile(
+            icon: Icons.delete_outline,
+            tint: t.danger,
+            title: 'clearHistory'.tr(),
+            titleColor: t.danger,
+            trailing: const SizedBox.shrink(),
             onTap: () async {
               final ok = await showDialog<bool>(
                 context: context,
@@ -225,7 +260,11 @@ class SettingsScreen extends ConsumerWidget {
                   content: Text('clearHistoryConfirm'.tr()),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('cancel'.tr())),
-                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('delete'.tr())),
+                    FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: t.danger),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('delete'.tr()),
+                    ),
                   ],
                 ),
               );
@@ -233,177 +272,351 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
         ]),
-        section('reachability'.tr(), [
-          if (Platform.isAndroid)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('stayReachable'.tr()),
-              subtitle: Text('stayReachableSub'.tr()),
-              value: s.keepAlive,
-              onChanged: (v) => s.keepAlive = v,
-            ),
-          if (Platform.isAndroid) const ReachabilityBanner(),
-          const _PermissionTile(Permission.microphone, 'microphone'),
-          const _PermissionTile(Permission.notification, 'notifications'),
-        ]),
-        section('audio'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('echoCancel'.tr()),
-            trailing: DropdownButton<int>(
-              value: s.aecMode,
-              underline: const SizedBox.shrink(),
-              items: [
-                DropdownMenuItem(value: 0, child: Text('aecOff'.tr())),
-                DropdownMenuItem(value: 1, child: Text('aecBasic'.tr())),
-                DropdownMenuItem(value: 2, child: Text('aecWebrtc'.tr())),
-              ],
-              onChanged: (v) => s.aecMode = v ?? 2,
-            ),
+        SettingsSection(title: 'more'.tr(), children: [
+          SettingsTile(
+            icon: Icons.tune,
+            tint: t.purple,
+            title: 'advancedCall'.tr(),
+            subtitle: 'advancedCallSub'.tr(),
+            onTap: () => open(const AdvancedCallSettingsScreen()),
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('jitterBuffer'.tr()),
-            subtitle: Text(switch (s.jitterMode) {
-              'low' => 'jitterLowSub'.tr(),
-              'robust' => 'jitterRobustSub'.tr(),
-              _ => 'jitterAutoSub'.tr(),
-            }),
-            trailing: DropdownButton<String>(
-              value: s.jitterMode,
-              underline: const SizedBox.shrink(),
-              items: [
-                DropdownMenuItem(value: 'auto', child: Text('jitterAuto'.tr())),
-                DropdownMenuItem(value: 'low', child: Text('jitterLow'.tr())),
-                DropdownMenuItem(value: 'robust', child: Text('jitterRobust'.tr())),
-              ],
-              onChanged: (v) => s.jitterMode = v ?? 'auto',
-            ),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('noiseSup'.tr()),
-            value: s.noiseSuppression,
-            onChanged: (v) => s.noiseSuppression = v,
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('autoGain'.tr()),
-            value: s.autoGain,
-            onChanged: (v) => s.autoGain = v,
+          SettingsTile(
+            icon: Icons.support_outlined,
+            tint: t.warn,
+            title: 'helpDiagnostics'.tr(),
+            subtitle: s.debugLogging ? 'debugLogging'.tr() : 'helpDiagnosticsSub'.tr(),
+            trailing: s.debugLogging
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    SettingsBadge('on'.tr(), color: t.warn),
+                    Icon(Icons.chevron_right, size: 20, color: t.text2.withValues(alpha: 0.6)),
+                  ])
+                : null,
+            onTap: () => open(const DiagnosticsScreen()),
           ),
         ]),
-        section('recording'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('callRecording'.tr()),
-            subtitle: Text(switch (s.recordingMode) {
-              'off' => 'recOffSub'.tr(),
-              'always' => 'recAlwaysSub'.tr(),
-              _ => 'recManualSub'.tr(),
-            }),
-            trailing: DropdownButton<String>(
-              value: s.recordingMode,
-              underline: const SizedBox.shrink(),
-              items: [
-                DropdownMenuItem(value: 'off', child: Text('recOff'.tr())),
-                DropdownMenuItem(value: 'manual', child: Text('recManual'.tr())),
-                DropdownMenuItem(value: 'always', child: Text('recAlways'.tr())),
-              ],
-              onChanged: (v) => s.recordingMode = v ?? 'manual',
+      ]),
+    );
+  }
+
+  static Future<void> _exportHistory(WidgetRef ref) async {
+    final calls = await ref.read(dbProvider).calls(limit: 100000);
+    String cell(Object? v) {
+      final text = v?.toString() ?? '';
+      return text.contains(RegExp(r'[",\n]')) ? '"${text.replaceAll('"', '""')}"' : text;
+    }
+
+    final csv = [
+      CallRecord.csvHeader.join(','),
+      for (final c in calls) c.toCsv().map(cell).join(','),
+    ].join('\n');
+    final f = File('${(await getTemporaryDirectory()).path}/medut-calls-${DateTime.now().millisecondsSinceEpoch}.csv');
+    await f.writeAsString(csv);
+    await Share.shareXFiles([XFile(f.path)]);
+  }
+}
+
+Widget _switch(BuildContext context, IconData icon, Color tint, String title, String? sub, bool value,
+        ValueChanged<bool> onChanged) =>
+    SettingsTile(
+      icon: icon,
+      tint: tint,
+      title: title,
+      subtitle: sub,
+      trailing: Switch(value: value, onChanged: onChanged),
+      onTap: () => onChanged(!value),
+    );
+
+/// One choice from a short list, in a sheet that closes on the pick.
+Future<T?> chooseOne<T>(BuildContext context, String title, T current, List<(T, String, String?)> options) =>
+    showModalBottomSheet<T>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: RadioGroup<T>(
+          groupValue: current,
+          onChanged: (v) => Navigator.pop(ctx, v),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             ),
-          ),
-          FutureBuilder<Directory>(
-            future: SipService.recordingsDir(s),
-            builder: (_, snap) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('recordingsFolder'.tr()),
-              subtitle: Text(
-                '${switch (s.recordingDir) {
-                  'private' => 'folderPrivate'.tr(),
-                  'custom' => 'folderCustom'.tr(),
-                  _ => 'folderShared'.tr(),
-                }}\n${snap.data?.path ?? ''}',
-                style: TextStyle(fontSize: 12, color: t.text2),
+            for (final o in options)
+              RadioListTile<T>(
+                value: o.$1,
+                activeColor: ctx.t.accent,
+                title: Text(o.$2),
+                subtitle: o.$3 == null ? null : Text(o.$3!, style: TextStyle(fontSize: 12.5, color: ctx.t.text2)),
               ),
-              isThreeLine: true,
-              trailing: Icon(Icons.chevron_right, color: t.text2),
-              onTap: () => showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => const _RecordingFolderSheet()),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      ),
+    );
+
+/// Who you are on the default account, and whether it is registered; tap
+/// for Accounts.
+class _ProfileCard extends ConsumerWidget {
+  const _ProfileCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final def = ref.watch(accountsProvider).defaultAccount;
+    final rt = def == null ? null : ref.watch(sipProvider).runtimes[def.id];
+    final ok = rt?.status == RegStatus.registered;
+    final name = def == null ? '' : (def.displayName.isNotEmpty ? def.displayName : def.user);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Material(
+        color: t.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: t.border)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountsScreen())),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Avatar(name.isEmpty ? '?' : name, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name.isEmpty ? 'noAccountsYet'.tr() : name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  if (def != null)
+                    Text('${def.user} · ${def.label}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: t.text2)),
+                ]),
+              ),
+              if (def != null) SettingsBadge(ok ? 'registered'.tr() : 'notRegistered'.tr(), color: ok ? t.success : t.danger),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// System, Light, Dark as three little previews of the app.
+class _ThemeSwatches extends StatelessWidget {
+  const _ThemeSwatches({required this.value, required this.onChanged});
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  static Widget _canvas(Color bg, Color bar, Color accent) => Container(
+        color: bg,
+        padding: const EdgeInsets.all(8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 18, height: 6, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(height: 6),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: bar, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 4),
+          Container(width: 28, height: 4, decoration: BoxDecoration(color: bar, borderRadius: BorderRadius.circular(2))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final light = _canvas(Tokens.light.bg, Tokens.light.border, Tokens.light.accent);
+    final dark = _canvas(Tokens.darkTokens.bg, Tokens.darkTokens.border, Tokens.darkTokens.accent);
+    return Row(children: [
+      for (final (mode, label, preview) in [
+        ('system', 'themeSystem'.tr(), Row(children: [Expanded(child: light), Expanded(child: dark)])),
+        ('light', 'themeLight'.tr(), light),
+        ('dark', 'themeDark'.tr(), dark),
+      ])
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Semantics(
+              button: true,
+              selected: value == mode,
+              label: label,
+              child: GestureDetector(
+                onTap: () => onChanged(mode),
+                child: Column(children: [
+                  Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: value == mode ? t.accent : t.border, width: value == mode ? 2 : 1),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox.expand(child: preview),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: value == mode ? FontWeight.w700 : FontWeight.w500,
+                          color: value == mode ? t.accent : t.text2)),
+                ]),
+              ),
             ),
           ),
+        ),
+    ]);
+  }
+}
+
+/// Settings → Advanced call settings: voice processing, quality, network.
+class AdvancedCallSettingsScreen extends ConsumerWidget {
+  const AdvancedCallSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+    String aec(int v) => switch (v) { 0 => 'aecOff'.tr(), 1 => 'aecBasic'.tr(), _ => 'aecWebrtc'.tr() };
+    String jitter(String v) => switch (v) { 'low' => 'jitterLow'.tr(), 'robust' => 'jitterRobust'.tr(), _ => 'jitterAuto'.tr() };
+    return Scaffold(
+      appBar: AppBar(title: Text('advancedCall'.tr(), style: const TextStyle(fontWeight: FontWeight.w800))),
+      body: ListView(padding: const EdgeInsets.only(bottom: 48), children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: t.info.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: t.info.withValues(alpha: 0.3)),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.info_outline, size: 20, color: t.info),
+            const SizedBox(width: 10),
+            Expanded(child: Text('advancedNotice'.tr(), style: const TextStyle(fontSize: 13, height: 1.45))),
+          ]),
+        ),
+        SettingsSection(title: 'audio'.tr(), children: [
+          SettingsTile(
+            icon: Icons.surround_sound_outlined,
+            tint: t.accent,
+            title: 'echoCancel'.tr(),
+            subtitle: aec(s.aecMode),
+            onTap: () async {
+              final v = await chooseOne<int>(context, 'echoCancel'.tr(), s.aecMode, [
+                (0, 'aecOff'.tr(), null),
+                (1, 'aecBasic'.tr(), null),
+                (2, 'aecWebrtc'.tr(), null),
+              ]);
+              if (v != null) s.aecMode = v;
+            },
+          ),
+          _switch(context, Icons.noise_aware, t.info, 'noiseSup'.tr(), null, s.noiseSuppression, (v) => s.noiseSuppression = v),
+          _switch(context, Icons.volume_up_outlined, t.info, 'autoGain'.tr(), null, s.autoGain, (v) => s.autoGain = v),
         ]),
-        section('network'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('iceServers'.tr()),
-            subtitle: Text(s.iceServers.isEmpty ? 'iceServersNone'.tr() : '${s.iceServers.length}'),
-            trailing: Icon(Icons.chevron_right, color: t.text2),
+        SettingsSection(title: 'voiceQuality'.tr(), children: [
+          SettingsTile(
+            icon: Icons.equalizer,
+            tint: t.info,
+            title: 'jitterBuffer'.tr(),
+            subtitle: jitter(s.jitterMode),
+            onTap: () async {
+              final v = await chooseOne<String>(context, 'jitterBuffer'.tr(), s.jitterMode, [
+                ('auto', 'jitterAuto'.tr(), 'jitterAutoSub'.tr()),
+                ('low', 'jitterLow'.tr(), 'jitterLowSub'.tr()),
+                ('robust', 'jitterRobust'.tr(), 'jitterRobustSub'.tr()),
+              ]);
+              if (v != null) s.jitterMode = v;
+            },
+          ),
+          _switch(context, Icons.signal_cellular_alt, t.success, 'showCallQuality'.tr(), 'showCallQualitySub'.tr(),
+              s.showCallQuality, (v) => s.showCallQuality = v),
+        ]),
+        SettingsSection(title: 'network'.tr(), children: [
+          SettingsTile(
+            icon: Icons.hub_outlined,
+            tint: t.accent,
+            title: 'iceServers'.tr(),
+            subtitle: s.iceServers.isEmpty ? 'iceServersNone'.tr() : '${s.iceServers.length}',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IceServersScreen())),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('forceRelay'.tr()),
-            subtitle: Text('forceRelaySub'.tr()),
-            value: s.forceRelay,
-            onChanged: (v) => s.forceRelay = v,
+          _switch(context, Icons.shield_outlined, t.warn, 'forceRelay'.tr(), 'forceRelaySub'.tr(), s.forceRelay,
+              (v) => s.forceRelay = v),
+          SettingsTile(
+            icon: Icons.timer_outlined,
+            tint: t.purple,
+            title: 'regExpires'.tr(),
+            subtitle: '${s.regExpires}s · ${'restartApp'.tr()}',
+            onTap: () async {
+              final v = await chooseOne<int>(context, 'regExpires'.tr(), s.regExpires,
+                  [for (final v in [60, 120, 300, 600, 1800, 3600]) (v, '${v}s', null)]);
+              if (v != null) s.regExpires = v;
+            },
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('regExpires'.tr()),
-            subtitle: Text('restartApp'.tr()),
-            trailing: DropdownButton<int>(
-              value: s.regExpires,
-              underline: const SizedBox.shrink(),
-              items: [for (final v in [60, 120, 300, 600, 1800, 3600]) DropdownMenuItem(value: v, child: Text('${v}s'))],
-              onChanged: (v) => s.regExpires = v ?? 300,
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('keepalive'.tr()),
-            subtitle: Text('restartApp'.tr()),
-            trailing: DropdownButton<int>(
-              value: s.keepaliveSec,
-              underline: const SizedBox.shrink(),
-              items: [for (final v in [15, 30, 60, 120]) DropdownMenuItem(value: v, child: Text('${v}s'))],
-              onChanged: (v) => s.keepaliveSec = v ?? 30,
-            ),
+          SettingsTile(
+            icon: Icons.monitor_heart_outlined,
+            tint: t.purple,
+            title: 'keepalive'.tr(),
+            subtitle: '${s.keepaliveSec}s · ${'restartApp'.tr()}',
+            onTap: () async {
+              final v = await chooseOne<int>(context, 'keepalive'.tr(), s.keepaliveSec,
+                  [for (final v in [15, 30, 60, 120]) (v, '${v}s', null)]);
+              if (v != null) s.keepaliveSec = v;
+            },
           ),
         ]),
-        section('diagnostics'.tr(), [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('debugLogging'.tr()),
-            subtitle: Text('restartApp'.tr()),
-            value: s.debugLogging,
-            onChanged: (v) => s.debugLogging = v,
+      ]),
+    );
+  }
+}
+
+/// Settings → Help & diagnostics: registration, permissions, logs, version.
+class DiagnosticsScreen extends ConsumerWidget {
+  const DiagnosticsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final s = ref.watch(settingsProvider);
+    final sip = ref.watch(sipProvider);
+    final accounts = ref.watch(accountsProvider).accounts;
+    void open(Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    return Scaffold(
+      appBar: AppBar(title: Text('helpDiagnostics'.tr(), style: const TextStyle(fontWeight: FontWeight.w800))),
+      body: ListView(padding: const EdgeInsets.only(bottom: 48), children: [
+        SettingsSection(title: 'connection'.tr(), children: [
+          for (final a in accounts)
+            Builder(builder: (context) {
+              final rt = sip.runtimes[a.id];
+              final ok = rt?.status == RegStatus.registered;
+              return SettingsTile(
+                icon: ok ? Icons.cloud_done_outlined : Icons.cloud_off,
+                tint: ok ? t.success : t.danger,
+                title: a.label,
+                subtitle: a.enabled ? regText(rt) : 'regOff'.tr(),
+                trailing: SettingsBadge(ok ? 'registered'.tr() : 'notRegistered'.tr(), color: ok ? t.success : t.danger),
+                onTap: ok ? null : () => sip.retryNow(a.id),
+              );
+            }),
+        ]),
+        SettingsSection(title: 'permissions'.tr(), children: const [
+          _PermissionTile(Permission.microphone, 'microphone', Icons.mic_none),
+          _PermissionTile(Permission.notification, 'notifications', Icons.notifications_none),
+        ]),
+        SettingsSection(title: 'diagnostics'.tr(), children: [
+          _switch(context, Icons.bug_report_outlined, t.warn, 'debugLogging'.tr(), 'restartApp'.tr(), s.debugLogging,
+              (v) => s.debugLogging = v),
+          SettingsTile(
+            icon: Icons.article_outlined,
+            tint: t.info,
+            title: 'connectionLog'.tr(),
+            subtitle: 'logLines'.tr(namedArgs: {'n': '${sip.connLog.length}'}),
+            onTap: () => open(LogScreen(title: 'connectionLog'.tr(), read: (r) => r.read(sipProvider).connLog)),
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('connectionLog'.tr()),
-            trailing: Icon(Icons.chevron_right, color: t.text2),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => LogScreen(title: 'connectionLog'.tr(), read: (r) => r.read(sipProvider).connLog))),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('sipTrace'.tr()),
-            subtitle: Text('restartNote'.tr()),
-            value: s.traceSip,
-            onChanged: (v) => s.traceSip = v,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('sipLog'.tr()),
-            trailing: Icon(Icons.chevron_right, color: t.text2),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => LogScreen(title: 'sipLog'.tr(), read: (r) => r.read(sipProvider).sipLog))),
+          _switch(context, Icons.swap_vert, t.purple, 'sipTrace'.tr(), 'restartNote'.tr(), s.traceSip, (v) => s.traceSip = v),
+          SettingsTile(
+            icon: Icons.receipt_long_outlined,
+            tint: t.purple,
+            title: 'sipLog'.tr(),
+            subtitle: 'logLines'.tr(namedArgs: {'n': '${sip.sipLog.length}'}),
+            onTap: () => open(LogScreen(title: 'sipLog'.tr(), read: (r) => r.read(sipProvider).sipLog)),
           ),
         ]),
-        section('about'.tr(), [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('sdk'.tr()),
+        SettingsSection(title: 'about'.tr(), children: [
+          SettingsTile(
+            icon: Icons.info_outline,
+            tint: t.text2,
+            title: 'sdk'.tr(),
             trailing: Text(sip.sdk?.version ?? '—', style: mono(context, size: 12)),
           ),
         ]),
@@ -413,9 +626,10 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 class _PermissionTile extends StatefulWidget {
-  const _PermissionTile(this.permission, this.labelKey);
+  const _PermissionTile(this.permission, this.labelKey, this.icon);
   final Permission permission;
   final String labelKey;
+  final IconData icon;
 
   @override
   State<_PermissionTile> createState() => _PermissionTileState();
@@ -433,9 +647,10 @@ class _PermissionTileState extends State<_PermissionTile> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(widget.labelKey.tr()),
+    return SettingsTile(
+      icon: widget.icon,
+      tint: _granted == true ? t.success : t.warn,
+      title: widget.labelKey.tr(),
       trailing: _granted == true
           ? Text('granted'.tr(), style: TextStyle(color: t.success, fontWeight: FontWeight.w600))
           : TextButton(
@@ -741,13 +956,16 @@ class _RecordingFolderSheet extends ConsumerWidget {
       if (dir == null) return;
       // The recorder writes the file natively, so the folder must be
       // writable as a plain path; test before switching to it.
-      try {
-        final probe = File('$dir/.medut-write-test');
-        await probe.writeAsString('ok');
-        await probe.delete();
-      } catch (_) {
+      if (!await SipService.canWrite(dir)) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('folderNotWritable'.tr())));
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text('folderNotWritableTitle'.tr()),
+              content: Text('folderNotWritable'.tr(namedArgs: {'dir': dir})),
+              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('close'.tr()))],
+            ),
+          );
         }
         return;
       }

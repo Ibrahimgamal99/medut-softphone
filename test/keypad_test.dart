@@ -35,7 +35,7 @@ void main() {
     store = await AccountStore.load();
   });
 
-  Future<void> pump(WidgetTester tester, Size size, {RegStatus status = RegStatus.registered}) async {
+  Future<void> pump(WidgetTester tester, Size size, {RegStatus status = RegStatus.registered, VoidCallback? onClose}) async {
     final settings = await AppSettings.load();
     final db = _FakeDb();
     sip = SipService(store: store, settings: settings, db: db);
@@ -53,11 +53,19 @@ void main() {
       ],
       child: MaterialApp(
         theme: ThemeData(useMaterial3: true, extensions: const [Tokens.light]),
-        home: Scaffold(body: SafeArea(child: DialerScreen(addCallMode: ValueNotifier(false)))),
+        home: Scaffold(body: SafeArea(child: DialerScreen(addCallMode: ValueNotifier(false), onClose: onClose))),
       ),
     ));
     await tester.pump();
   }
+
+  testWidgets('as a page from the dial button: close instead of the avatar, still fits 360', (tester) async {
+    var closed = false;
+    await pump(tester, const Size(360, 640), onClose: () => closed = true);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('close'));
+    expect(closed, isTrue);
+  });
 
   for (final size in const [Size(360, 640), Size(412, 915)]) {
     testWidgets('fits ${size.width.toInt()}×${size.height.toInt()} and types digits', (tester) async {

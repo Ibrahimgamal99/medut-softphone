@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!-- Recordings in Recordings/Medut: Android 10 and older need this to write
+         shared storage; Android 11+ lets an app create its own audio files there. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
 
     <!-- Ringing: full-screen incoming call over the lock screen -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -27,6 +30,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
+        android:requestLegacyExternalStorage="true"
         android:label="@string/app_name"
         android:name=".MedutApp"
         android:icon="@mipmap/ic_launcher">

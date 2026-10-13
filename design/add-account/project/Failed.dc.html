@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in failed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+.pk{--bg:#0C0E10;--sf:#16191C;--sf2:#1F2327;--bd:#2A2F34;--tx:#F2F4F6;--tx2:#A0A8B2;--mu:#6F7781;--ac:#3DD49A;--acs:rgba(61,212,154,.14);--onac:#04271A;--bad:#FF6B70;--bads:rgba(255,90,95,.14);--dim:rgba(0,0,0,.62);width:390px;height:844px;box-sizing:border-box;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:"Figtree",system-ui,sans-serif;display:flex;flex-direction:column}
+.pk.light{--bg:#F3F4F6;--sf:#FFFFFF;--sf2:#E9ECEF;--bd:#E0E3E8;--tx:#0E1116;--tx2:#5D6470;--mu:#8A919B;--ac:#08805A;--acs:#DCF2E8;--onac:#FFFFFF;--bad:#C62828;--bads:#FDE6E6;--dim:rgba(14,17,22,.4)}
+.pk *{box-sizing:border-box}
+.pk button,.pk input{font:inherit;color:inherit}
+.mono{font-family:"DM Mono",ui-monospace,monospace}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fld{display:block;background:var(--sf);border-radius:18px;padding:8px 16px 9px;border:1.5px solid transparent;box-shadow:0 1px 0 var(--bd)}
+.fld small{display:block;font-size:11px;font-weight:600;color:var(--tx2)}
+.fld input{display:block;width:100%;min-width:0;border:0;background:none;padding:2px 0 0;font-size:16px;font-weight:500;outline:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:27px;border:0;background:var(--ac);color:var(--onac);font-size:16px;font-weight:700;cursor:pointer}
+.fix{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 14px;border:0;border-top:1px solid var(--bd);background:none;cursor:pointer;min-height:52px}
+.fix:first-child{border-top:0}
+.fix .ic{color:var(--ac)}
+.fix b{display:block;font-size:14px;font-weight:600}
+.fix small{display:block;font-size:12px;color:var(--tx2);margin-top:1px}
+.ibtn{border:0;background:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--tx2);cursor:pointer}
+.log{margin:0;padding:0 14px 12px;font-size:11px;line-height:1.65;color:var(--tx2);white-space:pre}
+.log b{color:var(--tx);font-weight:500}
+</style>
+</helmet>
+<div class="pk {{theme}}">
+  <div style="display: flex; flex-direction: column; flex: 1; padding: 14px 22px 0">
+    <div style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 800; font-size: 16px; letter-spacing: -0.2px">
+      <span style="width: 26px; height: 26px; border-radius: 9px; background: var(--ac); color: var(--onac); display: grid; place-items: center"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" style="fill: currentColor"><rect x="3.5" y="9" width="2.8" height="6" rx="1.4"></rect><rect x="8.2" y="5.5" width="2.8" height="13" rx="1.4"></rect><rect x="12.9" y="2.5" width="2.8" height="19" rx="1.4"></rect><rect x="17.6" y="7" width="2.8" height="10" rx="1.4"></rect></svg></span>
+      medut
+    </div>
+
+    <h1 style="margin: 12px 0 14px; font-size: 28px; font-weight: 800; letter-spacing: -0.8px; line-height: 1.05">Sign in</h1>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <label class="fld"><small>SIP address</small><input type="text" value="201@pbx.acme.com"></label>
+      <label class="fld"><small>Password</small><input type="password" value="secret-pass"></label>
+    </div>
+
+    <div role="alert" style="display: flex; gap: 11px; margin-top: 14px; padding: 13px 14px; border-radius: 18px; background: var(--bads)">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--bad); margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16v.01"></path></svg>
+      <div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--bad)">pbx.acme.com didn't answer</div>
+        <div style="font-size: 12.5px; line-height: 1.4; margin-top: 3px">We tried secure (TLS), TCP, UDP and web links. None answered within 8 seconds.</div>
+      </div>
+    </div>
+
+    <h2 style="margin: 16px 6px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx2)">Things to try</h2>
+    <div style="border-radius: 18px; background: var(--sf); overflow: hidden">
+      <button class="fix" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        <span style="flex: 1"><b>Enter a web link</b><small>If your admin gave you a wss:// address</small></span>
+      </button>
+      <button class="fix" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>
+        <span style="flex: 1"><b>Use a QR code or setup file</b><small>Ask your admin for one</small></span>
+      </button>
+      <button class="fix" type="button">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"></path></svg>
+        <span style="flex: 1"><b>Check the network</b><small>Some servers need office Wi-Fi or a VPN</small></span>
+      </button>
+    </div>
+
+    <section aria-label="What happened" style="margin-top: 12px; border-radius: 18px; background: var(--sf)">
+      <div style="display: flex; align-items: center; padding: 4px 4px 0 14px">
+        <h2 style="margin: 0; flex: 1; font-size: 13.5px; font-weight: 700">What happened <span class="mono" style="font-weight: 400; font-size: 11px; color: var(--tx2)">17:42:03</span></h2>
+        <button class="ibtn" type="button" aria-label="Copy log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 17px; height: 17px"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+        <button class="ibtn" type="button" aria-label="Share log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 17px; height: 17px"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"></path></svg></button>
+      </div>
+<pre class="log mono"><b>DNS</b>  pbx.acme.com → 203.0.113.10
+<b>TLS</b>  :5061  no answer after 8 s
+<b>TCP</b>  :5060  connection refused
+<b>UDP</b>  :5060  no answer after 8 s
+<b>WSS</b>  :443   no SIP at /ws, /sip-ws, /</pre>
+    </section>
+
+    <div style="flex: 1"></div>
+    <button class="btn" type="button" style="margin-bottom: 18px">Try again</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

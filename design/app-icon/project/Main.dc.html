@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Medut icons on a home screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; font-family: 'Figtree', system-ui, sans-serif">
+  <sc-for list="{{rows}}" as="row" hint-placeholder-count="2">
+    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 26px; padding: 0 22px; background: {{row.wall}}">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; justify-items: center">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px">
+          <svg width="62" height="62" viewBox="0 0 100 100" role="img" aria-label="Option A, the speaking staff">
+            <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+            <path d="M34 78 V33 a9 9 0 0 1 9 -9 h3" fill="none" stroke="{{c.fg}}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M52 41 a13 13 0 0 1 0 18" fill="none" stroke="{{c.acc}}" stroke-width="6.5" stroke-linecap="round"></path>
+            <path d="M60 33 a24 24 0 0 1 0 34" fill="none" stroke="{{c.acc}}" stroke-width="6.5" stroke-linecap="round"></path>
+          </svg>
+          <span style="font-size: 12px; font-weight: 600; color: {{row.label}}">A · Staff</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px">
+          <svg width="62" height="62" viewBox="0 0 100 100" role="img" aria-label="Option B, mdwt in hieroglyphs">
+            <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+            <path d="M31 78 V32 a8 8 0 0 1 8 -8" fill="none" stroke="{{c.fg}}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="45" y="36" width="32" height="11" rx="5.5" fill="{{c.fg}}"></rect>
+            <rect x="49" y="29" width="7" height="10" rx="3.5" fill="{{c.fg}}"></rect>
+            <path d="M46 78 a15 15 0 0 1 30 0 z" fill="{{c.acc}}"></path>
+          </svg>
+          <span style="font-size: 12px; font-weight: 600; color: {{row.label}}">B · Glyphs</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px">
+          <svg width="62" height="62" viewBox="0 0 100 100" role="img" aria-label="Option C, cartouche">
+            <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+            <rect x="31" y="15" width="38" height="62" rx="19" fill="none" stroke="{{c.fg}}" stroke-width="6.5"></rect>
+            <rect x="27" y="82" width="46" height="6.5" rx="3.25" fill="{{c.fg}}"></rect>
+            <rect x="38.5" y="40" width="6" height="14" rx="3" fill="{{c.acc}}"></rect>
+            <rect x="47" y="33" width="6" height="28" rx="3" fill="{{c.acc}}"></rect>
+            <rect x="55.5" y="38" width="6" height="18" rx="3" fill="{{c.acc}}"></rect>
+          </svg>
+          <span style="font-size: 12px; font-weight: 600; color: {{row.label}}">C · Cartouche</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px">
+          <svg width="62" height="62" viewBox="0 0 100 100" role="img" aria-label="Option D, today's sound bars">
+            <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+            <rect x="23" y="41" width="9" height="18" rx="4.5" fill="{{c.fg}}"></rect>
+            <rect x="38" y="30.5" width="9" height="39" rx="4.5" fill="{{c.fg}}"></rect>
+            <rect x="53" y="21.5" width="9" height="57" rx="4.5" fill="{{c.fg}}"></rect>
+            <rect x="68" y="35" width="9" height="30" rx="4.5" fill="{{c.fg}}"></rect>
+          </svg>
+          <span style="font-size: 12px; font-weight: 600; color: {{row.label}}">D · Today</span>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"bg":{"editor":"enum","options":["green","ink","papyrus"],"default":"green"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const palettes = {
+      green: { bg: '#08805A', fg: '#FFFFFF', acc: '#A6F0CF' },
+      ink: { bg: '#0E1116', fg: '#3DD49A', acc: '#2A9C73' },
+      papyrus: { bg: '#EBDFC3', fg: '#14211B', acc: '#08805A' },
+    };
+    return {
+      c: palettes[this.props.bg ?? 'green'] ?? palettes.green,
+      rows: [
+        { wall: '#1C2633', label: '#F2F4F6' },
+        { wall: '#E7EBEF', label: '#0E1116' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

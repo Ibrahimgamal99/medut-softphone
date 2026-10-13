@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Icon B, mdwt in hieroglyphs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 480px; height: 560px; display: flex; flex-direction: column; background: #F3F4F6">
+  <div style="flex: 1; display: grid; place-items: center">
+    <svg width="300" height="300" viewBox="0 0 100 100" role="img" aria-label="Medut icon option B: the staff, hand and loaf that spell mdwt">
+      <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+      <path d="M31 78 V32 a8 8 0 0 1 8 -8" fill="none" stroke="{{c.fg}}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <rect x="45" y="36" width="32" height="11" rx="5.5" fill="{{c.fg}}"></rect>
+      <rect x="49" y="29" width="7" height="10" rx="3.5" fill="{{c.fg}}"></rect>
+      <path d="M46 78 a15 15 0 0 1 30 0 z" fill="{{c.acc}}"></path>
+    </svg>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: 150px">
+    <sc-for list="{{strips}}" as="strip" hint-placeholder-count="2">
+      <div style="display: flex; gap: 18px; align-items: center; justify-content: center; background: {{strip.bg}}">
+        <sc-for list="{{sizes}}" as="s" hint-placeholder-count="3">
+          <svg width="{{s}}" height="{{s}}" viewBox="0 0 100 100" aria-hidden="true">
+            <rect width="100" height="100" rx="22.5" fill="{{c.bg}}"></rect>
+            <path d="M31 78 V32 a8 8 0 0 1 8 -8" fill="none" stroke="{{c.fg}}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="45" y="36" width="32" height="11" rx="5.5" fill="{{c.fg}}"></rect>
+            <rect x="49" y="29" width="7" height="10" rx="3.5" fill="{{c.fg}}"></rect>
+            <path d="M46 78 a15 15 0 0 1 30 0 z" fill="{{c.acc}}"></path>
+          </svg>
+        </sc-for>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"bg":{"editor":"enum","options":["green","ink","papyrus"],"default":"green"},"$preview":{"width":480,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const palettes = {
+      green: { bg: '#08805A', fg: '#FFFFFF', acc: '#A6F0CF' },
+      ink: { bg: '#0E1116', fg: '#3DD49A', acc: '#2A9C73' },
+      papyrus: { bg: '#EBDFC3', fg: '#14211B', acc: '#08805A' },
+    };
+    return {
+      c: palettes[this.props.bg ?? 'green'] ?? palettes.green,
+      sizes: [72, 48, 32],
+      strips: [{ bg: '#FFFFFF' }, { bg: '#0C0E10' }],
+    };
+  }
+}
+</script>
+</body>
+</html>

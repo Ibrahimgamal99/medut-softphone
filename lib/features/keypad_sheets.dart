@@ -8,7 +8,6 @@ import '../core/theme.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'accounts.dart';
-import 'settings_screen.dart';
 import 'contacts_screen.dart';
 
 /// The two sheets of the keypad header: "you" from the avatar (status,
@@ -71,7 +70,7 @@ class _MeSheet extends ConsumerWidget {
           Expanded(
             child: Padding(
               padding: EdgeInsetsDirectional.only(end: s == MyStatus.dnd ? 0 : 6),
-              child: StatusButton(status: s, selected: settings.status == s, onTap: () => settings.status = s),
+              child: StatusButton(status: s, selected: settings.status == s, onTap: () => ref.read(sipProvider).setMyStatus(s)),
             ),
           ),
       ]),
@@ -95,15 +94,6 @@ class _MeSheet extends ConsumerWidget {
         onTap: () {
           nav.pop();
           nav.push(MaterialPageRoute(builder: (_) => const AccountsScreen()));
-        },
-      ),
-      const SizedBox(height: 8),
-      _SheetTile(
-        icon: Icons.settings_outlined,
-        title: 'settings'.tr(),
-        onTap: () {
-          nav.pop();
-          nav.push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
         },
       ),
     ]);

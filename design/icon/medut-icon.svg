@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <!-- Medut: the md staff (𓌃), first sign of mdwt "speech", speaking. Full-bleed square: iOS rounds it. -->
+  <rect width="100" height="100" fill="#08805A"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" transform="translate(-0.15 -1)">
+    <path d="M34 78 V33 a9 9 0 0 1 9 -9 h3" stroke-width="8"/>
+    <path d="M52 41 a13 13 0 0 1 0 18" stroke-width="6.5"/>
+    <path d="M60 33 a24 24 0 0 1 0 34" stroke-width="6.5"/>
+  </g>
+</svg>

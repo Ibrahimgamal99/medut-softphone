@@ -57,6 +57,10 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     @Suppress("UNCHECKED_CAST")
     val second: Map<String, Any?>? get() = raw["second"] as? Map<String, Any?>
 
+    /** A warm transfer under way: phase (calling | talking), status, hint, join, back. */
+    @Suppress("UNCHECKED_CAST")
+    val transfer: Map<String, Any?>? get() = raw["transfer"] as? Map<String, Any?>
+
     @Suppress("UNCHECKED_CAST")
     private val labels: Map<String, Any?> get() = raw["labels"] as? Map<String, Any?> ?: emptyMap()
 

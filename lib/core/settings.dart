@@ -52,6 +52,7 @@ class AppSettings extends ChangeNotifier {
 
   String _s(String k, String d) => _prefs.getString(k) ?? d;
   bool _b(String k, bool d) => _prefs.getBool(k) ?? d;
+  int _i(String k, int d) => _prefs.getInt(k) ?? d;
 
   Future<void> _set(String k, Object v) async {
     switch (v) {
@@ -76,6 +77,16 @@ class AppSettings extends ChangeNotifier {
   // Your status
   MyStatus get status => MyStatus.values.byName(_s('status', 'available'));
   set status(MyStatus v) => _set('status', v.name);
+
+  /// When the status was last picked (for the "Ready 12:03" timer).
+  DateTime get statusSince => DateTime.fromMillisecondsSinceEpoch(_i('statusSince', 0));
+  set statusSince(DateTime v) => _set('statusSince', v.millisecondsSinceEpoch);
+
+  /// Accounts whose queue log-in code was dialed last (rather than log-out),
+  /// so a toggle code such as FreePBX's *45 is only dialed to change it.
+  Set<String> get queueIn => (jsonDecode(_s('queueIn', '[]')) as List).cast<String>().toSet();
+  void setQueueIn(String accountId, bool on) =>
+      _set('queueIn', jsonEncode((on ? ({...queueIn, accountId}) : (queueIn..remove(accountId))).toList()));
 
   bool get officeHours => _b('officeHours', false);
   set officeHours(bool v) => _set('officeHours', v);

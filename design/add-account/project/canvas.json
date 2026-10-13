@@ -1,0 +1,40 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-13T14:55:00Z"},
+  "title": "Add account redesign",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "A · One smart field (recommended)"},
+    "SignIn-B.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "B · Server first"},
+    "SignIn-C.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "C · Choose a way first"},
+    "Checking.dc.html": {"x": 0, "y": 1300, "w": 390, "h": 844, "title": "Checking every way at once"},
+    "Failed.dc.html": {"x": 470, "y": 1300, "w": 390, "h": 844, "title": "Couldn't sign in"},
+    "Connected.dc.html": {"x": 940, "y": 1300, "w": 390, "h": 844, "title": "Connected"},
+    "More-A.dc.html": {"x": 0, "y": 2600, "w": 390, "h": 844, "title": "A · Plain words (recommended)"},
+    "More-B.dc.html": {"x": 470, "y": 2600, "w": 390, "h": 844, "title": "B · Named by the problem"},
+    "Tech-A.dc.html": {"x": 0, "y": 3900, "w": 390, "h": 844, "title": "A · Sections with summaries (recommended)"},
+    "Tech-A-Connection.dc.html": {"x": 470, "y": 3900, "w": 390, "h": 844, "title": "A · Connection page"},
+    "Tech-B.dc.html": {"x": 940, "y": 3900, "w": 390, "h": 844, "title": "B · One page with jump chips"}
+  },
+  "order": [
+    "Main.dc.html",
+    "SignIn-B.dc.html",
+    "SignIn-C.dc.html",
+    "Checking.dc.html",
+    "Failed.dc.html",
+    "Connected.dc.html",
+    "More-A.dc.html",
+    "More-B.dc.html",
+    "Tech-A.dc.html",
+    "Tech-A-Connection.dc.html",
+    "Tech-B.dc.html"
+  ],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "1 · Add account", "kind": "title1", "maxW": 1330},
+    "row2": {"x": 0, "y": 1000, "text": "2 · Signing in (with A)", "kind": "title1", "maxW": 1330},
+    "row3": {"x": 0, "y": 2300, "text": "3 · More options sheet", "kind": "title1", "maxW": 1330},
+    "row4": {"x": 0, "y": 3600, "text": "4 · All technical settings", "kind": "title1", "maxW": 1330}
+  },
+  "designSystems": []
+}

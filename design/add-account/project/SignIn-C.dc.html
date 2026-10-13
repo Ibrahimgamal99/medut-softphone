@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add an account, choose a way</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+.pk{--bg:#0C0E10;--sf:#16191C;--sf2:#1F2327;--bd:#2A2F34;--tx:#F2F4F6;--tx2:#A0A8B2;--mu:#6F7781;--ac:#3DD49A;--acs:rgba(61,212,154,.14);--onac:#04271A;--bad:#FF6B70;--bads:rgba(255,90,95,.14);--dim:rgba(0,0,0,.62);width:390px;height:844px;box-sizing:border-box;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:"Figtree",system-ui,sans-serif;display:flex;flex-direction:column}
+.pk.light{--bg:#F3F4F6;--sf:#FFFFFF;--sf2:#E9ECEF;--bd:#E0E3E8;--tx:#0E1116;--tx2:#5D6470;--mu:#8A919B;--ac:#08805A;--acs:#DCF2E8;--onac:#FFFFFF;--bad:#C62828;--bads:#FDE6E6;--dim:rgba(14,17,22,.4)}
+.pk *{box-sizing:border-box}
+.pk button,.pk input{font:inherit;color:inherit}
+.mono{font-family:"DM Mono",ui-monospace,monospace}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tbtn{border:0;background:none;cursor:pointer;color:var(--tx2);font-weight:600;font-size:14px;min-height:44px;padding:0 6px}
+.way{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:16px;border-radius:20px;border:1px solid var(--bd);background:var(--sf);cursor:pointer}
+.way.first{border:1.5px solid var(--ac)}
+.way .ico{width:44px;height:44px;border-radius:14px;background:var(--acs);color:var(--ac);display:grid;place-items:center;flex:none}
+.way .ico .ic{width:22px;height:22px}
+.way b{display:block;font-size:16px;font-weight:700}
+.way small{display:block;font-size:12.5px;color:var(--tx2);margin-top:2px;line-height:1.35}
+.way .chev{color:var(--tx2)}
+</style>
+</helmet>
+<div class="pk {{theme}}">
+  <div style="display: flex; flex-direction: column; flex: 1; padding: 14px 22px 0">
+    <div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px">
+      <button type="button" aria-label="Back" style="border: 0; background: none; padding: 0; width: 44px; height: 44px; margin-left: -12px; display: grid; place-items: center; color: var(--tx); cursor: pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="m15 18-6-6 6-6"></path></svg></button>
+      <button class="tbtn" type="button" lang="ar">العربية</button>
+    </div>
+
+    <h1 style="margin: 16px 0 8px; font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.05">Add an account</h1>
+    <p style="margin: 0 0 24px; font-size: 14.5px; line-height: 1.4; color: var(--tx2)">How did your admin send your details?</p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <button class="way first" type="button">
+        <span class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 16h8M10 13h4"></path></svg></span>
+        <span style="flex: 1; min-width: 0"><b>Address and password</b><small>Like 201@pbx.acme.com and a password</small></span>
+        <svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+      <button class="way" type="button">
+        <span class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 17h4v4h-4z"></path></svg></span>
+        <span style="flex: 1; min-width: 0"><b>QR code</b><small>Scan it from a screen, an email or a printout</small></span>
+        <svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+      <button class="way" type="button">
+        <span class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg></span>
+        <span style="flex: 1; min-width: 0"><b>Setup file</b><small>A <span class="mono">.json</span> account file, like Medut-SDK's</small></span>
+        <svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+      <button class="way" type="button">
+        <span class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path></svg></span>
+        <span style="flex: 1; min-width: 0"><b>Paste a setup link</b><small>A <span class="mono">sip:</span> link or account text you were sent</small></span>
+        <svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+    </div>
+
+    <div style="flex: 1"></div>
+    <p style="margin: 0 0 22px; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--tx2)">Each way ends on the same check before anything is saved. You can change any setting later in Accounts.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

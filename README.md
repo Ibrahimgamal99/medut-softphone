@@ -8,6 +8,11 @@ The app is only an interface: every feature maps to a Medut-SDK call. What the
 SDK does not do (video, conference mixing, call park, visual voicemail) is not
 in the app.
 
+## The name
+
+*Medut* is the Ancient Egyptian *mdwt* (/mɛduːt/): "words, speech". The app
+icon is its first hieroglyph, the staff 𓌃, speaking.
+
 ## Features
 
 - Any number of SIP accounts over UDP / TCP / TLS / WS / WSS, with live

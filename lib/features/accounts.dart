@@ -83,7 +83,14 @@ class _AccountCard extends ConsumerWidget {
         Row(children: [
           Dot(color, size: 10),
           const SizedBox(width: 10),
-          Expanded(child: Text(cfg.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+          Flexible(child: Text(cfg.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+          IconButton(
+            tooltip: 'rename'.tr(),
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.edit_outlined, size: 18, color: t.text2),
+            onPressed: () => renameAccount(context, ref, cfg),
+          ),
+          const Spacer(),
           if (cfg.isDefault)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -182,4 +189,45 @@ class _DialRulesCard extends ConsumerWidget {
       ]),
     );
   }
+}
+
+/// Gives an account a name of your own ("Office", "Sales line").
+Future<void> renameAccount(BuildContext context, WidgetRef ref, SipAccountConfig cfg) async {
+  final name = await showDialog<String>(context: context, builder: (_) => _RenameDialog(initial: cfg.label));
+  if (name == null) return;
+  await ref.read(accountsProvider).save(cfg.copyWith(name: name.trim().isEmpty ? cfg.domain : name.trim()));
+}
+
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final _text = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('accountName'.tr()),
+        content: TextField(
+          controller: _text,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(hintText: 'accountNameHint'.tr(), helperText: 'accountNameHelp'.tr()),
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+          FilledButton(onPressed: () => Navigator.pop(context, _text.text), child: Text('save'.tr())),
+        ],
+      );
 }

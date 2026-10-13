@@ -14,10 +14,11 @@ import 'chat.dart';
 import 'dialer.dart';
 import 'contacts_screen.dart';
 import 'transfer_sheet.dart';
+import 'settings_screen.dart';
 
-/// Bottom tabs (Calls · Keypad · Contacts) and the bar that returns to a call
-/// running on the native screen. Accounts and settings open from the avatar
-/// on the keypad.
+/// Bottom tabs (Calls · Contacts · Settings), the dial button that opens the
+/// keypad over Calls and Contacts, and the bar that returns to a call running
+/// on the native screen.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -26,7 +27,7 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _tab = 1; // Keypad
+  int _tab = 0; // Calls
   final _addCallMode = ValueNotifier<bool>(false);
   final _subs = <StreamSubscription<dynamic>>[];
 
@@ -60,8 +61,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case 'transfer':
         if (call != null) showTransferSheet(context);
       case 'add':
-        setState(() => _tab = 1);
-        _addCallMode.value = true;
+        _openKeypad(addCall: true);
       case 'message':
       case 'reply':
         if (call != null) {
@@ -79,20 +79,40 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
+  /// The keypad, full screen over the tabs; [addCall] when the call screen
+  /// asked for a second call.
+  void _openKeypad({bool addCall = false}) {
+    _addCallMode.value = addCall;
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => KeypadPage(addCallMode: _addCallMode),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final sip = ref.watch(sipProvider);
     return Scaffold(
+      floatingActionButton: _tab < 2
+          ? FloatingActionButton(
+              tooltip: 'tabKeypad'.tr(),
+              onPressed: _openKeypad,
+              backgroundColor: t.accent,
+              foregroundColor: t.onAccent,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.dialpad),
+            )
+          : null,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
           if (sip.hasCall) _ReturnToCallBar(sip: sip),
           Expanded(
-            child: IndexedStack(index: _tab, children: [
-              const ActivityScreen(),
-              DialerScreen(addCallMode: _addCallMode),
-              const ContactsScreen(),
+            child: IndexedStack(index: _tab, children: const [
+              ActivityScreen(),
+              ContactsScreen(),
+              SettingsScreen(),
             ]),
           ),
         ]),
@@ -173,8 +193,8 @@ class _BottomNav extends ConsumerWidget {
     final seen = ref.watch(settingsProvider).activitySeenAt;
     final items = [
       (Icons.schedule, 'tabCalls'.tr()),
-      (Icons.dialpad, 'tabKeypad'.tr()),
       (Icons.people_outline, 'tabContacts'.tr()),
+      (Icons.settings_outlined, 'settings'.tr()),
     ];
     return Container(
       color: t.nav,

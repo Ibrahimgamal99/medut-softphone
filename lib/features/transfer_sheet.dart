@@ -13,8 +13,9 @@ Future<void> showTransferSheet(BuildContext context) => showModalBottomSheet<voi
       builder: (_) => const _TransferSheet(),
     );
 
-/// Design E · Transfer: "Talk first" (attended, REFER + Replaces) or
-/// "Send now" (blind REFER), to a watched colleague or any number.
+/// Transfer: type or pick who to send the caller to, then
+/// "Blind transfer" (REFER, you leave at once) or "Warm transfer" (the caller
+/// waits on hold while you talk to them; Join & drop on the call screen).
 class _TransferSheet extends ConsumerStatefulWidget {
   const _TransferSheet();
 
@@ -23,9 +24,6 @@ class _TransferSheet extends ConsumerStatefulWidget {
 }
 
 class _TransferSheetState extends ConsumerState<_TransferSheet> {
-  bool _talkFirst = true;
-  String _target = '';
-  String _targetName = '';
   final _input = TextEditingController();
 
   @override
@@ -34,110 +32,121 @@ class _TransferSheetState extends ConsumerState<_TransferSheet> {
     super.dispose();
   }
 
+  void _go({required bool warm}) {
+    final target = _input.text.trim();
+    if (target.isEmpty) return;
+    final s = ref.read(sipProvider);
+    if (warm) {
+      s.transferAttended(target);
+    } else {
+      s.transferBlind(target);
+    }
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final t = context.t;
     final sip = ref.watch(sipProvider);
     final call = sip.focused;
     final watched = ref.watch(settingsProvider).watched;
     final q = _input.text.trim().toLowerCase();
     final list = watched.where((w) => q.isEmpty || w.name.toLowerCase().contains(q) || w.ext.contains(q)).toList();
-    final a = call?.title ?? '';
-    final b = _targetName.isNotEmpty ? _targetName : (_target.isNotEmpty ? _target : 'someone'.tr());
+    final ready = _input.text.trim().isNotEmpty && call != null;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('transferWho'.tr(namedArgs: {'a': a}), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+            Text('transferWho'.tr(namedArgs: {'a': call?.title ?? ''}),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.2)),
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: t.surface2, borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [
-                for (final talk in [true, false])
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _talkFirst = talk),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _talkFirst == talk ? t.surface : Colors.transparent,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Text(talk ? 'talkFirst'.tr() : 'sendNow'.tr(),
-                            style: TextStyle(
-                                fontWeight: _talkFirst == talk ? FontWeight.w700 : FontWeight.w500,
-                                color: _talkFirst == talk ? t.text : t.text2)),
-                      ),
-                    ),
-                  ),
-              ]),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _input,
+              autofocus: true,
               keyboardType: TextInputType.phone,
-              onChanged: (v) => setState(() {
-                _target = v.trim();
-                _targetName = '';
-              }),
-              decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'targetHint'.tr()),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'transferTo'.tr(),
+                prefixIcon: const Icon(Icons.dialpad),
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+              ),
+            ),
+            if (list.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView(shrinkWrap: true, children: [
+                  for (final w in list)
+                    _TargetRow(
+                      name: w.name,
+                      ext: w.ext,
+                      selected: _input.text.trim() == w.ext,
+                      onTap: () => setState(() => _input.text = w.ext),
+                    ),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 12),
+            _Option(
+              icon: Icons.phone_forwarded,
+              title: 'blindTransfer'.tr(),
+              hint: 'blindTransferSub'.tr(),
+              onTap: ready ? () => _go(warm: false) : null,
             ),
             const SizedBox(height: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 260),
-              child: ListView(shrinkWrap: true, children: [
-                for (final w in list)
-                  _TargetRow(
-                    name: w.name,
-                    ext: w.ext,
-                    selected: _target == w.ext,
-                    onTap: () => setState(() {
-                      _target = w.ext;
-                      _targetName = w.name;
-                    }),
-                  ),
-              ]),
+            _Option(
+              icon: Icons.groups_outlined,
+              title: 'warmTransfer'.tr(),
+              hint: 'warmTransferSub'.tr(),
+              onTap: ready ? () => _go(warm: true) : null,
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: t.accentSoft, borderRadius: BorderRadius.circular(14)),
-              child: Text(
-                (_talkFirst ? 'helpTalkFirst' : 'helpSendNow').tr(namedArgs: {'a': a, 'b': b}),
-                style: TextStyle(fontSize: 13, height: 1.45, color: t.text),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: SecondaryButton(label: 'cancel'.tr(), onPressed: () => Navigator.pop(context))),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: PrimaryButton(
-                  label: (_talkFirst ? 'callFirst' : 'sendTo').tr(namedArgs: {'b': b}),
-                  color: t.success,
-                  textColor: t.onSuccess,
-                  onPressed: _target.isEmpty || call == null
-                      ? null
-                      : () {
-                          final s = ref.read(sipProvider);
-                          if (_talkFirst) {
-                            s.transferAttended(_target);
-                          } else {
-                            s.transferBlind(_target);
-                          }
-                          Navigator.pop(context);
-                        },
-                ),
-              ),
-            ]),
           ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// One way to transfer: a card with an icon, what it does, and a chevron.
+class _Option extends StatelessWidget {
+  const _Option({required this.icon, required this.title, required this.hint, required this.onTap});
+  final IconData icon;
+  final String title, hint;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Opacity(
+      opacity: onTap == null ? 0.5 : 1,
+      child: Material(
+        color: t.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
+                child: Icon(icon, size: 20, color: t.accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(hint, style: TextStyle(fontSize: 12.5, height: 1.35, color: t.text2)),
+                ]),
+              ),
+              Icon(Icons.chevron_right, color: t.text2),
+            ]),
+          ),
         ),
       ),
     );
@@ -171,7 +180,7 @@ class _TargetRow extends ConsumerWidget {
                 Text('$ext · ${presenceText(p)}', style: TextStyle(fontSize: 12, color: t.text2)),
               ]),
             ),
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: selected ? t.accent : t.border),
+            if (selected) Icon(Icons.check_circle, color: t.accent),
           ]),
         ),
       ),

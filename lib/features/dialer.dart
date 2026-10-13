@@ -13,6 +13,7 @@ import '../core/theme.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'keypad_sheets.dart';
+import 'status.dart';
 import 'settings_screen.dart';
 import 'sign_in.dart';
 
@@ -28,11 +29,25 @@ Future<void> placeCall(BuildContext context, WidgetRef ref, String number, {Stri
   ref.read(sipProvider).dial(number, accountId: accountId, name: name);
 }
 
-/// Pocket · Keypad: you, the account that places the call and voicemail on
+/// Pocket · Keypad: you, the account that places the call and your status on
 /// top; the number with live matches; big round keys.
-class DialerScreen extends ConsumerStatefulWidget {
-  const DialerScreen({super.key, required this.addCallMode});
+/// The keypad, opened full screen from the dial button on Calls and Contacts.
+class KeypadPage extends StatelessWidget {
+  const KeypadPage({super.key, required this.addCallMode});
   final ValueNotifier<bool> addCallMode;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(child: DialerScreen(addCallMode: addCallMode, onClose: () => Navigator.maybePop(context))),
+      );
+}
+
+class DialerScreen extends ConsumerStatefulWidget {
+  const DialerScreen({super.key, required this.addCallMode, this.onClose});
+  final ValueNotifier<bool> addCallMode;
+
+  /// Shown as a close button in place of the avatar (the keypad page).
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<DialerScreen> createState() => _DialerScreenState();
@@ -165,21 +180,26 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
     final matches = _number.isEmpty ? const <_Match>[] : _matches(_number);
 
     return Column(children: [
-      // You (status, accounts, settings) · the account that places the call · voicemail.
+      // You (status, accounts) · the account that places the call · your status.
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
         child: Row(children: [
-          Semantics(
-            button: true,
-            label: 'yourStatus'.tr(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => showMeSheet(context),
-              child: Avatar(me, size: 40, dot: statusColor(t, settings.effectiveStatus())),
+          if (widget.onClose != null)
+            RoundIcon(icon: Icons.keyboard_arrow_down, size: 40, tooltip: 'close'.tr(), onTap: widget.onClose)
+          else
+            Semantics(
+              button: true,
+              label: 'yourStatus'.tr(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => showMeSheet(context),
+                child: Avatar(me, size: 40, dot: statusColor(t, settings.effectiveStatus())),
+              ),
             ),
-          ),
+          const SizedBox(width: 8),
           Expanded(
-            child: Center(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
               child: _AccountPill(
                 label: selected?.label ?? 'noAccountsYet'.tr(),
                 dot: selected == null ? null : regColor(t, reg),
@@ -187,30 +207,9 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
               ),
             ),
           ),
-          if (rt != null)
-            Stack(clipBehavior: Clip.none, children: [
-              RoundIcon(
-                icon: Icons.voicemail,
-                size: 40,
-                tooltip: 'voicemail'.tr(),
-                onTap: () => placeCall(context, ref, selected!.voicemail, accountId: selected.id, name: 'voicemail'.tr()),
-              ),
-              if (rt.mwi.newVoice > 0)
-                PositionedDirectional(
-                  top: -3,
-                  end: -3,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 17),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(color: t.danger, borderRadius: BorderRadius.circular(9)),
-                    child: Text('${rt.mwi.newVoice}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-            ])
-          else
-            const SizedBox(width: 40),
+          const SizedBox(width: 8),
+          StatusPill(compact: MediaQuery.sizeOf(context).width < 420),
+          const SizedBox(width: 8),
         ]),
       ),
       // Said only when something is wrong: a registered account stays quiet.

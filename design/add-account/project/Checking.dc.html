@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Signing in, checking</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+.pk{--bg:#0C0E10;--sf:#16191C;--sf2:#1F2327;--bd:#2A2F34;--tx:#F2F4F6;--tx2:#A0A8B2;--mu:#6F7781;--ac:#3DD49A;--acs:rgba(61,212,154,.14);--onac:#04271A;--bad:#FF6B70;--bads:rgba(255,90,95,.14);--dim:rgba(0,0,0,.62);width:390px;height:844px;box-sizing:border-box;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:"Figtree",system-ui,sans-serif;display:flex;flex-direction:column}
+.pk.light{--bg:#F3F4F6;--sf:#FFFFFF;--sf2:#E9ECEF;--bd:#E0E3E8;--tx:#0E1116;--tx2:#5D6470;--mu:#8A919B;--ac:#08805A;--acs:#DCF2E8;--onac:#FFFFFF;--bad:#C62828;--bads:#FDE6E6;--dim:rgba(14,17,22,.4)}
+.pk *{box-sizing:border-box}
+.pk button,.pk input{font:inherit;color:inherit}
+.mono{font-family:"DM Mono",ui-monospace,monospace}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fld{display:block;background:var(--sf);border-radius:18px;padding:9px 16px 10px;border:1.5px solid transparent;box-shadow:0 1px 0 var(--bd)}
+.fld small{display:block;font-size:11px;font-weight:600;color:var(--tx2)}
+.fld input{display:block;width:100%;min-width:0;border:0;background:none;padding:2px 0 0;font-size:16px;font-weight:500;outline:none;color:var(--tx2)}
+.btn2{display:flex;align-items:center;justify-content:center;width:100%;height:54px;border-radius:27px;border:1.5px solid var(--bd);background:none;font-size:16px;font-weight:700;cursor:pointer}
+.chk{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid var(--bd)}
+.chk .dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none}
+.chk .dot .ic{width:12px;height:12px;stroke-width:3}
+.chk .ok{background:var(--acs);color:var(--ac)}
+.chk .no{background:var(--sf2);color:var(--tx2)}
+.chk .run{color:var(--ac)}
+.chk .run .ic{width:20px;height:20px;stroke-width:2.6}
+.chk .wait{border:2px solid var(--bd)}
+.chk .what{flex:1;min-width:0;font-size:14px;font-weight:600}
+.chk .what span{font-weight:400;color:var(--tx2)}
+.chk .res{font-size:12px;color:var(--tx2);text-align:right}
+.chk.dimmed .what{color:var(--tx2);font-weight:500}
+</style>
+</helmet>
+<div class="pk {{theme}}">
+  <div style="display: flex; flex-direction: column; flex: 1; padding: 14px 22px 0">
+    <div style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 800; font-size: 16px; letter-spacing: -0.2px">
+      <span style="width: 26px; height: 26px; border-radius: 9px; background: var(--ac); color: var(--onac); display: grid; place-items: center"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" style="fill: currentColor"><rect x="3.5" y="9" width="2.8" height="6" rx="1.4"></rect><rect x="8.2" y="5.5" width="2.8" height="13" rx="1.4"></rect><rect x="12.9" y="2.5" width="2.8" height="19" rx="1.4"></rect><rect x="17.6" y="7" width="2.8" height="10" rx="1.4"></rect></svg></span>
+      medut
+    </div>
+
+    <h1 style="margin: 30px 0 22px; font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.05">Sign in</h1>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <label class="fld"><small>SIP address</small><input type="text" value="201@pbx.acme.com" disabled></label>
+      <label class="fld"><small>Password</small><input type="password" value="secret-pass" disabled></label>
+    </div>
+
+    <section aria-label="Connection check" style="margin-top: 18px; padding: 14px 16px 6px; border-radius: 20px; background: var(--sf)">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700">Connecting to pbx.acme.com</h2>
+        <span class="mono" style="font-size: 11.5px; color: var(--tx2)">3 s</span>
+      </div>
+
+      <div class="chk">
+        <span class="dot ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+        <span class="what">Server found</span>
+        <span class="res mono">203.0.113.10</span>
+      </div>
+      <div class="chk dimmed">
+        <span class="dot no"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+        <span class="what">Secure (TLS) <span class="mono">5061</span></span>
+        <span class="res">no answer</span>
+      </div>
+      <div class="chk dimmed">
+        <span class="dot no"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+        <span class="what">TCP <span class="mono">5060</span></span>
+        <span class="res">refused</span>
+      </div>
+      <div class="chk dimmed">
+        <span class="dot no"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+        <span class="what">UDP <span class="mono">5060</span></span>
+        <span class="res">no answer</span>
+      </div>
+      <div class="chk">
+        <span class="dot ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+        <span class="what">Web link (WSS) <span class="mono">443</span></span>
+        <span class="res mono">/sip-ws</span>
+      </div>
+      <div class="chk">
+        <span class="dot run"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56"></path></svg></span>
+        <span class="what">Signing in as 201</span>
+        <span class="res">waiting for reply</span>
+      </div>
+    </section>
+    <p style="margin: 10px 8px 0; font-size: 12px; line-height: 1.4; color: var(--tx2)">All ways are tried at the same time. The first one that answers is kept.</p>
+
+    <div style="flex: 1"></div>
+    <button class="btn2" type="button" style="margin-bottom: 22px">Cancel</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

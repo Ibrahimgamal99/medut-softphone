@@ -208,7 +208,8 @@ class RoundIcon extends StatelessWidget {
   }
 }
 
-/// The Medut mark: four rising sound bars on a green rounded square.
+/// The Medut mark, as on the app icon: the staff 𓌃 (md, the first sign of
+/// mdwt, "speech") speaking, white on a green rounded square.
 class MedutMark extends StatelessWidget {
   const MedutMark({super.key, this.size = 26});
   final double size;
@@ -216,26 +217,51 @@ class MedutMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final bar = size * 0.11;
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(size * 0.34)),
-      alignment: Alignment.center,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final h in const [0.25, 0.54, 0.79, 0.42])
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: bar * 0.4),
-              width: bar,
-              height: size * h * 0.72,
-              decoration: BoxDecoration(color: t.onAccent, borderRadius: BorderRadius.circular(bar)),
-            ),
-        ],
-      ),
+      decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(size * 0.225)),
+      child: CustomPaint(painter: _MarkPainter(t.onAccent)),
     );
   }
+}
+
+/// Paths of design/icon/medut-icon.svg, on its 100-unit grid.
+class _MarkPainter extends CustomPainter {
+  const _MarkPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas
+      ..scale(size.width / 100)
+      ..translate(-0.15, -1);
+    Paint stroke(double w) => Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(
+      Path()
+        ..moveTo(34, 78)
+        ..lineTo(34, 33)
+        ..arcToPoint(const Offset(43, 24), radius: const Radius.circular(9))
+        ..lineTo(46, 24),
+      stroke(8),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(52, 41)
+        ..arcToPoint(const Offset(52, 59), radius: const Radius.circular(13))
+        ..moveTo(60, 33)
+        ..arcToPoint(const Offset(60, 67), radius: const Radius.circular(24)),
+      stroke(6.5),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MarkPainter old) => old.color != color;
 }
 
 // ── Status helpers ─────────────────────────────────────────────────────────
@@ -351,4 +377,171 @@ class QualityMetricsRow extends StatelessWidget {
       chip('Loss', fmt(lossPct, '%', digits: 1), (lossPct ?? 0) < 1),
     ]);
   }
+}
+
+/// Pocket segmented choice: a tinted track, the chosen segment in the accent.
+class PocketSegments extends StatelessWidget {
+  const PocketSegments({super.key, required this.options, required this.labels, required this.value, required this.onChanged, this.track});
+  final List<String> options, labels;
+  final String value;
+  final ValueChanged<String>? onChanged;
+
+  /// The track colour; defaults to the second surface (for a sheet or card).
+  final Color? track;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: track ?? t.surface2, borderRadius: BorderRadius.circular(13)),
+      child: Row(children: [
+        for (var i = 0; i < options.length; i++)
+          Expanded(
+            child: Semantics(
+              selected: value == options[i],
+              button: true,
+              child: Material(
+                color: value == options[i] ? t.accentSoft : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: onChanged == null ? null : () => onChanged!(options[i]),
+                  child: SizedBox(
+                    height: 38,
+                    child: Center(
+                      child: Text(labels[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: value == options[i] ? t.accent : t.text2)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+// ── Settings sections and rows ───────────────────────────────────────────────
+
+/// A settings group: an uppercase caption over one rounded card whose rows
+/// are separated by hairlines.
+class SettingsSection extends StatelessWidget {
+  const SettingsSection({super.key, this.title, required this.children});
+  final String? title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (title != null)
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 8),
+          child: Text(title!.toUpperCase(),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: t.text2)),
+        )
+      else
+        const SizedBox(height: 20),
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: t.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) Divider(height: 1, thickness: 1, indent: 60, color: t.border.withValues(alpha: 0.6)),
+              children[i],
+            ],
+          ]),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// A settings row: a tinted icon tile, a title and an optional subtitle, and
+/// a trailing control (or a chevron when the row opens something).
+class SettingsTile extends StatelessWidget {
+  const SettingsTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.tint,
+    this.trailing,
+    this.onTap,
+    this.titleColor,
+  });
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Color? tint;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color? titleColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final c = tint ?? t.accent;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 18, color: c),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500, color: titleColor ?? t.text)),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subtitle!, style: TextStyle(fontSize: 12, height: 1.35, color: t.text2)),
+              ],
+            ]),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!]
+          else if (onTap != null)
+            Icon(Icons.chevron_right, size: 20, color: t.text2.withValues(alpha: 0.6)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A small status badge (REGISTERED, ON).
+class SettingsBadge extends StatelessWidget {
+  const SettingsBadge(this.text, {super.key, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Text(text.toUpperCase(),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.3, color: color)),
+      );
 }

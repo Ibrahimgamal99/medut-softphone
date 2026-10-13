@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>More options, plain words</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+.pk{--bg:#0C0E10;--sf:#16191C;--sf2:#1F2327;--bd:#2A2F34;--tx:#F2F4F6;--tx2:#A0A8B2;--mu:#6F7781;--ac:#3DD49A;--acs:rgba(61,212,154,.14);--onac:#04271A;--bad:#FF6B70;--bads:rgba(255,90,95,.14);--dim:rgba(0,0,0,.62);width:390px;height:844px;box-sizing:border-box;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:"Figtree",system-ui,sans-serif;display:flex;flex-direction:column}
+.pk.light{--bg:#F3F4F6;--sf:#FFFFFF;--sf2:#E9ECEF;--bd:#E0E3E8;--tx:#0E1116;--tx2:#5D6470;--mu:#8A919B;--ac:#08805A;--acs:#DCF2E8;--onac:#FFFFFF;--bad:#C62828;--bads:#FDE6E6;--dim:rgba(14,17,22,.4)}
+.pk *{box-sizing:border-box}
+.pk button,.pk input{font:inherit;color:inherit}
+.mono{font-family:"DM Mono",ui-monospace,monospace}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.fld{display:block;background:var(--bg);border-radius:16px;padding:8px 14px 9px;border:1.5px solid transparent}
+.fld.on{border-color:var(--ac)}
+.fld small{display:block;font-size:11px;font-weight:600;color:var(--tx2)}
+.fld input{display:block;width:100%;min-width:0;border:0;background:none;padding:2px 0 0;font-size:15px;font-weight:500;outline:none}
+.seg{display:grid;gap:3px;padding:3px;border-radius:13px;background:var(--sf2)}
+.seg button{border:0;background:none;height:38px;border-radius:10px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer;padding:0 2px}
+.seg button[aria-pressed="true"]{background:var(--acs);color:var(--ac)}
+.hd b{display:block;font-size:15px;font-weight:700}
+.hd small{display:block;font-size:12.5px;color:var(--tx2);margin-top:2px;line-height:1.35}
+.row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;min-height:52px;padding:6px 0;border:0;border-top:1px solid var(--bd);background:none;cursor:pointer}
+.row .t{flex:1;min-width:0;font-size:14.5px;font-weight:600}
+.row .v{font-size:13px;color:var(--tx2);display:flex;align-items:center;gap:2px}
+.row .v .ic{width:16px;height:16px}
+</style>
+</helmet>
+<div class="pk {{theme}}">
+  <div aria-hidden="true" style="padding: 14px 22px 0">
+    <div style="display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 800; font-size: 16px">
+      <span style="width: 26px; height: 26px; border-radius: 9px; background: var(--ac)"></span>medut
+    </div>
+    <div style="margin: 30px 0 0; font-size: 34px; font-weight: 800; letter-spacing: -1px">Sign in</div>
+  </div>
+  <div style="position: absolute; inset: 0; background: var(--dim)"></div>
+
+  <section role="dialog" aria-label="More options" style="position: absolute; left: 0; right: 0; bottom: 0; top: 104px; display: flex; flex-direction: column; padding: 8px 20px 18px; border-radius: 28px 28px 0 0; background: var(--sf)">
+    <span style="width: 38px; height: 5px; border-radius: 3px; background: var(--bd); margin: 2px auto 10px; flex: none"></span>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+      <h2 style="margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.3px">More options</h2>
+      <button type="button" style="border: 0; background: none; color: var(--ac); font-weight: 700; font-size: 15px; min-height: 44px; padding: 0 4px; cursor: pointer">Done</button>
+    </div>
+
+    <div class="hd"><b>Connection</b><small>Your admin gave you a web link, so we use it.</small></div>
+    <div class="seg" style="grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 10px">
+      <button type="button" aria-pressed="false">Auto</button>
+      <button type="button" aria-pressed="false">TLS</button>
+      <button type="button" aria-pressed="false">TCP</button>
+      <button type="button" aria-pressed="false">UDP</button>
+      <button type="button" aria-pressed="true">Web link</button>
+    </div>
+    <label class="fld on" style="margin-top: 10px"><small>Web link</small><input class="mono" type="url" value="wss://pbx.acme.com/sip-ws" style="font-size: 14px"></label>
+
+    <div class="hd" style="margin-top: 18px"><b>Encrypt calls</b><small>Web links need DTLS. We set it for you.</small></div>
+    <div class="seg" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px">
+      <button type="button" aria-pressed="false">Off</button>
+      <button type="button" aria-pressed="false">SRTP</button>
+      <button type="button" aria-pressed="true">DTLS</button>
+    </div>
+
+    <div style="margin-top: 16px">
+      <button class="row" type="button"><span class="t">Different login name</span><span class="v">Off<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></span></button>
+      <button class="row" type="button"><span class="t">Outbound proxy</span><span class="v">None<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></span></button>
+      <button class="row" type="button"><span class="t">Name on calls</span><span class="v">Not set<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></span></button>
+    </div>
+
+    <div style="flex: 1"></div>
+    <button type="button" style="display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--bg); cursor: pointer">
+      <span style="flex: 1"><span style="display: block; font-size: 14px; font-weight: 700">All technical settings</span><span class="mono" style="display: block; font-size: 11px; color: var(--tx2); margin-top: 2px">ports, codecs, NAT, DTMF, headers</span></span>
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--tx2)"><path d="m9 18 6-6-6-6"></path></svg>
+    </button>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

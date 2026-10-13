@@ -1,0 +1,20 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-13T16:10:00Z"},
+  "title": "Medut app icon",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 1000, "w": 390, "h": 844, "title": "On the home screen"},
+    "Icon-A.dc.html": {"x": 0, "y": 0, "w": 480, "h": 560, "title": "A · The speaking staff (recommended)"},
+    "Icon-B.dc.html": {"x": 560, "y": 0, "w": 480, "h": 560, "title": "B · mdwt in hieroglyphs"},
+    "Icon-C.dc.html": {"x": 1120, "y": 0, "w": 480, "h": 560, "title": "C · Cartouche"},
+    "Icon-D.dc.html": {"x": 1680, "y": 0, "w": 480, "h": 560, "title": "D · Today's mark"}
+  },
+  "order": ["Main.dc.html", "Icon-A.dc.html", "Icon-B.dc.html", "Icon-C.dc.html", "Icon-D.dc.html"],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "Medut app icon · four options", "kind": "title1", "maxW": 2160},
+    "row2": {"x": 0, "y": 700, "text": "Side by side on a home screen", "kind": "title1", "maxW": 2160}
+  },
+  "designSystems": []
+}

@@ -95,6 +95,13 @@ class CallActivity : Activity() {
     private lateinit var secondPill: LinearLayout
     private lateinit var secondText: TextView
     private lateinit var secondSwap: TextView
+
+    // A warm transfer under way: who is being consulted, Back to caller / Join & drop.
+    private lateinit var xferBar: LinearLayout
+    private lateinit var xferStatus: TextView
+    private lateinit var xferHint: TextView
+    private lateinit var xferBack: TextView
+    private lateinit var xferJoin: TextView
     private lateinit var avatar: TextView
     private lateinit var name: TextView
     private lateinit var timer: TextView
@@ -301,6 +308,22 @@ class CallActivity : Activity() {
             secondAction = second["action"] as? String ?: "swap"
         } else {
             secondPill.visibility = View.GONE
+        }
+
+        val xfer = s.transfer
+        if (xfer != null) {
+            // The bar replaces the "on hold · Complete" pill while it is up.
+            secondPill.visibility = View.GONE
+            xferBar.visibility = View.VISIBLE
+            xferStatus.text = xfer["status"] as? String ?: ""
+            xferHint.text = xfer["hint"] as? String ?: ""
+            xferBack.text = xfer["back"] as? String ?: "Back to caller"
+            xferJoin.text = xfer["join"] as? String ?: "Join & drop"
+            val talking = xfer["phase"] == "talking"
+            xferJoin.isEnabled = talking
+            xferJoin.alpha = if (talking) 1f else 0.45f
+        } else {
+            xferBar.visibility = View.GONE
         }
 
         setDock("mute", if (s.muted) R.drawable.ic_mic_off else R.drawable.ic_mic, s.label("mute", "Mute"), s.muted)
@@ -655,6 +678,38 @@ class CallActivity : Activity() {
             addView(secondSwap)
         }
 
+        xferStatus = text(14.5f, 700)
+        xferHint = text(12f, color = TEXT2).apply { setPadding(dp(4), dp(3), dp(4), dp(12)) }
+        xferBack = text(14f, 700).apply {
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = pill(FILL, 24f)
+            layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
+            setOnClickListener { NativeBridge.action("cancelTransfer") }
+        }
+        xferJoin = text(14f, 700, ON_GOOD).apply {
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = pill(GOOD, 24f)
+            layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { NativeBridge.action("completeTransfer") }
+        }
+        xferBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(14), dp(12), dp(14), dp(14))
+            background = pill(PILL, 22f)
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { setMargins(dp(20), dp(12), dp(20), 0) }
+            addView(xferStatus)
+            addView(xferHint)
+            addView(LinearLayout(this@CallActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                addView(xferBack)
+                addView(xferJoin)
+            })
+            visibility = View.GONE
+        }
+
         // Caller, time, quality, tags
         avatar = text(36f, 700).apply { layoutParams = lp(dp(148), dp(148)).apply { gravity = Gravity.CENTER_HORIZONTAL } }
         name = text(30f, 800).apply { setPadding(dp(8), dp(14), dp(8), 0) }
@@ -730,6 +785,7 @@ class CallActivity : Activity() {
         call.addView(status)
         call.addView(qualityPill)
         call.addView(tags)
+        call.addView(xferBar)
         call.addView(spacer())
         call.addView(dockRow)
         call.addView(bottom)

@@ -4,6 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Filled in when ICE is turned on and no STUN server is set.
+const kDefaultStun = 'stun:stun.l.google.com:19302';
+
+/// The status feature codes a status change dials, by key.
+const kStatusCodeKeys = ['dndOn', 'dndOff', 'queueLogin', 'queueLogout'];
+
+/// Feature codes as each PBX ships them (all editable per account):
+/// FreePBX and Issabel (Asterisk) DND *78 / *79, queue toggle *45;
+/// FusionPBX (FreeSWITCH) DND *78 / *79, call-center agent toggle *22;
+/// 3CX queue log in *62 / out *63 (no DND code by default).
+const kPbxPresets = <String, Map<String, String>>{
+  'freepbx': {'dndOn': '*78', 'dndOff': '*79', 'queueLogin': '*45', 'queueLogout': '*45'},
+  'fusionpbx': {'dndOn': '*78', 'dndOff': '*79', 'queueLogin': '*22', 'queueLogout': '*22'},
+  '3cx': {'dndOn': '', 'dndOff': '', 'queueLogin': '*62', 'queueLogout': '*63'},
+  'custom': {'dndOn': '', 'dndOff': '', 'queueLogin': '', 'queueLogout': ''},
+};
+
 /// One SIP account as the user configured it. Passwords live in the
 /// Keychain / Keystore; everything else in preferences.
 @immutable
@@ -37,6 +54,8 @@ class SipAccountConfig {
     this.dialPrefix = '',
     this.plusReplace = '',
     this.headers = '',
+    this.pbx = 'freepbx',
+    this.codes = const {},
   });
 
   final String id, name, user, domain, password, transport;
@@ -62,6 +81,16 @@ class SipAccountConfig {
 
   /// Extra SIP headers on this account's requests, one "Name: value" per line.
   final String headers;
+
+  /// Which PBX this is (a key of [kPbxPresets]): it fills [codes].
+  final String pbx;
+
+  /// Status feature codes set on this account, by [kStatusCodeKeys] key;
+  /// a key not set here takes the [pbx] preset's code.
+  final Map<String, String> codes;
+
+  /// The code to dial for [key] ('' = this PBX has none).
+  String code(String key) => codes[key] ?? kPbxPresets[pbx]?[key] ?? '';
 
   /// `user@domain[:port]`, as Medut-SDK expects the AOR.
   String get aor => port > 0 ? '$user@$domain:$port' : '$user@$domain';
@@ -95,6 +124,8 @@ class SipAccountConfig {
     String? dialPrefix,
     String? plusReplace,
     String? headers,
+    String? pbx,
+    Map<String, String>? codes,
   }) =>
       SipAccountConfig(
         id: id,
@@ -125,6 +156,8 @@ class SipAccountConfig {
         dialPrefix: dialPrefix ?? this.dialPrefix,
         plusReplace: plusReplace ?? this.plusReplace,
         headers: headers ?? this.headers,
+        pbx: pbx ?? this.pbx,
+        codes: codes ?? this.codes,
       );
 
   /// Everything except the password.
@@ -155,6 +188,8 @@ class SipAccountConfig {
         'dialPrefix': dialPrefix,
         'plusReplace': plusReplace,
         'headers': headers,
+        'pbx': pbx,
+        'codes': codes,
       };
 
   factory SipAccountConfig.fromJson(Map<String, dynamic> j, {String password = '', String turnPass = ''}) =>
@@ -187,6 +222,8 @@ class SipAccountConfig {
         dialPrefix: j['dialPrefix'] as String? ?? '',
         plusReplace: j['plusReplace'] as String? ?? '',
         headers: j['headers'] as String? ?? '',
+        pbx: j['pbx'] as String? ?? 'freepbx',
+        codes: (j['codes'] as Map?)?.cast<String, String>() ?? const {},
       );
 
   /// The provisioning JSON (Medut-SDK account format) for sharing this

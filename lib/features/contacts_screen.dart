@@ -14,6 +14,7 @@ import '../ui/widgets.dart';
 import 'chat.dart';
 import 'dialer.dart';
 import 'keypad_sheets.dart';
+import 'status.dart';
 
 /// Pocket · Contacts: your status, favourites, the extensions on the phone
 /// system with their presence (learned from calls and contacts, so nobody has
@@ -280,23 +281,7 @@ class _YouLine extends ConsumerWidget {
                   Text(officeHoursText(settings), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: t.text2)),
                 ]),
               ),
-              Container(
-                padding: const EdgeInsetsDirectional.fromSTEB(10, 5, 6, 5),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(16)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Dot(color, size: 7),
-                  const SizedBox(width: 6),
-                  Text(
-                    switch (status) {
-                      MyStatus.available => 'statusAvailable'.tr(),
-                      MyStatus.silent => 'statusSilent'.tr(),
-                      MyStatus.dnd => 'statusDnd'.tr(),
-                    },
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color),
-                  ),
-                  Icon(Icons.expand_more, size: 16, color: color),
-                ]),
-              ),
+              const StatusPill(),
             ]),
           ),
         ),

@@ -13,13 +13,15 @@ import '../core/db.dart';
 import '../core/people.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'chat.dart';
 import 'dialer.dart';
+import 'status.dart';
 
 enum _Filter { all, missed, recorded, messages }
 
-/// Pocket · Calls: voicemail on top, then calls (missed ones from the same
+/// Pocket · Calls: calls (missed ones from the same
 /// number folded together), recordings and messages, with search.
 class ActivityScreen extends ConsumerStatefulWidget {
   const ActivityScreen({super.key});
@@ -46,13 +48,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.t;
     final db = ref.watch(dbProvider);
-    final sip = ref.watch(sipProvider);
-    final mwi = sip.runtimes.values.where((r) => r.mwi.newVoice > 0 || r.mwi.oldVoice > 0).toList();
-    final newVm = mwi.fold<int>(0, (a, r) => a + r.mwi.newVoice);
-    final oldVm = mwi.fold<int>(0, (a, r) => a + r.mwi.oldVoice);
-    final urgent = mwi.fold<int>(0, (a, r) => a + r.mwi.newUrgent);
     final query = _search.text.trim();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -79,8 +75,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               : Row(children: [
                   Expanded(
                     child: Text('tabCalls'.tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
                   ),
+                  StatusPill(compact: MediaQuery.sizeOf(context).width < 420),
+                  const SizedBox(width: 8),
                   RoundIcon(icon: Icons.search, size: 40, tooltip: 'search'.tr(), onTap: () => setState(() => _searching = true)),
                 ]),
         ),
@@ -91,42 +91,6 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         child: _FilterTrack(value: _filter, onChanged: (f) => setState(() => _filter = f)),
       ),
       const SizedBox(height: 12),
-      if ((newVm > 0 || oldVm > 0) && query.isEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-          child: Material(
-            color: t.accentSoft,
-            borderRadius: BorderRadius.circular(20),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () {
-                final rt = mwi.first;
-                placeCall(context, ref, rt.cfg.voicemail, accountId: rt.cfg.id, name: 'voicemail'.tr());
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Row(children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
-                    child: Icon(Icons.play_arrow_rounded, color: t.onAccent),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('newVoicemails'.tr(namedArgs: {'n': '$newVm'}),
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                      Text('voicemailSub'.tr(namedArgs: {'u': '$urgent', 'o': '$oldVm'}),
-                          style: TextStyle(fontSize: 12.5, color: t.text2)),
-                    ]),
-                  ),
-                  Text('listen'.tr(), style: TextStyle(color: t.accent, fontWeight: FontWeight.w700)),
-                ]),
-              ),
-            ),
-          ),
-        ),
       Expanded(
         child: _filter == _Filter.messages
             ? FutureBuilder<List<ChatMessage>>(
@@ -483,7 +447,10 @@ class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
       if (!ref.read(sipProvider).hasCall) {
         final session = await AudioSession.instance;
         await session.configure(const AudioSessionConfiguration.music());
+        await session.setActive(true);
       }
+      // A recording cut off by the end of its call may still say it is empty.
+      await SipService.repairWav(widget.path);
       await _player.setFilePath(widget.path);
       if (!mounted) return;
       setState(() => _ready = true);

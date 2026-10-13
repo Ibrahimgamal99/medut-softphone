@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:medut/medut.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:proximity_screen_lock/proximity_screen_lock.dart';
 
 import '../core/accounts.dart';
@@ -14,6 +15,7 @@ import '../core/db.dart';
 import '../core/people.dart';
 import '../core/settings.dart';
 import 'native_bridge.dart';
+import 'probe.dart';
 import 'quality.dart';
 import 'tones.dart';
 
@@ -97,6 +99,23 @@ class ActiveCall {
 
   /// Set on the consult call of an attended transfer: the held call to hand over.
   ActiveCall? transferOf;
+
+  /// Set on a call placed to follow the other side's transfer (incoming
+  /// REFER): the old leg, hung up once this one answers.
+  ActiveCall? replaces;
+
+  /// A REFER was sent for this call and has not failed yet.
+  bool transferring = false;
+
+  /// Hangs our leg up if the PBX took the transfer but never ended it.
+  Timer? backstop;
+
+  /// The join (REFER with Replaces) was refused and the plain transfer to
+  /// the same person was tried instead.
+  bool semiTried = false;
+
+  /// A status feature code (DND on, queue log-in…): kept out of the history.
+  bool featureCode = false;
 
   String get title => name.isNotEmpty ? name : number;
 }
@@ -327,6 +346,61 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     if (connLog.length > 500) connLog.removeRange(0, connLog.length - 500);
   }
 
+  // ── Your status and the PBX feature codes behind it ───────────────────────
+
+  /// Feature codes waiting to be dialed: (account id, code key, code).
+  final List<(String, String, String)> _codeQueue = [];
+  ActiveCall? _codeCall;
+
+  /// Picks Ready, Silent or Do not disturb, and tells each registered
+  /// account's PBX with its feature codes: Ready = DND off + queue log-in,
+  /// Do not disturb = DND on + queue log-out, Silent = only the phone goes
+  /// quiet (DND off when it comes from Do not disturb). The codes are dialed
+  /// as ordinary calls, one after the other, so the PBX's announcement is
+  /// heard; a toggle such as FreePBX's *45 is only dialed to change state.
+  void setMyStatus(MyStatus next) {
+    final prev = settings.status;
+    if (prev == next) return;
+    settings.status = next;
+    settings.statusSince = DateTime.now();
+    for (final rt in runtimes.values) {
+      if (rt.status != RegStatus.registered || !store.accounts.any((a) => a.id == rt.cfg.id)) continue;
+      final c = rt.cfg;
+      final inQueue = settings.queueIn.contains(c.id);
+      final keys = switch (next) {
+        MyStatus.available => ['dndOff', if (!inQueue) 'queueLogin'],
+        MyStatus.dnd => ['dndOn', if (inQueue) 'queueLogout'],
+        MyStatus.silent => [if (prev == MyStatus.dnd) 'dndOff'],
+      };
+      for (final k in keys) {
+        final code = c.code(k);
+        if (code.isEmpty) continue;
+        _codeQueue.add((c.id, k, code));
+        if (k == 'queueLogin') settings.setQueueIn(c.id, true);
+        if (k == 'queueLogout') settings.setQueueIn(c.id, false);
+      }
+    }
+    _dialNextCode();
+  }
+
+  /// Dials the next waiting feature code, once no call is up.
+  void _dialNextCode() {
+    if (_codeCall != null || _codeQueue.isEmpty || calls.isNotEmpty) return;
+    final (id, key, code) = _codeQueue.removeAt(0);
+    _log('status code: $key $code');
+    final ac = dial(code, accountId: id, name: tr('code_$key'));
+    if (ac == null) {
+      _dialNextCode();
+      return;
+    }
+    ac.featureCode = true;
+    _codeCall = ac;
+    // The PBX hangs up after its announcement; if it does not, we do.
+    ac.backstop = Timer(const Duration(seconds: 20), () {
+      if (calls.contains(ac)) hangup(ac);
+    });
+  }
+
   // ── Accounts ──────────────────────────────────────────────────────────────
 
   void _scheduleApply() {
@@ -334,9 +408,23 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _applyDebounce = Timer(const Duration(milliseconds: 300), applyAccounts);
   }
 
-  String _signature(SipAccountConfig c) =>
-      '${c.toJson()}|${c.password}|${c.turnPass}|${c.push ? _pushProvider.name : ''}'
-      '|${settings.iceServers}|${settings.forceRelay}';
+  /// What the SDK account is built from: a change here re-creates it (and
+  /// re-registers). Settings only the app reads (name, default, dial rules,
+  /// voicemail, recording, status codes) are left out, so renaming an account
+  /// does not drop its registration.
+  String _signature(SipAccountConfig c) {
+    final j = c.toJson()
+      ..remove('name')
+      ..remove('isDefault')
+      ..remove('voicemail')
+      ..remove('recordCalls')
+      ..remove('dialPrefix')
+      ..remove('plusReplace')
+      ..remove('pbx')
+      ..remove('codes');
+    return '$j|${c.password}|${c.turnPass}|${c.push ? _pushProvider.name : ''}'
+        '|${settings.iceServers}|${settings.forceRelay}';
+  }
 
   Future<void> applyAccounts() async {
     if (_sdk == null) return;
@@ -466,6 +554,11 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     if (!result.ok) cancelProbe(c.id);
     return result;
   }
+
+  /// Checks how [host] can be reached (TLS, TCP, UDP, web link) without
+  /// signing in: see probe.dart.
+  Future<ProbeReport> probe(String host, {int port = 0, ProbeListener? onStep}) =>
+      probeServer(host, port: port, onStep: onStep);
 
   /// Drops a tried account that was not saved (failed, or the user left).
   void cancelProbe(String id) {
@@ -624,27 +717,48 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         final ac = _find(e.call);
         if (ac != null) ac.crypto = e.negotiatedCrypto ?? '';
       case TransferRequestEvent():
-        // The other side (or the PBX) moves us to another party: follow it.
+        // The other side (or the PBX) moves us to another party: follow it,
+        // and drop the old leg once the new one answers. The transferor
+        // waits for an answer either way, so one we cannot follow is refused.
+        if (e.autoFollowed) break;
         final old = _find(e.call);
-        final next = e.call.transferAccept();
-        if (next != null && old != null) {
-          final ac = ActiveCall(
-            id: _callId(next),
-            call: next,
-            runtime: old.runtime,
-            direction: CallDirection.outgoing,
-            number: userPart(e.referToUri),
-            name: nameFor(userPart(e.referToUri)),
-            phase: Phase.outgoing,
-          );
-          calls.add(ac);
-          focused = ac;
-          _push();
+        final next = old == null ? null : e.call.transferAccept();
+        if (next == null || old == null) {
+          e.call.transferReject();
+          break;
         }
+        final ac = ActiveCall(
+          id: _callId(next),
+          call: next,
+          runtime: old.runtime,
+          direction: CallDirection.outgoing,
+          number: userPart(e.referToUri),
+          name: nameFor(userPart(e.referToUri)),
+          phase: Phase.outgoing,
+        )..replaces = old;
+        calls.add(ac);
+        focused = ac;
+        _push();
+        notifyListeners();
       case TransferFailedEvent():
         final ac = _find(e.call);
-        if (ac != null && ac.phase == Phase.held) _resume(ac);
-        _notices.add('${tr('transferFailed')}: ${e.reason}');
+        if (ac != null) {
+          ac.backstop?.cancel();
+          final consult = calls.where((c) => c.transferOf == ac).firstOrNull;
+          if (consult != null && !ac.semiTried) {
+            // The PBX would not join the two calls: send the caller to the
+            // same person as a plain transfer instead.
+            ac.semiTried = true;
+            consult.transferOf = null; // its end must not take the caller off hold
+            hangup(consult);
+            _refer(ac, consult.number);
+            break;
+          }
+          ac.transferring = false;
+          if (ac.phase == Phase.held) _resume(ac);
+          _push();
+        }
+        _notices.add('${tr('transferFailed')}${e.reason.isEmpty ? '' : ': ${e.reason}'}');
       case NetworkEvent():
         _log('network ${e.stage.name}${e.localAddr.isNotEmpty ? ' ${e.localAddr}' : ''}');
         final ac = e.call == null ? null : _find(e.call!);
@@ -757,6 +871,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         if (first) unawaited(_initCallRoute());
         ac.answeredAt ??= DateTime.now();
         ac.phase = Phase.active;
+        // We followed a transfer and the new party answered: the old leg goes.
+        final old = ac.replaces;
+        ac.replaces = null;
+        if (old != null && calls.contains(old)) hangup(old);
         if (first && settings.recordingMode == 'always' && ac.runtime.cfg.recordCalls && !ac.recording) {
           toggleRecord(ac);
         }
@@ -780,20 +898,39 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     } catch (_) {}
     calls.remove(ac);
     ac.autoAnswer?.cancel();
+    ac.backstop?.cancel();
     if (!calls.any((c) => c.phase == Phase.outgoing)) Tones.stopRingback();
     if (calls.isEmpty) {
       _routes = const [];
       _route = 'earpiece';
     }
+    // Ended by the other side while recording: the SDK has already closed the
+    // file (stopping it now would touch a freed call) but left its WAV header
+    // saying "no audio", so it is fixed from the file's size.
     if (ac.recording) {
-      try {
-        ac.call.recordStop();
-      } catch (_) {}
+      ac.recording = false;
+      await repairWav(ac.recordingPath);
     }
     for (final c in calls) {
       if (c.transferOf == ac) c.transferOf = null;
+      if (c.replaces == ac) c.replaces = null;
+    }
+    // The person we were consulting hung up, declined or never answered:
+    // the caller waiting on hold comes back rather than being left there.
+    final waiting = ac.transferOf;
+    if (waiting != null && calls.contains(waiting) && !waiting.transferring && waiting.phase == Phase.held) {
+      _resume(waiting);
     }
     if (focused == ac) focused = calls.isEmpty ? null : calls.first;
+
+    if (identical(_codeCall, ac)) _codeCall = null;
+    // A feature code waiting for the line, or the next one in a row.
+    if (calls.isEmpty && _codeQueue.isNotEmpty) Timer(const Duration(milliseconds: 800), _dialNextCode);
+    if (ac.featureCode) {
+      _push();
+      notifyListeners();
+      return;
+    }
 
     final answered = ac.answeredAt != null;
     final result = ac.direction == CallDirection.incoming
@@ -887,6 +1024,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         if (waiting != null) await answer(waiting);
       case 'completeTransfer':
         completeTransfer();
+      case 'cancelTransfer':
+        cancelTransfer();
     }
   }
 
@@ -908,6 +1047,14 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
 
   void hangup(ActiveCall ac) {
     ac.endedLocally = true;
+    // Close the recording while the call still exists: once it has ended the
+    // SDK has freed it, and stopping then crashed the app.
+    if (ac.recording) {
+      try {
+        ac.call.recordStop();
+      } catch (_) {}
+      ac.recording = false;
+    }
     if (ac.phase == Phase.incoming) {
       decline(ac);
     } else {
@@ -1004,15 +1151,20 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Route call audio to an output picked on the call screen. Goes through
   /// the SDK, then through Telecom (Android) last, because while a Telecom
-  /// call is up Telecom owns the route and would undo the SDK's change.
+  /// call is up Telecom owns the route and would undo the SDK's change. Both
+  /// get the route asked for: the list the SDK answers with is read before
+  /// the switch completes and still names the old route as active, and
+  /// passing that on sent Telecom back to the earpiece on every Speaker tap.
+  /// The real route comes back through Telecom's and the SDK's route events.
   Future<void> selectRoute(String id) async {
     final route = _routes.where((r) => r.id == id).firstOrNull;
-    if (route != null) _route = _kindName(route.kind);
+    final kind = route == null ? _route : _kindName(route.kind);
+    _route = kind;
     _push();
     try {
-      _applyRoutes(await MedutPlatform.setAudioRoute(id));
+      _routes = await MedutPlatform.setAudioRoute(id);
     } catch (_) {}
-    await _bridge.setRoute(_route);
+    await _bridge.setRoute(kind);
     _push();
   }
 
@@ -1069,12 +1221,43 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       final dir = await recordingsDir(settings);
       await dir.create(recursive: true);
-      final safe = ac.number.replaceAll(RegExp(r'[^\w+]'), '_');
-      ac.recordingPath = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_$safe.wav';
+      // The call may have ended meanwhile; a freed call must not be touched.
+      if (!calls.contains(ac)) return;
+      ac.recordingPath = '${dir.path}/${recordingName(ac.number, ac.name, DateTime.now())}';
       ac.recording = ac.call.recordStart(ac.recordingPath) == 0;
     }
     _push();
     notifyListeners();
+  }
+
+  /// Fixes the sizes in a WAV header written when recording started (data
+  /// size 0) but never finished, so players see the audio: the SDK closes a
+  /// recording without finishing it when the call ends under it.
+  static Future<void> repairWav(String path) async {
+    if (path.isEmpty) return;
+    try {
+      final f = File(path);
+      if (!await f.exists()) return;
+      final raf = await f.open(mode: FileMode.append); // read-write, no truncation
+      try {
+        final len = await raf.length();
+        await raf.setPosition(0);
+        final h = await raf.read(44);
+        String tag(int at) => String.fromCharCodes(h.sublist(at, at + 4));
+        if (h.length < 44 || tag(0) != 'RIFF' || tag(8) != 'WAVE' || tag(36) != 'data') return;
+        int u32(int at) => h[at] | h[at + 1] << 8 | h[at + 2] << 16 | h[at + 3] << 24;
+        final align = (h[32] | h[33] << 8).clamp(1, 64);
+        final data = ((len - 44) ~/ align) * align;
+        if (u32(40) == data && u32(4) == 36 + data) return;
+        List<int> le(int v) => [v & 0xff, v >> 8 & 0xff, v >> 16 & 0xff, v >> 24 & 0xff];
+        await raf.setPosition(4);
+        await raf.writeFrom(le(36 + data));
+        await raf.setPosition(40);
+        await raf.writeFrom(le(data));
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {}
   }
 
   /// Length of a WAV file from its header (byte rate) and size; null if
@@ -1099,10 +1282,22 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// A recording's file name, the way the phone's own call recorder names
+  /// them: who (number, then name when there is one) and when.
+  /// `201 Sara_261013_182405.wav`.
+  static String recordingName(String number, String name, DateTime at) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final when = '${two(at.year % 100)}${two(at.month)}${two(at.day)}_${two(at.hour)}${two(at.minute)}${two(at.second)}';
+    final who = {number.trim(), name.trim()}.where((x) => x.isNotEmpty).join(' ');
+    final safe = who.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]+'), '_').replaceAll(RegExp(r'^[_\s]+|[_\s]+$'), '');
+    return '${safe.isEmpty ? 'call' : safe}_$when.wav';
+  }
+
   /// Where recordings go (Settings → Recording → Save recordings in):
-  /// shared — Android: the app folder under Android/data, seen in Files and
-  /// over USB; iOS: Documents/Recordings, seen in the Files app;
-  /// private — inside the app only; custom — an Android folder of your choice.
+  /// shared — Android: Internal storage › Recordings › Medut, next to
+  /// Download and DCIM (Music › Medut before Android 12); iOS:
+  /// Documents/Recordings, seen in the Files app; private — inside the app
+  /// only; custom — an Android folder of your choice.
   static Future<Directory> recordingsDir(AppSettings settings) async {
     switch (settings.recordingDir) {
       case 'custom' when settings.recordingCustomDir.isNotEmpty:
@@ -1110,11 +1305,44 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       case 'private':
         return Directory('${(await getApplicationSupportDirectory()).path}/recordings');
       default:
-        if (Platform.isAndroid) {
-          final ext = await getExternalStorageDirectory();
-          if (ext != null) return Directory('${ext.path}/Recordings');
-        }
+        if (Platform.isAndroid) return _sharedRecordings ??= _findSharedRecordings();
         return Directory('${(await getApplicationDocumentsDirectory()).path}/Recordings');
+    }
+  }
+
+  static Future<Directory>? _sharedRecordings;
+
+  static Future<Directory> _findSharedRecordings() async {
+    final app = await getExternalStorageDirectory(); // …/Android/data/<id>/files
+    final root = app?.path.split('/Android/').first;
+    if (root != null) {
+      final tries = ['$root/Recordings/Medut', '$root/Music/Medut'];
+      for (final d in tries) {
+        if (await canWrite(d)) return Directory(d);
+      }
+      // Android 10 and older write shared storage only with this permission.
+      if (await Permission.storage.request().isGranted) {
+        for (final d in tries) {
+          if (await canWrite(d)) return Directory(d);
+        }
+      }
+    }
+    return Directory('${(app ?? await getApplicationSupportDirectory()).path}/Recordings');
+  }
+
+  /// Whether recordings can be written to [dir] as plain files (the recorder
+  /// writes them natively). Since Android 11 an app may create audio files
+  /// only inside the shared Recordings, Music, Download, Documents (and
+  /// similar) folders, so the test file is a .wav too.
+  static Future<bool> canWrite(String dir) async {
+    try {
+      await Directory(dir).create(recursive: true);
+      final probe = File('$dir/.medut-write-test.wav');
+      await probe.writeAsBytes(const []);
+      await probe.delete();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -1189,14 +1417,41 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// "Send now": REFER the focused call to [target] and leave.
-  void transferBlind(String target) {
-    final ac = focused;
-    if (ac == null) return;
-    ac.call.transfer(uriFor(ac.runtime.cfg, target));
+  /// The Refer-To of a transfer to [target]: a full `sip:` URI. baresip
+  /// takes anything else for a user name, so `201@pbx` became
+  /// `sip:201%40pbx@pbx` and every transfer went to a number that does not
+  /// exist.
+  static String referUri(SipAccountConfig cfg, String target) {
+    final u = uriFor(cfg, target);
+    return RegExp(r'^sips?:', caseSensitive: false).hasMatch(u) ? u : 'sip:$u';
   }
 
-  /// "Talk first": hold the caller, call [target]; Complete joins them.
+  /// Sends [ac]'s caller to [target] (REFER). The PBX ends our leg when it
+  /// takes the call; a refusal comes back as [TransferFailedEvent] and the
+  /// call carries on. If neither happens, our leg is hung up after 20 s.
+  void _refer(ActiveCall ac, String target) {
+    ac.transferring = true;
+    ac.call.transfer(referUri(ac.runtime.cfg, target));
+    _armBackstop(ac);
+    _push();
+  }
+
+  void _armBackstop(ActiveCall ac) {
+    ac.backstop?.cancel();
+    ac.backstop = Timer(const Duration(seconds: 20), () {
+      if (calls.contains(ac) && ac.transferring) hangup(ac);
+    });
+  }
+
+  /// Blind transfer: the caller goes straight to [target] and we leave.
+  void transferBlind(String target) {
+    final ac = focused;
+    if (ac == null || target.trim().isEmpty) return;
+    _refer(ac, target);
+  }
+
+  /// Warm transfer: hold the caller and call [target]; "Join & drop" joins
+  /// them once [target] answers, "Back to caller" ends the consult call.
   void transferAttended(String target) {
     final original = focused;
     if (original == null) return;
@@ -1205,11 +1460,29 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _push();
   }
 
+  /// Joins the held caller to the person consulted (REFER with Replaces).
+  /// Still ringing there: the caller is sent to that number instead and our
+  /// ringing call is dropped, since a call nobody answered cannot be replaced.
   void completeTransfer() {
     final consult = calls.where((c) => c.transferOf != null).firstOrNull;
     final original = consult?.transferOf;
     if (consult == null || original == null) return;
-    original.call.attendedTransfer(consult.call);
+    if (consult.phase == Phase.outgoing || consult.phase == Phase.incoming) {
+      consult.transferOf = null; // its end must not take the caller off hold
+      hangup(consult);
+      _refer(original, consult.number);
+    } else {
+      original.transferring = true;
+      original.call.attendedTransfer(consult.call);
+      _armBackstop(original);
+      _push();
+    }
+  }
+
+  /// "Back to caller": ends the consult call; the caller comes off hold.
+  void cancelTransfer() {
+    final consult = calls.where((c) => c.transferOf != null).firstOrNull;
+    if (consult != null) hangup(consult);
   }
 
   void sendMessage(String peer, String body, {String? accountId}) {
@@ -1279,14 +1552,29 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         second = {'name': other.title, 'text': '${other.title} · ${tr('onHold')}', 'label': tr('swap'), 'action': 'swap'};
       }
     }
+    // A warm transfer under way: who is being consulted and whether they
+    // answered ("Join & drop" needs them on the line).
+    final consult = calls.where((c) => c.transferOf != null && calls.contains(c.transferOf)).firstOrNull;
+    Map<String, Object?>? transfer;
+    if (consult != null) {
+      final talking = consult.phase == Phase.active;
+      transfer = {
+        'phase': talking ? 'talking' : 'calling',
+        'status': tr(talking ? 'xferConnectedTo' : 'xferCalling').replaceAll('{name}', consult.title),
+        'hint': tr(talking ? 'xferHintTalking' : 'xferHintCalling'),
+        'join': tr('xferJoin'),
+        'back': tr('xferBack'),
+      };
+    }
     return {
       ...base,
+      'transfer': transfer,
       'phase': f.phase.name,
       'callId': f.id,
       'name': f.name,
       'number': f.number,
       'account': '${f.runtime.cfg.label} · ${f.runtime.cfg.user}',
-      'status': switch (f.phase) {
+      'status': f.transferring ? tr('transferring') : switch (f.phase) {
         Phase.outgoing => f.remoteRinging ? tr('ringing') : tr('calling'),
         Phase.held => tr('onHold'),
         _ => f.link == 'reconnecting'

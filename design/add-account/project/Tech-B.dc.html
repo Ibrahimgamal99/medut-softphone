@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Technical settings, one page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Figtree:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+.pk{--bg:#0C0E10;--sf:#16191C;--sf2:#1F2327;--bd:#2A2F34;--tx:#F2F4F6;--tx2:#A0A8B2;--mu:#6F7781;--ac:#3DD49A;--acs:rgba(61,212,154,.14);--onac:#04271A;--bad:#FF6B70;--bads:rgba(255,90,95,.14);--dim:rgba(0,0,0,.62);width:390px;height:844px;box-sizing:border-box;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:"Figtree",system-ui,sans-serif;display:flex;flex-direction:column}
+.pk.light{--bg:#F3F4F6;--sf:#FFFFFF;--sf2:#E9ECEF;--bd:#E0E3E8;--tx:#0E1116;--tx2:#5D6470;--mu:#8A919B;--ac:#08805A;--acs:#DCF2E8;--onac:#FFFFFF;--bad:#C62828;--bads:#FDE6E6;--dim:rgba(14,17,22,.4)}
+.pk *{box-sizing:border-box}
+.pk button,.pk input{font:inherit;color:inherit}
+.mono{font-family:"DM Mono",ui-monospace,monospace}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:27px;border:0;background:var(--ac);color:var(--onac);font-size:16px;font-weight:700;cursor:pointer}
+.fld{display:block;background:var(--bg);border-radius:14px;padding:7px 12px 8px;border:1.5px solid transparent;min-width:0}
+.fld.on{border-color:var(--ac)}
+.fld small{display:block;font-size:11px;font-weight:600;color:var(--tx2)}
+.fld input{display:block;width:100%;min-width:0;border:0;background:none;padding:2px 0 0;font-size:14px;font-weight:500;outline:none}
+.fld input::placeholder{color:var(--mu)}
+.seg{display:grid;gap:3px;padding:3px;border-radius:12px;background:var(--bg)}
+.seg button{border:0;background:none;height:36px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--tx2);cursor:pointer;padding:0 2px}
+.seg button[aria-pressed="true"]{background:var(--acs);color:var(--ac)}
+.jump{height:34px;padding:0 13px;border-radius:17px;border:1px solid var(--bd);background:none;font-size:12.5px;font-weight:600;color:var(--tx2);white-space:nowrap;cursor:pointer;flex:none}
+.jump[aria-current="true"]{background:var(--tx);border-color:var(--tx);color:var(--bg)}
+.card{padding:14px;border-radius:20px;background:var(--sf);display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:15px;font-weight:700}
+.sw{position:relative;width:46px;height:28px;border-radius:14px;border:0;padding:0;background:var(--sf2);cursor:pointer;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw[aria-checked="true"]{background:var(--ac)}
+.sw[aria-checked="true"]::after{left:21px}
+.tg{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:600}
+.tg span{flex:1}
+</style>
+</helmet>
+<div class="pk {{theme}}">
+  <div style="display: flex; align-items: center; gap: 4px; min-height: 56px; padding: 6px 12px 0 10px">
+    <button type="button" aria-label="Back" style="border: 0; background: none; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 22px; height: 22px"><path d="m15 18-6-6 6-6"></path></svg></button>
+    <h1 style="margin: 0; flex: 1; font-size: 19px; font-weight: 800; letter-spacing: -0.2px">Technical settings</h1>
+    <div class="seg" style="grid-template-columns: repeat(2, minmax(0, 1fr)); width: 112px; background: var(--sf)">
+      <button type="button" aria-pressed="true" style="height: 30px">Form</button>
+      <button type="button" aria-pressed="false" style="height: 30px">JSON</button>
+    </div>
+  </div>
+
+  <nav aria-label="Jump to section" style="display: flex; gap: 6px; padding: 8px 16px 12px; overflow: hidden">
+    <button class="jump" type="button">Sign-in</button>
+    <button class="jump" type="button" aria-current="true">Connection</button>
+    <button class="jump" type="button">Security</button>
+    <button class="jump" type="button">Network</button>
+    <button class="jump" type="button">Audio</button>
+    <button class="jump" type="button">Dialing</button>
+  </nav>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; flex: 1; padding: 0 16px; overflow: hidden">
+    <section class="card" aria-label="Connection">
+      <h2>Connection</h2>
+      <div class="seg" style="grid-template-columns: repeat(5, minmax(0, 1fr))">
+        <button type="button" aria-pressed="false">UDP</button>
+        <button type="button" aria-pressed="false">TCP</button>
+        <button type="button" aria-pressed="false">TLS</button>
+        <button type="button" aria-pressed="false">WS</button>
+        <button type="button" aria-pressed="true">WSS</button>
+      </div>
+      <label class="fld on"><small>Web link</small><input class="mono" type="url" value="wss://pbx.acme.com/sip-ws"></label>
+      <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px">
+        <label class="fld"><small>Port</small><input class="mono" type="text" value="443"></label>
+        <label class="fld"><small>Outbound proxy</small><input class="mono" type="text" placeholder="sip:proxy.acme.com;lr"></label>
+      </div>
+      <div class="tg"><span>Check the server's certificate</span><button class="sw" type="button" role="switch" aria-checked="true" aria-label="Check the server's certificate"></button></div>
+    </section>
+
+    <section class="card" aria-label="Security">
+      <h2>Security</h2>
+      <div class="seg" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+        <button type="button" aria-pressed="false">None</button>
+        <button type="button" aria-pressed="false">SDES</button>
+        <button type="button" aria-pressed="true">DTLS-SRTP</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Network">
+      <h2>Network</h2>
+      <div class="tg"><span>ICE</span><button class="sw" type="button" role="switch" aria-checked="true" aria-label="ICE"></button></div>
+      <label class="fld"><small>STUN server</small><input class="mono" type="text" value="stun:stun.acme.com:3478"></label>
+      <label class="fld"><small>TURN server</small><input class="mono" type="text" placeholder="turn:turn.acme.com:3478"></label>
+    </section>
+  </div>
+
+  <div style="padding: 12px 16px 18px; background: var(--bg); border-top: 1px solid var(--bd)">
+    <button class="btn" type="button">Save and connect</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>
