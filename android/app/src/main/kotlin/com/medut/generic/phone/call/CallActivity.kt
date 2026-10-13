@@ -131,7 +131,7 @@ class CallActivity : Activity() {
     private lateinit var sheetRows: LinearLayout
     private lateinit var moreSheet: LinearLayout
     private lateinit var moreAdd: TextView
-    private lateinit var moreRecord: TextView
+    private lateinit var moreKeypad: TextView
     private lateinit var moreMessage: TextView
 
     // Keypad
@@ -334,7 +334,15 @@ class CallActivity : Activity() {
             else -> s.label("speaker", "Speaker")
         }
         setDock("speaker", routeIcon, routeLabel, s.route == "speaker" || s.route == "bluetooth")
-        setDock("keypad", R.drawable.ic_dialpad, s.label("keypad", "Keypad"), false)
+        // Record sits in the dock (red while recording), the keypad in More;
+        // with recording turned off the keypad keeps its place.
+        if (s.canRecord) {
+            setDock("third", R.drawable.ic_record,
+                if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record"),
+                s.recording, onFill = END, onTint = Color.WHITE)
+        } else {
+            setDock("third", R.drawable.ic_dialpad, s.label("keypad", "Keypad"), false)
+        }
         setDock("hold", R.drawable.ic_pause, if (s.held) s.label("resume", "Resume") else s.label("hold", "Hold"), s.held)
         transfer.text = s.label("transfer", "Transfer")
         more.text = s.label("more", "More")
@@ -372,8 +380,8 @@ class CallActivity : Activity() {
         }
         if (sheet == "more") {
             moreAdd.text = s.label("addCall", "Add call")
-            moreRecord.text = if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record")
-            moreRecord.visibility = vis(s.canRecord)
+            moreKeypad.text = s.label("keypad", "Keypad")
+            moreKeypad.visibility = vis(s.canRecord)
             moreMessage.text = s.label("message", "Message")
         }
     }
@@ -412,12 +420,7 @@ class CallActivity : Activity() {
         when (key) {
             "mute" -> NativeBridge.action(if (s.muted) "unmute" else "mute")
             "speaker" -> chooseRoute(s)
-            "keypad" -> {
-                keypadOpen = true
-                dtmfTyped = ""
-                keypadDigits.text = ""
-                render(s)
-            }
+            "third" -> if (s.canRecord) NativeBridge.action("record") else openKeypad()
             "hold" -> NativeBridge.action(if (s.held) "unhold" else "hold")
         }
     }
@@ -752,7 +755,7 @@ class CallActivity : Activity() {
             setPadding(dp(6), dp(14), dp(6), dp(12))
             background = pill(DOCK, 28f)
         }
-        listOf("mute", "speaker", "keypad", "hold").forEach { key ->
+        listOf("mute", "speaker", "third", "hold").forEach { key ->
             val img = icon(R.drawable.ic_mic, 54, oval(FILL), TEXT, key) { onDock(key) }
             val (box, label) = cell(img, 11.5f)
             dock[key] = img to label
@@ -901,9 +904,9 @@ class CallActivity : Activity() {
             moreSheet.addView(this)
         }
         moreAdd = row(R.drawable.ic_add) { openApp("add") }
-        moreRecord = row(R.drawable.ic_record) {
-            NativeBridge.action("record")
+        moreKeypad = row(R.drawable.ic_dialpad) {
             openSheet(null)
+            openKeypad()
         }
         moreMessage = row(R.drawable.ic_message) { openApp("message") }
         root.addView(moreSheet, bottom())
@@ -924,13 +927,20 @@ class CallActivity : Activity() {
         })
     }
 
-    private fun setDock(key: String, res: Int, label: String, on: Boolean) {
+    private fun setDock(key: String, res: Int, label: String, on: Boolean, onFill: Int = TEXT, onTint: Int = INK) {
         val (img, t) = dock[key] ?: return
         img.setImageResource(res)
         img.contentDescription = label
-        img.background = oval(if (on) TEXT else FILL)
-        img.imageTintList = ColorStateList.valueOf(if (on) INK else TEXT)
+        img.background = oval(if (on) onFill else FILL)
+        img.imageTintList = ColorStateList.valueOf(if (on) onTint else TEXT)
         t.text = label
+    }
+
+    private fun openKeypad() {
+        keypadOpen = true
+        dtmfTyped = ""
+        keypadDigits.text = ""
+        render(snap)
     }
 
     private fun initials(s: String): String {

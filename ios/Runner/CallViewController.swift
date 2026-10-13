@@ -187,7 +187,14 @@ final class CallViewController: UIViewController {
       : s.route == "wired" ? s.label("headset", "Headset") : s.label("speaker", "Speaker")
     setDock("speaker", s.route == "bluetooth" ? "headphones" : "speaker.wave.2.fill", routeLabel,
             on: s.route == "speaker" || s.route == "bluetooth")
-    setDock("keypad", "circle.grid.3x3.fill", s.label("keypad", "Keypad"), on: false)
+    // Record sits in the dock (red while recording), the keypad in More;
+    // with recording turned off the keypad keeps its place.
+    if s.canRecord {
+      setDock("third", "record.circle", s.recording ? s.label("stopRecord", "Stop rec") : s.label("record", "Record"),
+              on: s.recording, onBg: Ink.end, onTint: .white)
+    } else {
+      setDock("third", "circle.grid.3x3.fill", s.label("keypad", "Keypad"), on: false)
+    }
     setDock("hold", "pause.fill", s.held ? s.label("resume", "Resume") : s.label("hold", "Hold"), on: s.held)
     transferLabel.text = s.label("transfer", "Transfer")
     moreLabel.text = s.label("more", "More")
@@ -264,7 +271,7 @@ final class CallViewController: UIViewController {
     switch key {
     case "mute": MedutBridge.shared.action(s.muted ? "unmute" : "mute")
     case "speaker": chooseRoute(s, from: sender)
-    case "keypad": showKeypad(true)
+    case "third": if s.canRecord { MedutBridge.shared.action("record") } else { showKeypad(true) }
     case "hold": MedutBridge.shared.action(s.held ? "unhold" : "hold")
     default: break
     }
@@ -279,8 +286,9 @@ final class CallViewController: UIViewController {
       self?.openApp("add")
     })
     if s.canRecord {
-      menu.addAction(UIAlertAction(title: s.recording ? s.label("stopRecord", "Stop rec") : s.label("record", "Record"),
-                                   style: .default) { _ in MedutBridge.shared.action("record") })
+      menu.addAction(UIAlertAction(title: s.label("keypad", "Keypad"), style: .default) { [weak self] _ in
+        self?.showKeypad(true)
+      })
     }
     menu.addAction(UIAlertAction(title: s.label("message", "Message"), style: .default) { [weak self] _ in
       self?.openApp("message")
@@ -461,7 +469,7 @@ final class CallViewController: UIViewController {
     dockRow.layoutMargins = UIEdgeInsets(top: 14, left: 6, bottom: 12, right: 6)
     dockRow.backgroundColor = Ink.dock
     dockRow.layer.cornerRadius = 28
-    for key in ["mute", "speaker", "keypad", "hold"] {
+    for key in ["mute", "speaker", "third", "hold"] {
       let b = roundButton(54, symbol: "mic.fill", bg: Ink.fill, tint: Ink.text, action: #selector(tapDock(_:)))
       b.accessibilityIdentifier = key
       let l = UILabel()
@@ -645,12 +653,13 @@ final class CallViewController: UIViewController {
     return s
   }
 
-  private func setDock(_ key: String, _ symbol: String, _ title: String, on: Bool) {
+  private func setDock(_ key: String, _ symbol: String, _ title: String, on: Bool,
+                       onBg: UIColor? = nil, onTint: UIColor? = nil) {
     guard let (b, l) = dock[key] else { return }
     b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)), for: .normal)
     b.accessibilityLabel = title
-    b.backgroundColor = on ? Ink.text : Ink.fill
-    b.tintColor = on ? Ink.ground(dark: false) : Ink.text
+    b.backgroundColor = on ? (onBg ?? Ink.text) : Ink.fill
+    b.tintColor = on ? (onTint ?? Ink.ground(dark: false)) : Ink.text
     l.text = title
   }
 
