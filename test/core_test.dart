@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -37,6 +38,26 @@ void main() {
     test('rejects anything else', () {
       expect(SipAccountConfig.parseProvisioning('hello'), isNull);
       expect(SipAccountConfig.parseProvisioning('{"uri": "nope"}'), isNull);
+    });
+
+    test('every example in docs/account-setup.md reads', () {
+      final doc = File('docs/account-setup.md').readAsStringSync();
+      final json = [for (final m in RegExp(r'```json\n(.*?)```', dotAll: true).allMatches(doc)) m.group(1)!];
+      final uris = [
+        for (final m in RegExp(r'```text\n(.*?)```', dotAll: true).allMatches(doc)) ...m.group(1)!.trim().split('\n')
+      ];
+      expect(json.length + uris.length, greaterThan(8));
+      final read = {for (final e in [...json, ...uris]) e: SipAccountConfig.parseProvisioning(e)};
+      read.forEach((e, a) => expect(a, isNotNull, reason: e));
+
+      final web = read.values.firstWhere((a) => a!.transport == 'wss')!;
+      expect(web.serverUrl, startsWith('wss://'));
+      expect(web.mediaEnc, 'dtls');
+      expect(web.ice, isTrue);
+
+      // The export example is exactly what Share as QR code writes for it.
+      final export = json.firstWhere((e) => e.contains('"verify_tls"'));
+      expect(jsonDecode(read[export]!.toProvisioning()), jsonDecode(export));
     });
   });
 

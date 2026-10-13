@@ -23,7 +23,8 @@ icon is its first hieroglyph, the staff 𓌃, with two sound waves.
 - A failed sign-in says why, lists things to try and shows the attempt's log
   with Copy and Share.
 - Scan a QR code, import a setup file or paste one. Any account can be shared
-  as a QR code.
+  as a QR code. [docs/account-setup.md](docs/account-setup.md) gives the
+  format, with examples.
 - *More options* covers the transport, encryption (SRTP SDES / DTLS-SRTP over
   TLS and WSS only), auth user, outbound proxy, ICE and TURN. *All technical
   settings* covers every SDK option, grouped into sections that show their
