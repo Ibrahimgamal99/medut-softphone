@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../sip/quality.dart';
 
 import '../core/db.dart';
+import '../core/people.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../ui/widgets.dart';
@@ -138,21 +139,13 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   var items = s.data ?? const <CallRecord>[];
                   if (_filter == _Filter.missed) items = items.where((c) => c.result == CallResult.missed).toList();
                   if (_filter == _Filter.recorded) items = items.where((c) => c.recordingPath.isNotEmpty).toList();
-                  if (query.isNotEmpty) items = items.where((c) => _matches(query, [c.name, c.number])).toList();
+                  if (query.isNotEmpty) items = items.where((c) => matchesQuery(query, [c.name, c.number])).toList();
                   return _CallList(items: items, searching: query.isNotEmpty);
                 },
               ),
       ),
     ]);
   }
-}
-
-/// Text in any of [fields]; a number typed with spaces, dashes or brackets
-/// matches on its digits.
-bool _matches(String query, List<String> fields) {
-  final q = query.toLowerCase();
-  final digits = RegExp(r'^[\d\s\-+().]+$').hasMatch(q) ? q.replaceAll(RegExp(r'\D'), '') : '';
-  return fields.any((f) => f.toLowerCase().contains(q) || (digits.isNotEmpty && f.replaceAll(RegExp(r'\D'), '').contains(digits)));
 }
 
 /// All · Missed · Recorded · Messages on one pill track.
@@ -606,7 +599,7 @@ class _ConversationList extends ConsumerWidget {
       return contact.isNotEmpty ? contact : peer;
     }
 
-    final shown = query.isEmpty ? items : items.where((m) => _matches(query, [m.peer, titleFor(m.peer), m.body])).toList();
+    final shown = query.isEmpty ? items : items.where((m) => matchesQuery(query, [m.peer, titleFor(m.peer), m.body])).toList();
     return Stack(children: [
       if (shown.isEmpty)
         _Empty(icon: query.isEmpty ? Icons.chat_bubble_outline : Icons.search_off, text: (query.isEmpty ? 'noMessages' : 'noMatches').tr())

@@ -9,7 +9,7 @@ import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'accounts.dart';
 import 'settings_screen.dart';
-import 'team.dart';
+import 'contacts_screen.dart';
 
 /// The two sheets of the keypad header: "you" from the avatar (status,
 /// accounts, settings) and the account picker from the account pill.
@@ -78,6 +78,16 @@ class _MeSheet extends ConsumerWidget {
       const SizedBox(height: 8),
       Text(help, style: TextStyle(fontSize: 12.5, color: t.text2)),
       const SizedBox(height: 18),
+      _SheetTile(
+        icon: Icons.schedule,
+        title: 'statusRules'.tr(),
+        subtitle: officeHoursText(settings),
+        onTap: () {
+          nav.pop();
+          nav.push(MaterialPageRoute(builder: (_) => const StatusRulesScreen()));
+        },
+      ),
+      const SizedBox(height: 8),
       _SheetTile(
         icon: Icons.dns_outlined,
         title: 'tabAccounts'.tr(),

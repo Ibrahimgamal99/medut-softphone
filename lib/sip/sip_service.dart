@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:medut/medut.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,7 @@ import 'package:proximity_screen_lock/proximity_screen_lock.dart';
 
 import '../core/accounts.dart';
 import '../core/db.dart';
+import '../core/people.dart';
 import '../core/settings.dart';
 import 'native_bridge.dart';
 import 'quality.dart';
@@ -115,6 +117,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   bool Function() isDark = () => false;
   bool Function() isRtl = () => false;
   String Function(String number) nameFor = (_) => '';
+  /// Every number in the phone's contacts (extensions among them get presence).
+  Iterable<String> Function() contactNumbers = () => const [];
 
   Medut? _sdk;
   final Map<String, AccountRuntime> runtimes = {};
@@ -140,6 +144,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _statusTimer;
   Timer? _applyDebounce;
   final Set<String> _subscribed = {};
+  Timer? _presenceDebounce;
+
+  /// The extensions whose presence is followed (see [presenceTargets]).
+  List<String> presenceList = const [];
   final _ready = Completer<void>();
 
   /// Accounts being tried by [tryRegister]: registered but not saved yet.
@@ -193,6 +201,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     await applyAccounts();
     store.addListener(_scheduleApply);
     settings.addListener(_onSettings);
+    db.addListener(syncPresence); // a new call can bring a new extension
     _statusTimer = Timer.periodic(const Duration(minutes: 1), (_) => _publishStatus());
     _syncKeepAlive();
     _push();
@@ -290,7 +299,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _publishStatus();
     _applyAudioPrefs();
     _scheduleApply(); // network settings (ICE servers, relay) live on the accounts
-    _syncSubscriptions();
+    syncPresence();
     _push();
   }
 
@@ -493,7 +502,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         rt.sipCode = int.tryParse(code ?? '') ?? 0;
         if (rt.status == RegStatus.registered) {
           _publishStatusFor(rt);
-          _syncSubscriptions();
+          syncPresence();
         }
         _syncKeepAlive();
         notifyListeners();
@@ -529,11 +538,31 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     rt.account?.publishPresence(s == MyStatus.dnd ? PresenceStatus.closed : PresenceStatus.open);
   }
 
-  void _syncSubscriptions() {
+  /// Recomputes [presenceList] and follows it on the default account:
+  /// favourites, hand-added extensions, and the most recent ones from calls
+  /// and contacts.
+  void syncPresence() {
+    _presenceDebounce?.cancel();
+    _presenceDebounce = Timer(const Duration(milliseconds: 400), _syncSubscriptions);
+  }
+
+  Future<void> _syncSubscriptions() async {
+    final recent = (await db.calls(limit: 300)).map((c) => c.number);
+    final targets = presenceTargets(
+      favourites: settings.favourites,
+      watched: settings.watched.map((w) => w.ext),
+      recent: recent,
+      contacts: contactNumbers(),
+      hidden: settings.hiddenExts,
+    );
+    if (!listEquals(targets, presenceList)) {
+      presenceList = targets;
+      notifyListeners();
+    }
     final def = store.defaultAccount;
     final rt = def == null ? null : runtimes[def.id];
     if (rt == null || rt.status != RegStatus.registered) return;
-    final want = {for (final w in settings.watched) '${rt.cfg.id}|${w.ext}'};
+    final want = {for (final ext in targets) '${rt.cfg.id}|$ext'};
     for (final key in _subscribed.difference(want).toList()) {
       final ext = key.split('|').last;
       runtimes[key.split('|').first]?.account?.unsubscribePresence(uriFor(rt.cfg, ext));
@@ -672,7 +701,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     if (settings.effectiveStatus() == MyStatus.dnd) {
-      final fav = settings.letFavourites && settings.favourites.contains(number);
+      final fav = settings.letFavourites && settings.favourites.any((f) => sameNumber(f, number));
       final repeat = settings.letRepeat && await db.calledRecently(number);
       if (!fav && !repeat) {
         e.call.reject(statusCode: 486, reason: 'Busy Here');

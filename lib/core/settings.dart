@@ -179,6 +179,10 @@ class AppSettings extends ChangeNotifier {
   Set<String> get favourites => (jsonDecode(_s('favourites', '[]')) as List).cast<String>().toSet();
   set favourites(Set<String> v) => _set('favourites', jsonEncode(v.toList()));
 
+  /// Extensions learned from calls that the user hid from Contacts.
+  Set<String> get hiddenExts => (jsonDecode(_s('hiddenExts', '[]')) as List).cast<String>().toSet();
+  set hiddenExts(Set<String> v) => _set('hiddenExts', jsonEncode(v.toList()));
+
   // Which account places a call
   List<DialRule> get dialRules => (jsonDecode(_s('dialRules', '[]')) as List)
       .map((e) => DialRule.fromJson(e as Map<String, dynamic>))

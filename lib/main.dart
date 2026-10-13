@@ -29,7 +29,10 @@ Future<void> main() async {
         if (w.ext == number) return w.name;
       }
       return contacts.nameFor(number);
-    };
+    }
+    ..contactNumbers = (() => contacts.contacts.expand((c) => c.numbers));
+  // Contacts saved with an extension get presence once the address book loads.
+  contacts.addListener(sip.syncPresence);
 
   // SIP starts before the first frame: on Android this engine also runs with
   // no UI at all (boot, push wake-up), and registering must not wait for one.

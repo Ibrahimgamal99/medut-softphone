@@ -12,10 +12,10 @@ import '../sip/sip_service.dart';
 import 'activity.dart';
 import 'chat.dart';
 import 'dialer.dart';
-import 'team.dart';
+import 'contacts_screen.dart';
 import 'transfer_sheet.dart';
 
-/// Bottom tabs (Calls · Keypad · People) and the bar that returns to a call
+/// Bottom tabs (Calls · Keypad · Contacts) and the bar that returns to a call
 /// running on the native screen. Accounts and settings open from the avatar
 /// on the keypad.
 class HomeShell extends ConsumerStatefulWidget {
@@ -92,7 +92,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             child: IndexedStack(index: _tab, children: [
               const ActivityScreen(),
               DialerScreen(addCallMode: _addCallMode),
-              const TeamScreen(),
+              const ContactsScreen(),
             ]),
           ),
         ]),
@@ -174,7 +174,7 @@ class _BottomNav extends ConsumerWidget {
     final items = [
       (Icons.schedule, 'tabCalls'.tr()),
       (Icons.dialpad, 'tabKeypad'.tr()),
-      (Icons.people_outline, 'tabPeople'.tr()),
+      (Icons.people_outline, 'tabContacts'.tr()),
     ];
     return Container(
       color: t.nav,

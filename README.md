@@ -13,9 +13,12 @@ in the app.
 - Any number of SIP accounts over UDP / TCP / TLS / WS / WSS, with live
   registration state (registered, reconnecting, failed with the SIP code and
   retry countdown) and dial rules that pick the account per number.
-- Add an account by QR code, by importing a Medut-SDK account JSON, or by
-  typing it in; Advanced holds every SDK option (SRTP SDES / DTLS-SRTP,
-  ICE / STUN / TURN, codec order, outbound proxy, auth user, DTMF mode, push).
+- Sign in with a SIP address (`201@pbx.example.com`) and a password: the
+  app tries TLS, then TCP, then UDP and keeps the first that registers. Or
+  scan a QR code. More options holds the connection, SRTP, auth user and
+  outbound proxy; All technical settings holds every SDK option (SRTP SDES /
+  DTLS-SRTP, ICE / STUN / TURN, codec order, DTMF mode, push, a Medut-SDK
+  account JSON import).
 - Calls: answer, decline (603), busy (486), hold, mute, speaker / Bluetooth,
   DTMF keypad, local WAV recording, two calls with swap, call waiting,
   blind transfer, attended transfer ("talk first" → Complete), and following a
@@ -43,11 +46,15 @@ in the app.
   be turned off per account). The call screen says when a call is recorded.
 - Live call quality: MOS both ways, jitter, loss, RTT, codec, SRTP suite, ICE
   path, jitter buffer.
-- Team: your status (Available / Silent / Do not disturb) published with SIP
-  PUBLISH, office hours, "let through" rules; colleagues' presence via
-  SUBSCRIBE; device contacts.
-- Activity: calls, recordings and SIP MESSAGE chats in one list, voicemail
-  count from MWI.
+- Tabs: Calls, Keypad, Contacts. Accounts and Settings open from your
+  avatar on the keypad.
+- Contacts: your status (Available / Silent / Do not disturb) published with
+  SIP PUBLISH, office hours, "let through" rules; favourites; the phone's
+  contacts. Extensions (2–6 digits) are learned from calls and from contacts
+  saved with one, since SIP has no directory, and get presence via SUBSCRIBE:
+  favourites and hand-added ones, plus the 30 most recent.
+- Calls: calls, recordings and SIP MESSAGE chats in one list with search,
+  missed calls from one number folded, voicemail count from MWI.
 - Light / dark theme, English / Arabic with right-to-left layout on every
   screen, native ones included.
 - SIP log viewer and export.
@@ -58,7 +65,7 @@ in the app.
 lib/                 Flutter UI + SipService (drives Medut-SDK over dart:ffi)
   sip/sip_service.dart   accounts, calls, presence, MWI, messages → call snapshots
   sip/native_bridge.dart the medut/native channel
-  features/              dialer, activity, chat, team, accounts, settings, transfer
+  features/              sign-in, dialer, activity, contacts, chat, accounts, settings, transfer
 android/…/phone/     MedutApp (process-wide engine), CallActivity (native call UI),
                      MedutService (keep-alive FGS), Telecom ConnectionService,
                      ring notifications, boot receiver
