@@ -261,7 +261,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     final hadProvider = _pushProvider != PushProvider.none;
     _pushToken = token;
     _pushProvider = token == null ? PushProvider.none : provider;
-    for (final rt in runtimes.values) {
+    // A copy: _recreate replaces entries in runtimes while we walk it.
+    for (final rt in runtimes.values.toList()) {
       if (!rt.cfg.push) continue;
       if (hadProvider && token != null) {
         rt.account?.setPushToken(token);
