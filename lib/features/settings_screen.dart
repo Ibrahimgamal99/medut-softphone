@@ -209,8 +209,8 @@ class SettingsScreen extends ConsumerWidget {
             title: 'callRecording'.tr(),
             subtitle: switch (s.recordingMode) {
               'off' => 'recOffSub'.tr(),
-              'always' => 'recAlwaysSub'.tr(),
-              _ => 'recManualSub'.tr(),
+              'always' => '${'recAlwaysSub'.tr()}\n${'recLaw'.tr()}',
+              _ => '${'recManualSub'.tr()}\n${'recLaw'.tr()}',
             },
             onTap: () async {
               final v = await chooseOne(context, 'callRecording'.tr(), s.recordingMode, [

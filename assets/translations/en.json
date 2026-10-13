@@ -241,6 +241,7 @@
   "recOffSub": "The Record button is hidden",
   "recManualSub": "Tap Record during a call",
   "recAlwaysSub": "Calls are recorded once connected. Recordings stay on this phone.",
+  "recLaw": "Recording laws differ by country. Tell the other person before you record.",
   "recordThisAccount": "Record calls on this account",
   "recordThisAccountSub": "Applies when Call recording is set to Every call",
   "recordingNow": "This call is being recorded",

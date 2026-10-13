@@ -171,6 +171,12 @@ flutter run                  # on a connected Android device
 flutter build apk --release  # Android
 ```
 
+**Google Play:** `scripts/build-release.sh` builds the App Bundle signed with
+the upload key from `android/key.properties`, and keeps the Dart debug info in
+`symbols/<version>/`. [docs/google-play.md](docs/google-play.md) covers the key,
+the developer account and every Play Console form. The privacy policy is
+[docs/privacy-policy.md](docs/privacy-policy.md).
+
 **iOS** (on a Mac):
 1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK
    repo does not ship it yet, and `pod install` reports it missing otherwise.

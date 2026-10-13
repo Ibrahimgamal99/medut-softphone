@@ -50,3 +50,6 @@ app.*.map.json
 # Per-deployment Firebase / APNs config (optional, see README)
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Dart debug info from scripts/build-release.sh (keep a copy per release)
+/symbols/
