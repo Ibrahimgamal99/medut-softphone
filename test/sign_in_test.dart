@@ -71,6 +71,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         accountsProvider.overrideWith((_) => store),
+        settingsProvider.overrideWith((_) => sip.settings),
         sipProvider.overrideWith((_) => sip),
       ],
       child: MaterialApp(

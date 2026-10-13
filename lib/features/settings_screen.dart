@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/accounts.dart' show codecNames, kCodecs;
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../core/db.dart';
@@ -488,6 +489,13 @@ class AdvancedCallSettingsScreen extends ConsumerWidget {
         ),
         SettingsSection(title: 'audio'.tr(), children: [
           SettingsTile(
+            icon: Icons.graphic_eq,
+            tint: t.accent,
+            title: 'codecs'.tr(),
+            subtitle: codecNames(s.codecs),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CodecsScreen())),
+          ),
+          SettingsTile(
             icon: Icons.surround_sound_outlined,
             tint: t.accent,
             title: 'echoCancel'.tr(),
@@ -824,6 +832,74 @@ class BlockedScreen extends ConsumerWidget {
 }
 
 /// Extra STUN / TURN servers for every account (Settings → Network).
+/// Advanced call settings → Codecs: the order every account offers them in.
+class CodecsScreen extends ConsumerWidget {
+  const CodecsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(settingsProvider);
+    return Scaffold(
+      appBar: AppBar(title: Text('codecs'.tr())),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
+        SectionLabel('codecOrder'.tr()),
+        _CodecList(codecs: s.codecs, onChanged: (c) => s.codecs = c),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+          child: Text('codecsWebLink'.tr(), style: TextStyle(fontSize: 12.5, color: context.t.text2)),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Codec order and on/off: G.711 A-law, G.711 µ-law, Opus (all Medut-SDK builds).
+class _CodecList extends StatelessWidget {
+  const _CodecList({required this.codecs, required this.onChanged});
+  final List<String> codecs;
+  final ValueChanged<List<String>> onChanged;
+
+  static const _names = {'opus': 'Opus', 'alaw': 'G.711 A-law (PCMA)', 'ulaw': 'G.711 µ-law (PCMU)'};
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final ordered = [...codecs, ...kCodecs.where((c) => !codecs.contains(c))];
+    return ECard(
+      padding: EdgeInsets.zero,
+      child: ReorderableListView(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
+        onReorderItem: (from, to) {
+          final l = [...ordered];
+          final item = l.removeAt(from);
+          l.insert(to, item);
+          onChanged(l.where(codecs.contains).toList());
+        },
+        children: [
+          for (var i = 0; i < ordered.length; i++)
+            ListTile(
+              key: ValueKey(ordered[i]),
+              leading: Checkbox(
+                value: codecs.contains(ordered[i]),
+                activeColor: t.accent,
+                onChanged: (on) {
+                  final next = on == true
+                      ? ordered.where((c) => codecs.contains(c) || c == ordered[i]).toList()
+                      : codecs.where((c) => c != ordered[i]).toList();
+                  if (next.isNotEmpty) onChanged(next);
+                },
+              ),
+              title: Text(_names[ordered[i]]!),
+              trailing: ReorderableDragStartListener(index: i, child: Icon(Icons.drag_handle, color: t.text2)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class IceServersScreen extends ConsumerWidget {
   const IceServersScreen({super.key});
 

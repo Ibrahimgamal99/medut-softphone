@@ -7,6 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Filled in when ICE is turned on and no STUN server is set.
 const kDefaultStun = 'stun:stun.l.google.com:19302';
 
+/// Every codec Medut-SDK builds, in the default order: G.711 first, which
+/// most PBXs and trunks speak without transcoding.
+const kCodecs = ['alaw', 'ulaw', 'opus'];
+
+/// `PCMA · PCMU · Opus` for a codec list.
+String codecNames(List<String> codecs) =>
+    codecs.map((c) => switch (c) { 'alaw' => 'PCMA', 'ulaw' => 'PCMU', _ => 'Opus' }).join(' · ');
+
 /// The status feature codes a status change dials, by key.
 const kStatusCodeKeys = ['dndOn', 'dndOff', 'queueLogin', 'queueLogout'];
 
@@ -43,7 +51,6 @@ class SipAccountConfig {
     this.turn = '',
     this.turnUser = '',
     this.turnPass = '',
-    this.codecs = const ['opus', 'alaw', 'ulaw'],
     this.verifyTls = true,
     this.enabled = true,
     this.isDefault = false,
@@ -63,7 +70,6 @@ class SipAccountConfig {
   final String serverUrl, authUser, displayName, outboundProxy, mediaEnc;
   final bool ice;
   final String stun, turn, turnUser, turnPass;
-  final List<String> codecs;
   final bool verifyTls, enabled, isDefault, push;
   final String dtmf;
 
@@ -92,6 +98,11 @@ class SipAccountConfig {
   /// The code to dial for [key] ('' = this PBX has none).
   String code(String key) => codes[key] ?? kPbxPresets[pbx]?[key] ?? '';
 
+  /// The codecs this account offers, in order: the app-wide [order], except
+  /// that a web link (a WebRTC server) puts Opus first.
+  List<String> codecsFrom(List<String> order) =>
+      transport == 'ws' || transport == 'wss' ? ['opus', ...order.where((c) => c != 'opus')] : order;
+
   /// `user@domain[:port]`, as Medut-SDK expects the AOR.
   String get aor => port > 0 ? '$user@$domain:$port' : '$user@$domain';
   String get label => name.isNotEmpty ? name : domain;
@@ -113,7 +124,6 @@ class SipAccountConfig {
     String? turn,
     String? turnUser,
     String? turnPass,
-    List<String>? codecs,
     bool? verifyTls,
     bool? enabled,
     bool? isDefault,
@@ -145,7 +155,6 @@ class SipAccountConfig {
         turn: turn ?? this.turn,
         turnUser: turnUser ?? this.turnUser,
         turnPass: turnPass ?? this.turnPass,
-        codecs: codecs ?? this.codecs,
         verifyTls: verifyTls ?? this.verifyTls,
         enabled: enabled ?? this.enabled,
         isDefault: isDefault ?? this.isDefault,
@@ -177,7 +186,6 @@ class SipAccountConfig {
         'stun': stun,
         'turn': turn,
         'turnUser': turnUser,
-        'codecs': codecs,
         'verifyTls': verifyTls,
         'enabled': enabled,
         'isDefault': isDefault,
@@ -211,7 +219,6 @@ class SipAccountConfig {
         turn: j['turn'] as String? ?? '',
         turnUser: j['turnUser'] as String? ?? '',
         turnPass: turnPass,
-        codecs: (j['codecs'] as List?)?.cast<String>() ?? const ['opus', 'alaw', 'ulaw'],
         verifyTls: j['verifyTls'] as bool? ?? true,
         enabled: j['enabled'] as bool? ?? true,
         isDefault: j['isDefault'] as bool? ?? false,
@@ -243,7 +250,6 @@ class SipAccountConfig {
         if (turn.isNotEmpty) 'turn_server': turn,
         if (turnUser.isNotEmpty) 'turn_user': turnUser,
         if (turnPass.isNotEmpty) 'turn_pass': turnPass,
-        'audio_codecs': codecs,
         'verify_tls': verifyTls,
       });
 
@@ -251,7 +257,8 @@ class SipAccountConfig {
 
   /// Reads a provisioning payload: a Medut-SDK account JSON (the same shape as
   /// the SDK's `account.json`), or a SIP URI like
-  /// `sip:201:secret@pbx.example.com:5061;transport=tls`.
+  /// `sip:201:secret@pbx.example.com:5061;transport=tls`. Its `audio_codecs`
+  /// is ignored: the codec order is app-wide ([codecsFrom]).
   static SipAccountConfig? parseProvisioning(String raw) {
     final text = raw.trim();
     if (text.startsWith('{')) {
@@ -267,8 +274,6 @@ class SipAccountConfig {
           port = int.tryParse(host.substring(colon + 1)) ?? 0;
           host = host.substring(0, colon);
         }
-        final codecs = (j['audio_codecs'] as List?)?.cast<String>() ??
-            (j['audio_codec'] is String ? [j['audio_codec'] as String] : null);
         return SipAccountConfig(
           id: newId(),
           name: j['name'] as String? ?? j['display_name'] as String? ?? host,
@@ -291,7 +296,6 @@ class SipAccountConfig {
           turn: j['turn_server'] as String? ?? '',
           turnUser: j['turn_user'] as String? ?? '',
           turnPass: j['turn_pass'] as String? ?? '',
-          codecs: codecs ?? const ['opus', 'alaw', 'ulaw'],
           verifyTls: j['verify_tls'] as bool? ?? true,
         );
       } catch (_) {

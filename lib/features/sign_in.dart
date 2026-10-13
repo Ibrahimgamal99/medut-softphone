@@ -163,7 +163,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _name = TextEditingController();
   final _accountName = TextEditingController();
 
-  /// What a QR code or file carried beyond the form (codecs, TURN, …).
+  /// What a QR code or file carried beyond the form (TURN, TLS checks, …).
   SipAccountConfig _base = const SipAccountConfig(id: '', name: '', user: '', domain: '');
   bool _showPass = false;
   bool _saving = false;
@@ -853,7 +853,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           Divider(height: 1, color: t.border),
           _Fact(Icons.lock_outline, 'callsLabel'.tr(), 'enc_${c.mediaEnc}'.tr()),
           Divider(height: 1, color: t.border),
-          _Fact(Icons.graphic_eq, 'sound'.tr(), codecNames(c.codecs)),
+          _Fact(Icons.graphic_eq, 'sound'.tr(), codecNames(c.codecsFrom(ref.read(settingsProvider).codecs))),
         ]),
       ),
       const SizedBox(height: 12),
@@ -900,10 +900,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     ];
   }
 }
-
-/// `Opus · PCMA · PCMU` for a codec list.
-String codecNames(List<String> codecs) =>
-    codecs.map((c) => switch (c) { 'alaw' => 'PCMA', 'ulaw' => 'PCMU', _ => 'Opus' }).join(' · ');
 
 extension on String {
   String ifEmpty(String other) => isEmpty ? other : this;

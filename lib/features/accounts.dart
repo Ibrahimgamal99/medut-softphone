@@ -73,7 +73,10 @@ class _AccountCard extends ConsumerWidget {
     final failed = status == RegStatus.failed;
     final color = regColor(t, status);
     final enc = switch (cfg.mediaEnc) { 'sdes' => 'SDES', 'dtls' => 'DTLS-SRTP', _ => 'no SRTP' };
-    final codecs = cfg.codecs.map((c) => c == 'alaw' ? 'PCMA' : c == 'ulaw' ? 'PCMU' : 'Opus').join(', ');
+    final codecs = cfg
+        .codecsFrom(ref.watch(settingsProvider).codecs)
+        .map((c) => c == 'alaw' ? 'PCMA' : c == 'ulaw' ? 'PCMU' : 'Opus')
+        .join(', ');
 
     return ECard(
       onTap: onEdit,

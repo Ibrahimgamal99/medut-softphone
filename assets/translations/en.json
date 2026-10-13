@@ -191,6 +191,8 @@
   "scanHint": "Point the camera at the account QR code",
   "imported": "Account details filled in",
   "codecOrder": "Drag to set the order",
+  "codecsWebLink": "Accounts on a web link (WSS) always offer Opus first, then this order.",
+  "codecsFromSettings": "The same order for every account: Settings, Advanced call settings, Codecs. On a web link (WSS), Opus comes first.",
   "serverHint": "pbx.example.com",
   "appearance": "Appearance",
   "theme": "Theme",

@@ -11,6 +11,7 @@ import 'package:medut_phone/core/providers.dart';
 import 'package:medut_phone/core/settings.dart';
 import 'package:medut_phone/core/theme.dart';
 import 'package:medut_phone/features/account_edit.dart';
+import 'package:medut_phone/features/settings_screen.dart';
 import 'package:medut_phone/sip/sip_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -175,6 +176,22 @@ void main() {
     await tester.tap(find.text('secSecurity'));
     await tester.pumpAndSettle();
     expect(find.text('encNeedsSecure'), findsOneWidget);
+  });
+
+  testWidgets('Codecs sets one order for every account; a web link still offers Opus first', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [settingsProvider.overrideWith((_) => settings)],
+      child: MaterialApp(
+        theme: ThemeData(useMaterial3: true, extensions: const [Tokens.light]),
+        home: const CodecsScreen(),
+      ),
+    ));
+    expect(settings.codecs, kCodecs, reason: 'G.711 first by default');
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pumpAndSettle();
+    expect(settings.codecs, ['ulaw', 'opus'], reason: 'A-law turned off');
+    expect(_echo.codecsFrom(settings.codecs), ['opus', 'ulaw']);
+    expect(tester.takeException(), isNull);
   });
 
   test('recordings are named like the phone recorder: who, then when', () {

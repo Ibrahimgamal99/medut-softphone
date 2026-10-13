@@ -93,11 +93,14 @@ icon is its first hieroglyph, the staff 𓌃, with two sound waves.
 **App**
 - Tabs: Calls, Contacts and Settings. A dial button on Calls and Contacts
   opens the keypad.
-- Settings in sections. *Advanced call settings* covers echo cancellation,
-  noise suppression, automatic gain, the jitter buffer (auto / low delay /
-  robust), extra STUN / TURN servers, relay-only, registration expiry and
-  keep-alive. *Help & diagnostics* has the SIP log viewer and export, the SIP
-  trace, the connection log and permissions.
+- Settings in sections. *Advanced call settings* covers the codec order,
+  echo cancellation, noise suppression, automatic gain, the jitter buffer
+  (auto / low delay / robust), extra STUN / TURN servers, relay-only,
+  registration expiry and keep-alive. *Help & diagnostics* has the SIP log
+  viewer and export, the SIP trace, the connection log and permissions.
+- One codec order for every account: G.711 A-law, G.711 µ-law, then Opus by
+  default. An account on a web link (WSS) offers Opus first, as WebRTC
+  servers expect.
 - Light and dark themes, and English and Arabic with right-to-left layout on
   every screen, native ones included.
 

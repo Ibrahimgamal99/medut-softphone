@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'accounts.dart';
+
 /// Your status. Available: registered, so calls to your extension ring,
 /// but out of the queues. Ready: in the queues as well. Do not disturb:
 /// DND on and out of the queues.
@@ -161,6 +163,11 @@ class AppSettings extends ChangeNotifier {
   set keepaliveSec(int v) => _set('keepaliveSec', v);
 
   // Audio
+  /// Codec order for every account, most preferred first; a codec left out is
+  /// not offered. Accounts on a web link put Opus first
+  /// ([SipAccountConfig.codecsFrom]).
+  List<String> get codecs => (jsonDecode(_s('codecs', jsonEncode(kCodecs))) as List).cast<String>();
+  set codecs(List<String> v) => _set('codecs', jsonEncode(v));
   /// auto (the stack's adaptive defaults) | low (20–150 ms) | robust (60–500 ms)
   String get jitterMode => _s('jitterMode', 'auto');
   set jitterMode(String v) => _set('jitterMode', v);

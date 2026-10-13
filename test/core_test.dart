@@ -23,7 +23,6 @@ void main() {
       expect(a.transport, 'tls');
       expect(a.mediaEnc, 'dtls');
       expect(a.ice, isTrue);
-      expect(a.codecs, ['opus', 'alaw']);
     });
 
     test('reads a SIP URI with password and transport', () {
@@ -59,6 +58,13 @@ void main() {
       final export = json.firstWhere((e) => e.contains('"verify_tls"'));
       expect(jsonDecode(read[export]!.toProvisioning()), jsonDecode(export));
     });
+  });
+
+  test('the codec order is app-wide, and a web link puts Opus first', () {
+    const tls = SipAccountConfig(id: 'a', name: '', user: '201', domain: 'pbx.example.com', transport: 'tls');
+    expect(tls.codecsFrom(kCodecs), ['alaw', 'ulaw', 'opus']);
+    expect(tls.copyWith(transport: 'wss').codecsFrom(kCodecs), ['opus', 'alaw', 'ulaw']);
+    expect(tls.copyWith(transport: 'ws').codecsFrom(['ulaw']), ['opus', 'ulaw'], reason: 'even with Opus turned off');
   });
 
   group('dial rules', () {

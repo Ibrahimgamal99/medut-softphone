@@ -319,7 +319,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _syncKeepAlive();
     _publishStatus();
     _applyAudioPrefs();
-    _scheduleApply(); // network settings (ICE servers, relay) live on the accounts
+    _scheduleApply(); // ICE servers, relay and the codec order live on the accounts
     syncPresence();
     _push();
   }
@@ -427,7 +427,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       ..remove('pbx')
       ..remove('codes');
     return '$j|${c.password}|${c.turnPass}|${c.push ? _pushProvider.name : ''}'
-        '|${settings.iceServers}|${settings.forceRelay}';
+        '|${settings.iceServers}|${settings.forceRelay}|${settings.codecs}';
   }
 
   Future<void> applyAccounts() async {
@@ -498,7 +498,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
           verifyTls: c.verifyTls,
           pushProvider: usePush ? _pushProvider : PushProvider.none,
           pushToken: usePush ? _pushToken : null,
-          audioCodecs: c.codecs,
+          audioCodecs: c.codecsFrom(settings.codecs),
           dtmfMode: switch (c.dtmf) {
             'info' => DtmfMode.sipInfo,
             'auto' => DtmfMode.auto,

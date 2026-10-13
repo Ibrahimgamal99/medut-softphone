@@ -16,7 +16,7 @@ import '../core/providers.dart';
 import '../core/theme.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
-import 'sign_in.dart' show PasteAccountDialog, codecNames;
+import 'sign_in.dart' show PasteAccountDialog;
 import 'status_codes.dart';
 
 /// The account being edited. Every page of the technical settings edits this
@@ -362,7 +362,11 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
   }
 
   void _open(_Section s) => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => _SectionPage(draft: _d, section: s, recordingAlways: ref.read(settingsProvider).recordingMode == 'always'),
+        builder: (_) => _SectionPage(
+            draft: _d,
+            section: s,
+            recordingAlways: ref.read(settingsProvider).recordingMode == 'always',
+            codecOrder: ref.read(settingsProvider).codecs),
       ));
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -417,7 +421,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
                             child: Icon(_icon(s), size: 18, color: t.text),
                           ),
                           title: Text(_title(s), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          subtitle: Text(_summary(s, c),
+                          subtitle: Text(_summary(s, c, ref.watch(settingsProvider).codecs),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textDirection: ui.TextDirection.ltr,
@@ -554,7 +558,7 @@ String _title(_Section s) => switch (s) {
 /// `stun:stun.l.google.com:19302` → `stun.l.google.com`.
 String _host(String url) => url.replaceFirst(RegExp(r'^(stuns?|turns?):', caseSensitive: false), '').split(':').first;
 
-String _summary(_Section s, SipAccountConfig c) {
+String _summary(_Section s, SipAccountConfig c, List<String> codecOrder) {
   final web = c.transport == 'ws' || c.transport == 'wss';
   final secure = c.transport == 'tls' || c.transport == 'wss';
   return switch (s) {
@@ -580,7 +584,7 @@ String _summary(_Section s, SipAccountConfig c) {
             c.turn.isNotEmpty ? 'TURN ${_host(c.turn)}' : 'sumNoTurn'.tr(),
           ].join(' · ')
         : 'sumIceOff'.tr(),
-    _Section.audio => codecNames(c.codecs),
+    _Section.audio => codecNames(c.codecsFrom(codecOrder)),
     _Section.calls => [
         'DTMF ${switch (c.dtmf) { 'info' => 'SIP INFO', 'auto' => 'auto', _ => 'RFC 4733' }}',
       ].join(' · '),
@@ -602,10 +606,12 @@ extension on String {
 
 /// One section of the technical settings.
 class _SectionPage extends StatelessWidget {
-  const _SectionPage({required this.draft, required this.section, required this.recordingAlways});
+  const _SectionPage(
+      {required this.draft, required this.section, required this.recordingAlways, required this.codecOrder});
   final AccountDraft draft;
   final _Section section;
   final bool recordingAlways;
+  final List<String> codecOrder;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -719,9 +725,17 @@ class _SectionPage extends StatelessWidget {
     ];
   }
 
+  /// Read-only: the codec order is app-wide (Advanced call settings → Codecs).
   List<Widget> _audio(BuildContext context) => [
-        SectionLabel('${'codecs'.tr()} · ${'codecOrder'.tr()}'),
-        _CodecList(codecs: draft.choices.codecs, onChanged: (c) => draft.set((x) => x.copyWith(codecs: c))),
+        SectionLabel('codecs'.tr()),
+        ECard(
+          child: Text(codecNames(draft.choices.codecsFrom(codecOrder)),
+              textDirection: ui.TextDirection.ltr, style: mono(context, size: 14)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+          child: Text('codecsFromSettings'.tr(), style: TextStyle(fontSize: 12.5, color: context.t.text2)),
+        ),
       ];
 
   List<Widget> _calls(BuildContext context) {
@@ -949,54 +963,6 @@ class _JsonDialogState extends State<_JsonDialog> {
           FilledButton(onPressed: () => Navigator.pop(context, _text.text), child: Text('apply'.tr())),
         ],
       );
-}
-
-/// Codec order and on/off: Opus, G.711 A-law, G.711 µ-law (all Medut-SDK builds).
-class _CodecList extends StatelessWidget {
-  const _CodecList({required this.codecs, required this.onChanged});
-  final List<String> codecs;
-  final ValueChanged<List<String>> onChanged;
-
-  static const _all = ['opus', 'alaw', 'ulaw'];
-  static const _names = {'opus': 'Opus', 'alaw': 'G.711 A-law (PCMA)', 'ulaw': 'G.711 µ-law (PCMU)'};
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final ordered = [...codecs, ..._all.where((c) => !codecs.contains(c))];
-    return ECard(
-      padding: EdgeInsets.zero,
-      child: ReorderableListView(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        buildDefaultDragHandles: false,
-        onReorderItem: (from, to) {
-          final l = [...ordered];
-          final item = l.removeAt(from);
-          l.insert(to, item);
-          onChanged(l.where(codecs.contains).toList());
-        },
-        children: [
-          for (var i = 0; i < ordered.length; i++)
-            ListTile(
-              key: ValueKey(ordered[i]),
-              leading: Checkbox(
-                value: codecs.contains(ordered[i]),
-                activeColor: t.accent,
-                onChanged: (on) {
-                  final next = on == true
-                      ? ordered.where((c) => codecs.contains(c) || c == ordered[i]).toList()
-                      : codecs.where((c) => c != ordered[i]).toList();
-                  if (next.isNotEmpty) onChanged(next);
-                },
-              ),
-              title: Text(_names[ordered[i]]!),
-              trailing: ReorderableDragStartListener(index: i, child: Icon(Icons.drag_handle, color: t.text2)),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 /// Full-screen camera that pops with the first QR code's text.

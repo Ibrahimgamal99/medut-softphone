@@ -61,7 +61,6 @@ sensitive.
 | `stun_server` | string | `""` | `stun:host:port`. |
 | `turn_server` | string | `""` | `turn:host:port`. Used only with ICE on. |
 | `turn_user`, `turn_pass` | string | `""` | TURN credentials. |
-| `audio_codecs` | list of strings | `["opus", "alaw", "ulaw"]` | Codec order, from `opus`, `alaw` (G.711 A-law) and `ulaw` (G.711 µ-law). `audio_codec` with a single string also works. |
 | `verify_tls` | boolean | `true` | `false` accepts a self-signed server certificate. |
 
 Things that break a JSON payload:
@@ -78,6 +77,11 @@ Things that break a JSON payload:
 Not in this format, so set them in the app after import: voicemail code, dial
 prefix, + replacement, custom SIP headers, PBX type and status codes, DTMF
 mode, per-account recording, and push.
+
+**Codecs are not per account.** `audio_codecs` and `audio_codec` are ignored.
+Every account uses the order set in *Settings > Advanced call settings >
+Codecs*, which is G.711 A-law, G.711 µ-law, then Opus by default. An account
+on a web link (`ws` / `wss`) puts Opus first, then the rest in that order.
 
 ## Examples
 
@@ -104,8 +108,7 @@ password:
   "password": "secret",
   "display_name": "Sara",
   "transport": "tls",
-  "media_enc": "sdes",
-  "audio_codecs": ["opus", "alaw"]
+  "media_enc": "sdes"
 }
 ```
 
@@ -185,7 +188,6 @@ transport:
   "transport": "tls",
   "media_enc": "sdes",
   "ice_enabled": false,
-  "audio_codecs": ["opus", "alaw", "ulaw"],
   "verify_tls": true
 }
 ```
