@@ -10,6 +10,7 @@ import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'account_edit.dart';
 import 'settings_screen.dart';
+import 'sign_in.dart';
 
 /// Design E · Accounts: every PBX account with its live registration state
 /// in plain words plus the SIP detail, and which account places a call.
@@ -23,8 +24,8 @@ class AccountsScreen extends ConsumerWidget {
     final sip = ref.watch(sipProvider);
     final accounts = store.accounts;
 
-    void openEdit([SipAccountConfig? a]) =>
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => AccountEditScreen(existing: a)));
+    void openEdit([SipAccountConfig? a]) => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => a == null ? const SignInScreen(another: true) : AccountEditScreen(existing: a)));
 
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
       Row(children: [
@@ -45,19 +46,6 @@ class AccountsScreen extends ConsumerWidget {
       ]),
       const SizedBox(height: 12),
       const ReachabilityBanner(),
-      if (accounts.isEmpty)
-        ECard(
-          padding: const EdgeInsets.all(20),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(Icons.dns_outlined, color: t.accent, size: 32),
-            const SizedBox(height: 10),
-            Text('welcome'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text('welcomeSub'.tr(), style: TextStyle(color: t.text2, height: 1.4)),
-            const SizedBox(height: 16),
-            SizedBox(width: double.infinity, child: PrimaryButton(label: 'addAccount'.tr(), onPressed: openEdit)),
-          ]),
-        ),
       for (final a in accounts) ...[
         _AccountCard(cfg: a, rt: sip.runtimes[a.id], onEdit: () => openEdit(a)),
         const SizedBox(height: 10),

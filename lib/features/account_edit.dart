@@ -14,11 +14,13 @@ import '../core/providers.dart';
 import '../core/theme.dart';
 import '../ui/widgets.dart';
 
-/// Design E · Add account: QR / file / typed in, simple by default, with an
-/// Advanced section holding every Medut-SDK account option.
+/// Every Medut-SDK account option: editing an account, or "All technical
+/// settings" from sign-in, which hands over what was typed there as [initial].
+/// Pops with `true` once the account is saved.
 class AccountEditScreen extends ConsumerStatefulWidget {
-  const AccountEditScreen({super.key, this.existing});
+  const AccountEditScreen({super.key, this.existing, this.initial});
   final SipAccountConfig? existing;
+  final SipAccountConfig? initial;
 
   @override
   ConsumerState<AccountEditScreen> createState() => _AccountEditScreenState();
@@ -27,6 +29,7 @@ class AccountEditScreen extends ConsumerStatefulWidget {
 class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
   final _form = GlobalKey<FormState>();
   late SipAccountConfig _a = widget.existing ??
+      widget.initial ??
       SipAccountConfig(id: SipAccountConfig.newId(), name: '', user: '', domain: '');
   late final _name = TextEditingController(text: _a.name);
   late final _user = TextEditingController(text: _a.user);
@@ -45,7 +48,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
   late final _prefix = TextEditingController(text: _a.dialPrefix);
   late final _plus = TextEditingController(text: _a.plusReplace);
   late final _headers = TextEditingController(text: _a.headers);
-  bool _advanced = false;
+  late bool _advanced = widget.initial != null;
   bool _showPass = false;
 
   @override
@@ -85,7 +88,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
 
   Future<void> _scan() async {
     if (!(await Permission.camera.request()).isGranted || !mounted) return;
-    final raw = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _QrScanScreen()));
+    final raw = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const QrScanScreen()));
     if (raw == null || !mounted) return;
     final p = _parseOrWarn(raw);
     if (p != null) _fill(SipAccountConfig.fromJson({...p.toJson(), 'id': _a.id}, password: p.password, turnPass: p.turnPass));
@@ -126,7 +129,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
     // Ask once, at the moment it makes sense: calls need the mic, and ringing
     // in the background needs notifications.
     await [Permission.microphone, Permission.notification].request();
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, true);
   }
 
   /// Show the account as a provisioning QR, to set up another phone.
@@ -546,14 +549,15 @@ class _CodecList extends StatelessWidget {
   }
 }
 
-class _QrScanScreen extends StatefulWidget {
-  const _QrScanScreen();
+/// Full-screen camera that pops with the first QR code's text.
+class QrScanScreen extends StatefulWidget {
+  const QrScanScreen({super.key});
 
   @override
-  State<_QrScanScreen> createState() => _QrScanScreenState();
+  State<QrScanScreen> createState() => _QrScanScreenState();
 }
 
-class _QrScanScreenState extends State<_QrScanScreen> {
+class _QrScanScreenState extends State<QrScanScreen> {
   bool _done = false;
 
   @override

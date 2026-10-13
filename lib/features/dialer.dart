@@ -12,7 +12,7 @@ import '../core/settings.dart';
 import '../core/theme.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
-import 'account_edit.dart';
+import 'sign_in.dart';
 
 /// Ask for the microphone before the first call; returns false if refused.
 Future<bool> ensureMic(BuildContext context) async {
@@ -173,7 +173,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
           Expanded(
             child: selected == null
                 ? InkWell(
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountEditScreen())),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignInScreen(another: true))),
                     child: Text('noAccountsYet'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: t.accent)),
                   )
                 : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

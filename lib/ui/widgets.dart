@@ -136,13 +136,15 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return SizedBox(
-      height: 52,
+      height: 54,
       child: FilledButton(
         style: FilledButton.styleFrom(
           backgroundColor: color ?? t.accent,
           foregroundColor: textColor ?? t.onAccent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          disabledBackgroundColor: t.surface2,
+          disabledForegroundColor: t.grey,
+          shape: const StadiumBorder(),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         onPressed: onPressed,
         child: Text(label),
@@ -160,13 +162,13 @@ class SecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     return SizedBox(
-      height: 52,
+      height: 54,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           backgroundColor: t.surface,
           foregroundColor: t.text,
           side: BorderSide(color: t.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: const StadiumBorder(),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         onPressed: onPressed,
@@ -198,6 +200,36 @@ class RoundIcon extends StatelessWidget {
           onTap: onTap,
           child: SizedBox(width: size, height: size, child: Icon(icon, size: size * 0.42, color: color ?? t.text2)),
         ),
+      ),
+    );
+  }
+}
+
+/// The Medut mark: four rising sound bars on a green rounded square.
+class MedutMark extends StatelessWidget {
+  const MedutMark({super.key, this.size = 26});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final bar = size * 0.11;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(size * 0.34)),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final h in const [0.25, 0.54, 0.79, 0.42])
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: bar * 0.4),
+              width: bar,
+              height: size * h * 0.72,
+              decoration: BoxDecoration(color: t.onAccent, borderRadius: BorderRadius.circular(bar)),
+            ),
+        ],
       ),
     );
   }

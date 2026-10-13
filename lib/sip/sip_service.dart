@@ -24,6 +24,19 @@ class MwiInfo {
   final int newVoice, oldVoice, newUrgent;
 }
 
+/// How a [SipService.tryRegister] attempt ended.
+class RegProbe {
+  const RegProbe(this.status, {this.sipCode = 0, this.error = ''});
+
+  /// [RegStatus.registering] means no answer before the timeout.
+  final RegStatus status;
+  final int sipCode;
+  final String error;
+
+  bool get ok => status == RegStatus.registered;
+  bool get badPassword => sipCode == 401 || sipCode == 403;
+}
+
 /// A configured account and its live SDK object.
 class AccountRuntime {
   AccountRuntime(this.cfg, this.signature);
@@ -127,6 +140,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _statusTimer;
   Timer? _applyDebounce;
   final Set<String> _subscribed = {};
+  final _ready = Completer<void>();
+
+  /// Accounts being tried by [tryRegister]: registered but not saved yet.
+  final Set<String> _probing = {};
 
   bool get started => _started;
   bool get hasCall => calls.isNotEmpty;
@@ -179,6 +196,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _statusTimer = Timer.periodic(const Duration(minutes: 1), (_) => _publishStatus());
     _syncKeepAlive();
     _push();
+    _ready.complete();
   }
 
   // Mobile tuning.
@@ -313,8 +331,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> applyAccounts() async {
     if (_sdk == null) return;
     final wanted = {for (final c in store.accounts.where((a) => a.enabled)) c.id: c};
+    // A tried account that has been saved is an ordinary account from now on.
+    _probing.removeWhere(wanted.containsKey);
     for (final id in runtimes.keys.toList()) {
-      if (!wanted.containsKey(id) && !calls.any((c) => c.runtime.cfg.id == id)) _destroy(id);
+      if (!wanted.containsKey(id) && !_probing.contains(id) && !calls.any((c) => c.runtime.cfg.id == id)) _destroy(id);
     }
     for (final c in wanted.values) {
       final rt = runtimes[c.id];
@@ -395,6 +415,53 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       rt.status = RegStatus.failed;
       rt.error = e.toString();
     }
+  }
+
+  /// Registers [c] without saving it, to see whether it works: sign-in tries
+  /// TLS, TCP and UDP this way. A registration that succeeds keeps running,
+  /// so saving the same config afterwards adopts it rather than registering
+  /// twice. Anything else is torn down.
+  Future<RegProbe> tryRegister(SipAccountConfig c, {Duration timeout = const Duration(seconds: 8)}) async {
+    try {
+      await _ready.future.timeout(timeout);
+    } on TimeoutException {
+      return const RegProbe(RegStatus.registering);
+    }
+    _probing.add(c.id);
+    _recreate(c);
+    final rt = runtimes[c.id];
+    if (rt == null) {
+      cancelProbe(c.id);
+      return const RegProbe(RegStatus.failed);
+    }
+    final settled = Completer<void>();
+    void check() {
+      final s = rt.status;
+      if (!settled.isCompleted && (s == RegStatus.registered || s == RegStatus.failed || s == RegStatus.reconnecting)) {
+        settled.complete();
+      }
+    }
+
+    addListener(check);
+    check();
+    try {
+      await settled.future.timeout(timeout);
+    } on TimeoutException {
+      // Still trying: no answer on this transport.
+    } finally {
+      removeListener(check);
+    }
+    if (!identical(runtimes[c.id], rt)) return const RegProbe(RegStatus.off); // cancelled meanwhile
+    final result = RegProbe(rt.status, sipCode: rt.sipCode, error: rt.error);
+    if (!result.ok) cancelProbe(c.id);
+    return result;
+  }
+
+  /// Drops a tried account that was not saved (failed, or the user left).
+  void cancelProbe(String id) {
+    if (!_probing.remove(id) || store.byId(id) != null) return;
+    _destroy(id);
+    notifyListeners();
   }
 
   AccountRuntime? runtimeFor(Account? a) {

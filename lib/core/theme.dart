@@ -37,55 +37,56 @@ class Tokens extends ThemeExtension<Tokens> {
   final Color purple, purpleSoft, grey, nav;
   final bool dark;
 
+  /// Pocket: cool neutrals, one green that is both the brand and "call".
   static const light = Tokens(
-    bg: Color(0xFFF6F8FA),
+    bg: Color(0xFFF3F4F6),
     surface: Color(0xFFFFFFFF),
-    surface2: Color(0xFFEEF1F5),
-    border: Color(0xFFD8DEE6),
-    text: Color(0xFF1C2128),
-    text2: Color(0xFF5A6573),
-    accent: Color(0xFF1F6FEB),
-    accentSoft: Color(0xFFDDEBFF),
+    surface2: Color(0xFFE9ECEF),
+    border: Color(0xFFE0E3E8),
+    text: Color(0xFF0E1116),
+    text2: Color(0xFF5D6470),
+    accent: Color(0xFF08805A),
+    accentSoft: Color(0xFFDCF2E8),
     onAccent: Color(0xFFFFFFFF),
-    success: Color(0xFF1A7F37),
-    successSoft: Color(0xFFDAF5E1),
+    success: Color(0xFF08805A),
+    successSoft: Color(0xFFDCF2E8),
     onSuccess: Color(0xFFFFFFFF),
-    danger: Color(0xFFCF222E),
-    dangerSoft: Color(0xFFFFE4E6),
-    missed: Color(0xFFC81E4E),
+    danger: Color(0xFFE5383B),
+    dangerSoft: Color(0xFFFDE6E6),
+    missed: Color(0xFFE5383B),
     warn: Color(0xFF9A6700),
-    warnSoft: Color(0xFFFFF3D1),
-    info: Color(0xFF0969DA),
-    purple: Color(0xFF7C5CFF),
-    purpleSoft: Color(0xFFECE8FF),
-    grey: Color(0xFF8B95A3),
-    nav: Color(0xFFFFFFFF),
+    warnSoft: Color(0xFFFDF1DC),
+    info: Color(0xFF1D5C99),
+    purple: Color(0xFF4B3BB0),
+    purpleSoft: Color(0xFFE7E3FB),
+    grey: Color(0xFF9097A1),
+    nav: Color(0xFFF3F4F6),
     dark: false,
   );
 
   static const darkTokens = Tokens(
-    bg: Color(0xFF0D1014),
-    surface: Color(0xFF14181E),
-    surface2: Color(0xFF1B2027),
-    border: Color(0xFF2A313A),
-    text: Color(0xFFE8EDF3),
-    text2: Color(0xFF9AA4B2),
-    accent: Color(0xFF4493F8),
-    accentSoft: Color(0x294493F8),
-    onAccent: Color(0xFF0D1014),
-    success: Color(0xFF3FB950),
-    successSoft: Color(0x243FB950),
-    onSuccess: Color(0xFF0D1014),
-    danger: Color(0xFFF85149),
-    dangerSoft: Color(0x24FF4D6A),
-    missed: Color(0xFFFF4D6A),
-    warn: Color(0xFFD29922),
-    warnSoft: Color(0x24D29922),
-    info: Color(0xFF58A6FF),
-    purple: Color(0xFFA5A5FF),
-    purpleSoft: Color(0x24A5A5FF),
-    grey: Color(0xFF6B7480),
-    nav: Color(0xFF161A21),
+    bg: Color(0xFF0C0E10),
+    surface: Color(0xFF16191C),
+    surface2: Color(0xFF1F2327),
+    border: Color(0xFF2A2F34),
+    text: Color(0xFFF2F4F6),
+    text2: Color(0xFFA0A8B2),
+    accent: Color(0xFF3DD49A),
+    accentSoft: Color(0x243DD49A),
+    onAccent: Color(0xFF04271A),
+    success: Color(0xFF3DD49A),
+    successSoft: Color(0x243DD49A),
+    onSuccess: Color(0xFF04271A),
+    danger: Color(0xFFFF5A5F),
+    dangerSoft: Color(0x26FF5A5F),
+    missed: Color(0xFFFF5A5F),
+    warn: Color(0xFFE9B04A),
+    warnSoft: Color(0x24E9B04A),
+    info: Color(0xFF8EC0F2),
+    purple: Color(0xFFB7AEFF),
+    purpleSoft: Color(0x29B7AEFF),
+    grey: Color(0xFF6F7781),
+    nav: Color(0xFF0C0E10),
     dark: true,
   );
 
@@ -103,7 +104,7 @@ extension TokensX on BuildContext {
 
 /// Monospace for SIP / RTP details (URIs, codecs, MOS).
 TextStyle mono(BuildContext context, {double size = 11, Color? color, FontWeight? weight}) =>
-    GoogleFonts.jetBrainsMono(fontSize: size, color: color ?? context.t.text2, fontWeight: weight);
+    GoogleFonts.dmMono(fontSize: size, color: color ?? context.t.text2, fontWeight: weight);
 
 ThemeData buildTheme(Tokens tk, {required bool arabic}) {
   final base = ThemeData(
@@ -124,7 +125,7 @@ ThemeData buildTheme(Tokens tk, {required bool arabic}) {
     dividerColor: tk.border,
     extensions: [tk],
   );
-  final family = arabic ? GoogleFonts.cairo().fontFamily : GoogleFonts.plusJakartaSans().fontFamily;
+  final family = arabic ? GoogleFonts.cairo().fontFamily : GoogleFonts.figtree().fontFamily;
   return base.copyWith(
     textTheme: base.textTheme.apply(fontFamily: family, bodyColor: tk.text, displayColor: tk.text),
     appBarTheme: AppBarTheme(
@@ -134,17 +135,42 @@ ThemeData buildTheme(Tokens tk, {required bool arabic}) {
       scrolledUnderElevation: 0,
       centerTitle: false,
     ),
+    // Fields are white pills with the label inside, as on the sign-in screen.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: tk.surface,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: tk.border)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: tk.border)),
       enabledBorder:
-          OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: tk.border)),
+          OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: tk.border)),
       focusedBorder:
-          OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: tk.accent, width: 2)),
+          OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: tk.accent, width: 1.5)),
+      errorBorder:
+          OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: tk.danger)),
+      focusedErrorBorder:
+          OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: tk.danger, width: 1.5)),
       labelStyle: TextStyle(color: tk.text2),
-      hintStyle: TextStyle(color: tk.text2),
+      floatingLabelStyle: TextStyle(color: tk.text2, fontWeight: FontWeight.w600),
+      hintStyle: TextStyle(color: tk.grey),
+      helperStyle: TextStyle(color: tk.grey, fontSize: 12),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: tk.accent,
+        foregroundColor: tk.onAccent,
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: tk.text, side: BorderSide(color: tk.border), shape: const StadiumBorder()),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: tk.accent, textStyle: const TextStyle(fontWeight: FontWeight.w600)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: tk.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -153,7 +179,7 @@ ThemeData buildTheme(Tokens tk, {required bool arabic}) {
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: tk.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.all(Colors.white),

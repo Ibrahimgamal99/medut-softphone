@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers.dart';
 import 'core/theme.dart';
 import 'features/shell.dart';
+import 'features/sign_in.dart';
 
 class MedutPhoneApp extends ConsumerStatefulWidget {
   const MedutPhoneApp({super.key});
@@ -63,7 +64,17 @@ class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindi
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
-      home: const HomeShell(),
+      home: const _Root(),
     );
   }
+}
+
+/// No account yet: Sign in. Saving one switches to the tabs, and deleting the
+/// last one comes back here.
+class _Root extends ConsumerWidget {
+  const _Root();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      ref.watch(accountsProvider).accounts.isEmpty ? const SignInScreen() : const HomeShell();
 }
