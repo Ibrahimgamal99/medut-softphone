@@ -1250,6 +1250,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     'incomingOn', 'incomingCall', 'answer', 'decline', 'busy', 'message', 'mute', 'unmute', 'keypad',
     'speaker', 'earpiece', 'bluetooth', 'headset', 'hold', 'resume', 'addCall', 'transfer', 'record',
     'stopRecord', 'hide', 'onHold', 'swap', 'callDetails', 'audioOutput', 'cancel', 'complete',
+    'more', 'callQuality', 'youHear', 'theyHear', 'encrypted', 'recShort',
   ];
 
   Map<String, Object?> snapshot() {
@@ -1295,6 +1296,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
                 // Shown while recording, so it is never silent that a call is recorded.
                 : (f.recording ? tr('recordingNow') : ''),
       },
+      // ok | reconnecting | weak: the native screen tells a warning from the recording notice.
+      'link': f.link,
       'canRecord': settings.recordingMode != 'off' || f.recording,
       'startedAt': f.answeredAt?.millisecondsSinceEpoch ?? 0,
       'outgoing': f.direction == CallDirection.outgoing,
@@ -1316,6 +1319,10 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'recording': f.recording,
       'silent': settings.effectiveStatus() == MyStatus.silent,
       'mos': s == null ? '' : fmt(mos, 1),
+      // The quality sheet: each direction's MOS, then the figures behind it.
+      'mosYou': s == null || s.mosLq <= 0 ? '' : fmt(s.mosLq, 1),
+      'mosThem': s == null || s.mosLqRx <= 0 ? '' : fmt(s.mosLqRx, 1),
+      'encrypted': f.crypto.isNotEmpty,
       // 3-bar grade. "Checking…" until the first sample, a link in
       // trouble (reconnecting, stalled media) is never better than poor.
       'qualityLevel': level,
@@ -1324,14 +1331,14 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'details': s == null
           ? <List<String>>[]
           : [
-              ['codec', '${s.codec}/${s.codecClockRate ~/ 1000}k'],
-              ['srtp', f.crypto.isEmpty ? (f.runtime.cfg.mediaEnc == 'none' ? 'off' : f.runtime.cfg.mediaEnc) : f.crypto],
-              ['ice', s.iceLocalType.name],
-              ['rtt', '${fmt(s.rttMs)} ms'],
-              ['jitter', '${fmt(s.jitterMs)} ms'],
-              ['loss', '${fmt(s.lossPct, 1)} %'],
-              ['mos ↑/↓', '${fmt(s.mosLq, 1)} / ${fmt(s.mosLqRx, 1)}'],
-              ['jbuf', '${s.jitterBufferMs} ms'],
+              [tr('qJitter'), '${fmt(s.jitterMs)} ms'],
+              [tr('qLoss'), '${fmt(s.lossPct, 1)} %'],
+              [tr('qRtt'), '${fmt(s.rttMs)} ms'],
+              [tr('qCodec'), '${s.codec} ${s.codecClockRate ~/ 1000} kHz'],
+              [tr('qSrtp'), f.crypto.isNotEmpty ? f.crypto : tr('encNone')],
+              [tr('qIce'), s.iceLocalType.name],
+              [tr('qJbuf'), '${s.jitterBufferMs} ms'],
+              [tr('connection'), '${f.runtime.cfg.transport.toUpperCase()} · ${f.runtime.cfg.domain}'],
             ],
       'second': second,
     };

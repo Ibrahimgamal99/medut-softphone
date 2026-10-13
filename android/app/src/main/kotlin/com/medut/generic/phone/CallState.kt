@@ -39,6 +39,12 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val quality: String get() = raw["quality"] as? String ?: ""
     val qualityLevel: Int get() = (raw["qualityLevel"] as? Number)?.toInt() ?: 0
     val qualityWord: String get() = raw["qualityWord"] as? String ?: ""
+    /** MOS of what you hear, and of what the other side hears ("" until measured). */
+    val mosYou: String get() = raw["mosYou"] as? String ?: ""
+    val mosThem: String get() = raw["mosThem"] as? String ?: ""
+    val encrypted: Boolean get() = raw["encrypted"] == true
+    /** ok | reconnecting | weak */
+    val link: String get() = raw["link"] as? String ?: "ok"
     val dark: Boolean get() = raw["dark"] == true
     val rtl: Boolean get() = raw["rtl"] == true
 

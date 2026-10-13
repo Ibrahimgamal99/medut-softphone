@@ -25,70 +25,94 @@ enum CallScreenPresenter {
   }
 }
 
-/// Native in-call screen (design E). Ringing on iOS is CallKit's own screen;
-/// this takes over once the call is dialling or connected. It holds no call
-/// state: it renders [MedutBridge.latest] and sends every tap to Dart.
-final class CallViewController: UIViewController {
-
-  private struct Palette {
-    let bg, surface, border, text, text2, accent, accentSoft, success, successSoft, danger, warn, warnSoft: UIColor
-    init(dark: Bool) {
-      func c(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {
-        UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
-                blue: CGFloat(hex & 0xFF) / 255, alpha: a)
-      }
-      bg = dark ? c(0x0D1014) : c(0xF6F8FA)
-      surface = dark ? c(0x14181E) : c(0xFFFFFF)
-      border = dark ? c(0x2A313A) : c(0xD8DEE6)
-      text = dark ? c(0xE8EDF3) : c(0x1C2128)
-      text2 = dark ? c(0x9AA4B2) : c(0x5A6573)
-      accent = dark ? c(0x4493F8) : c(0x1F6FEB)
-      accentSoft = dark ? c(0x4493F8, 0.16) : c(0xDDEBFF)
-      success = dark ? c(0x3FB950) : c(0x1A7F37)
-      successSoft = dark ? c(0x3FB950, 0.12) : c(0xDAF5E1)
-      danger = dark ? c(0xF85149) : c(0xCF222E)
-      warn = dark ? c(0xD29922) : c(0x9A6700)
-      warnSoft = dark ? c(0xD29922, 0.14) : c(0xFFF3D1)
-    }
+/// The ink surface: the same in both themes except the ground.
+private enum Ink {
+  static func c(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {
+    UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255, alpha: a)
   }
 
-  private var p = Palette(dark: false)
-  private var paletteDark: Bool?
+  static let text = c(0xF4F6F8)
+  static let text2 = UIColor(white: 1, alpha: 0.68)
+  static let fill = UIColor(white: 1, alpha: 0.12)
+  static let dock = UIColor(white: 1, alpha: 0.07)
+  static let pill = UIColor(white: 1, alpha: 0.10)
+  static let sheet = c(0x182027)
+  static let line = UIColor(white: 1, alpha: 0.08)
+  static let good = c(0x3DD49A)
+  static let fair = c(0xE9B04A)
+  static let poor = c(0xFF5A5F)
+  static let rec = c(0xFF8A8D)
+  static let end = c(0xE5383B)
+
+  /// (background, initials) per person: the app's dark avatar colours, picked the same way.
+  static let avatars: [(UIColor, UIColor)] = [
+    (c(0x163428), c(0x7DE3B8)), (c(0x25214A), c(0xB7AEFF)),
+    (c(0x38261A), c(0xF4B27A)), (c(0x162A3D), c(0x8EC0F2)),
+  ]
+
+  static func ground(dark: Bool) -> UIColor { dark ? .black : c(0x0F1418) }
+
+  static func grade(_ level: Int) -> UIColor {
+    level >= 3 ? good : level == 2 ? fair : level == 1 ? poor : text2
+  }
+
+  static func avatar(_ title: String) -> (UIColor, UIColor) {
+    var h = 0
+    for u in title.utf16 { h = (h * 31 + Int(u)) & 0x7fffffff }
+    return avatars[h % avatars.count]
+  }
+}
+
+/// Native in-call screen (Pocket). Ringing on iOS is CallKit's own screen;
+/// this takes over once the call is dialling or connected. A dark "ink"
+/// surface in both themes: the caller, the quality pill (tap it for every
+/// figure), four controls in a dock, then Transfer · End · More. It holds no
+/// call state: it renders [MedutBridge.latest] and sends every tap to Dart.
+final class CallViewController: UIViewController {
+
   private var snap = CallSnapshot()
   private var listener: UUID?
   private var timer: Timer?
-  private var detailsOpen = false
+  private var dark: Bool?
+  private var sheetOpen = false
   private var dtmfTyped = ""
   private var secondAction = "swap"
 
   private let stack = UIStackView()
   private let minimize = UIButton(type: .system)
   private let account = UILabel()
-  private let mosPill = UIStackView()
-  private let qualityBars = QualityBarsView()
-  private let qualityWord = UILabel()
-  private let mosText = UILabel()
-  private let secondBanner = UIStackView()
+  private let secondRow = UIStackView()
   private let secondText = UILabel()
   private let secondSwap = UIButton(type: .system)
-  private let avatar = UILabel()
-  private var avatarSize: NSLayoutConstraint!
+  private let avatar = RingAvatar(size: 148, fontSize: 36)
   private let nameLabel = UILabel()
-  private let statusLabel = UILabel()
   private let timerLabel = UILabel()
-  private let details = UIStackView()
-  private let detailsTitle = UILabel()
-  private let detailsRows = UIStackView()
-  private let grid = UIStackView()
-  private var controls: [String: (UIButton, UILabel)] = [:]
-  private let hangup = UIButton(type: .system)
+  private let statusLabel = UILabel()
+  private let qualityPill = QualityPill(chevron: true)
+  private let encryptedTag = UIStackView()
+  private let encryptedLabel = UILabel()
+  private let recLabel = UILabel()
+  private var dock: [String: (UIButton, UILabel)] = [:]
+  private let transferLabel = UILabel()
+  private let moreLabel = UILabel()
+  private var moreButton: UIButton!
+
+  private let dim = UIView()
+  private let sheet = UIView()
+  private let sheetTitle = UILabel()
+  private let sheetPill = QualityPill(chevron: false)
+  private let mosYouLabel = UILabel()
+  private let mosYou = UILabel()
+  private let mosThemLabel = UILabel()
+  private let mosThem = UILabel()
+  private let sheetRows = UIStackView()
 
   private let keypad = UIStackView()
   private let keypadDigits = UILabel()
-  private var keypadKeys: [UIButton] = []
   private let keypadHide = UIButton(type: .system)
 
-  override var preferredStatusBarStyle: UIStatusBarStyle { paletteDark == true ? .lightContent : .darkContent }
+  override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -98,8 +122,6 @@ final class CallViewController: UIViewController {
     }
     timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateTimer() }
   }
-
-
 
   deinit {
     timer?.invalidate()
@@ -114,84 +136,87 @@ final class CallViewController: UIViewController {
       close()
       return
     }
-    if paletteDark != s.dark {
-      paletteDark = s.dark
-      p = Palette(dark: s.dark)
-      applyPalette()
+    if dark != s.dark {
+      dark = s.dark
+      view.backgroundColor = Ink.ground(dark: s.dark)
     }
-    view.semanticContentAttribute = s.rtl ? .forceRightToLeft : .forceLeftToRight
-    stack.semanticContentAttribute = view.semanticContentAttribute
+    let direction: UISemanticContentAttribute = s.rtl ? .forceRightToLeft : .forceLeftToRight
+    view.semanticContentAttribute = direction
+    stack.semanticContentAttribute = direction
 
     account.text = s.account
-    avatar.text = initials(s.title)
+    avatar.set(title: s.title, initials: initials(s.title))
     nameLabel.text = s.title
-    statusLabel.text = s.status.isEmpty ? s.number : s.status
     updateTimer()
-
-    // Quality pill: 3 bars + word, MOS beside it, tap for details.
-    if s.qualityWord.isEmpty {
-      mosPill.isHidden = true
+    // Calling / ringing / on hold, or a connection in trouble; otherwise the
+    // number under a name until the call is answered.
+    let line: String
+    if s.phase == "outgoing" || s.phase == "held" || s.link != "ok" {
+      line = s.status
+    } else if s.startedAt <= 0 && !s.name.isEmpty {
+      line = s.number
     } else {
-      mosPill.isHidden = false
-      let fg: UIColor = [3, 4].contains(s.qualityLevel) ? p.success
-        : s.qualityLevel == 2 ? p.warn : s.qualityLevel == 1 ? p.danger : p.text2
-      mosPill.backgroundColor = fg.withAlphaComponent(0.12)
-      qualityBars.setQuality(level: s.qualityLevel, litColor: fg, offColor: p.text2.withAlphaComponent(0.25))
-      qualityWord.text = s.qualityWord
-      qualityWord.textColor = fg
-      mosText.text = (s.mos.isEmpty ? "" : s.mos + " ") + (detailsOpen ? "▴" : "▾")
-      mosText.textColor = fg
+      line = ""
     }
+    statusLabel.text = line
+    statusLabel.isHidden = line.isEmpty
 
-    let rows = s.details
-    details.isHidden = !(detailsOpen && !rows.isEmpty)
-    if !details.isHidden {
-      detailsTitle.text = s.label("callDetails", "Call details")
-      detailsRows.arrangedSubviews.forEach { $0.removeFromSuperview() }
-      stride(from: 0, to: rows.count, by: 2).forEach { i in
-        let line = UIStackView()
-        line.axis = .horizontal
-        line.distribution = .fillEqually
-        line.spacing = 14
-        line.addArrangedSubview(detailCell(rows[i]))
-        line.addArrangedSubview(i + 1 < rows.count ? detailCell(rows[i + 1]) : UIView())
-        detailsRows.addArrangedSubview(line)
-      }
+    // Quality pill: 3 bars, the grade word and the MOS, in the grade's colour.
+    qualityPill.isHidden = s.qualityWord.isEmpty
+    if !s.qualityWord.isEmpty {
+      qualityPill.set(level: s.qualityLevel, word: s.qualityWord, mos: s.mos)
+      qualityPill.accessibilityLabel = s.label("callQuality", "Call quality") + ": " + s.qualityWord
     }
-    let big = details.isHidden
-    avatarSize.constant = big ? 108 : 76
-    avatar.layer.cornerRadius = avatarSize.constant / 2
-    avatar.font = .systemFont(ofSize: big ? 36 : 26, weight: .bold)
+    encryptedLabel.text = s.label("encrypted", "Encrypted")
+    encryptedTag.isHidden = !s.encrypted
+    recLabel.text = "● " + s.label("recShort", "Rec")
+    recLabel.isHidden = !s.recording
 
     if let second = s.second {
-      secondBanner.isHidden = false
+      secondRow.isHidden = false
       secondText.text = second["text"] as? String
         ?? "\(second["name"] as? String ?? "") · \(s.label("onHold", "On hold"))"
       secondSwap.setTitle(second["label"] as? String ?? s.label("swap", "Swap"), for: .normal)
       secondAction = second["action"] as? String ?? "swap"
     } else {
-      secondBanner.isHidden = true
+      secondRow.isHidden = true
     }
 
-    setControl("mute", s.muted ? "mic.slash" : "mic",
-               s.muted ? s.label("unmute", "Unmute") : s.label("mute", "Mute"), on: s.muted)
-    setControl("keypad", "circle.grid.3x3.fill", s.label("keypad", "Keypad"), on: false)
-    setControl("speaker", s.route == "bluetooth" ? "headphones" : "speaker.wave.2",
-               s.route == "bluetooth" ? s.label("bluetooth", "Bluetooth") : s.label("speaker", "Speaker"),
-               on: s.route == "speaker" || s.route == "bluetooth")
-    setControl("hold", "pause", s.held ? s.label("resume", "Resume") : s.label("hold", "Hold"), on: s.held)
-    setControl("add", "plus", s.label("addCall", "Add call"), on: false)
-    setControl("transfer", "arrow.turn.up.right", s.label("transfer", "Transfer"), on: false)
-    setControl("record", "record.circle",
-               s.recording ? s.label("stopRecord", "Stop rec") : s.label("record", "Record"),
-               on: s.recording, danger: true)
-    if let (b, l) = controls["record"] {
-      b.isHidden = !s.canRecord
-      l.isHidden = !s.canRecord
-    }
-    setControl("message", "message", s.label("message", "Message"), on: false)
+    setDock("mute", s.muted ? "mic.slash.fill" : "mic.fill", s.label("mute", "Mute"), on: s.muted)
+    let routeLabel = s.route == "bluetooth" ? s.label("bluetooth", "Bluetooth")
+      : s.route == "wired" ? s.label("headset", "Headset") : s.label("speaker", "Speaker")
+    setDock("speaker", s.route == "bluetooth" ? "headphones" : "speaker.wave.2.fill", routeLabel,
+            on: s.route == "speaker" || s.route == "bluetooth")
+    setDock("keypad", "circle.grid.3x3.fill", s.label("keypad", "Keypad"), on: false)
+    setDock("hold", "pause.fill", s.held ? s.label("resume", "Resume") : s.label("hold", "Hold"), on: s.held)
+    transferLabel.text = s.label("transfer", "Transfer")
+    moreLabel.text = s.label("more", "More")
     keypadHide.setTitle(s.label("hide", "Hide"), for: .normal)
+    renderSheet(s)
     // Screen-off at the ear is driven from Dart (proximity_screen_lock).
+  }
+
+  private func renderSheet(_ s: CallSnapshot) {
+    if sheetOpen && s.details.isEmpty { sheetOpen = false }
+    dim.isHidden = !sheetOpen
+    sheet.isHidden = !sheetOpen
+    guard sheetOpen else { return }
+    sheetTitle.text = s.label("callQuality", "Call quality")
+    sheetPill.set(level: s.qualityLevel, word: s.qualityWord, mos: s.mos)
+    mosYouLabel.text = s.label("youHear", "You hear")
+    mosYou.text = s.mosYou.isEmpty ? "—" : s.mosYou
+    mosThemLabel.text = s.label("theyHear", "They hear")
+    mosThem.text = s.mosThem.isEmpty ? "—" : s.mosThem
+    sheetRows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    for (i, row) in s.details.enumerated() {
+      if i > 0 {
+        let sep = UIView()
+        sep.backgroundColor = Ink.line
+        sep.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        sheetRows.addArrangedSubview(sep)
+      }
+      sheetRows.addArrangedSubview(detailRow(row))
+    }
   }
 
   private func updateTimer() {
@@ -219,49 +244,80 @@ final class CallViewController: UIViewController {
     CallScreenPresenter.current = nil
   }
 
-  @objc private func tapMos() {
-    detailsOpen.toggle()
+  @objc private func tapQuality() {
+    sheetOpen = true
+    render(snap)
+  }
+
+  @objc private func closeSheet() {
+    sheetOpen = false
     render(snap)
   }
 
   @objc private func tapSwap() { MedutBridge.shared.action(secondAction) }
   @objc private func tapHangup() { MedutBridge.shared.action("hangup") }
+  @objc private func tapTransfer() { openApp("transfer") }
 
-  @objc private func tapControl(_ sender: UIButton) {
+  @objc private func tapDock(_ sender: UIButton) {
     guard let key = sender.accessibilityIdentifier else { return }
     let s = snap
     switch key {
     case "mute": MedutBridge.shared.action(s.muted ? "unmute" : "mute")
+    case "speaker": chooseRoute(s, from: sender)
     case "keypad": showKeypad(true)
-    case "speaker": chooseRoute(s)
     case "hold": MedutBridge.shared.action(s.held ? "unhold" : "hold")
-    case "record": MedutBridge.shared.action("record")
-    case "add", "transfer", "message":
-      // These flows live in the Flutter UI: show it on the right screen.
-      MedutBridge.shared.action(key)
-      MedutBridge.shared.toDart("openRoute", ["route": key])
-      tapMinimize()
     default: break
     }
   }
 
-  private func chooseRoute(_ s: CallSnapshot) {
+  /// What doesn't fit in the dock.
+  @objc private func tapMore() {
+    let s = snap
+    let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+    menu.overrideUserInterfaceStyle = .dark
+    menu.addAction(UIAlertAction(title: s.label("addCall", "Add call"), style: .default) { [weak self] _ in
+      self?.openApp("add")
+    })
+    if s.canRecord {
+      menu.addAction(UIAlertAction(title: s.recording ? s.label("stopRecord", "Stop rec") : s.label("record", "Record"),
+                                   style: .default) { _ in MedutBridge.shared.action("record") })
+    }
+    menu.addAction(UIAlertAction(title: s.label("message", "Message"), style: .default) { [weak self] _ in
+      self?.openApp("message")
+    })
+    menu.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))
+    menu.popoverPresentationController?.sourceView = moreButton
+    menu.popoverPresentationController?.sourceRect = moreButton.bounds
+    present(menu, animated: true)
+  }
+
+  /// These flows live in the Flutter UI: show it on the right screen.
+  private func openApp(_ route: String) {
+    MedutBridge.shared.action(route)
+    MedutBridge.shared.toDart("openRoute", ["route": route])
+    tapMinimize()
+  }
+
+  private func chooseRoute(_ s: CallSnapshot, from button: UIButton) {
     // One tap toggles the speaker; with a headset connected, pick the output.
     guard s.bluetooth, !s.routes.isEmpty else {
       MedutBridge.shared.action("toggleSpeaker")
       return
     }
-    let sheet = UIAlertController(title: s.label("audioOutput", "Audio output"), message: nil, preferredStyle: .actionSheet)
+    let menu = UIAlertController(title: s.label("audioOutput", "Audio output"), message: nil, preferredStyle: .actionSheet)
+    menu.overrideUserInterfaceStyle = .dark
     for r in s.routes {
       let id = r["id"] as? String ?? ""
       let name = r["name"] as? String ?? id
       let active = (r["kind"] as? String) == s.route
-      sheet.addAction(UIAlertAction(title: (active ? "✓ " : "") + name, style: .default) { _ in
+      menu.addAction(UIAlertAction(title: (active ? "✓ " : "") + name, style: .default) { _ in
         MedutBridge.shared.action("route", extra: ["routeId": id])
       })
     }
-    sheet.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))
-    present(sheet, animated: true)
+    menu.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))
+    menu.popoverPresentationController?.sourceView = button
+    menu.popoverPresentationController?.sourceRect = button.bounds
+    present(menu, animated: true)
   }
 
   private func showKeypad(_ show: Bool) {
@@ -284,162 +340,174 @@ final class CallViewController: UIViewController {
 
   // MARK: Construction
 
-  private func label(_ size: CGFloat, _ weight: UIFont.Weight = .regular, mono: Bool = false) -> UILabel {
+  private func label(_ size: CGFloat, _ weight: UIFont.Weight = .regular, color: UIColor = Ink.text) -> UILabel {
     let l = UILabel()
-    l.font = mono ? .monospacedDigitSystemFont(ofSize: size, weight: weight) : .systemFont(ofSize: size, weight: weight)
+    l.font = .systemFont(ofSize: size, weight: weight)
+    l.textColor = color
     l.textAlignment = .center
-    l.adjustsFontForContentSizeCategory = true
     return l
   }
 
+  private func style(_ l: UILabel, _ size: CGFloat, _ weight: UIFont.Weight = .regular, color: UIColor = Ink.text) {
+    l.font = .systemFont(ofSize: size, weight: weight)
+    l.textColor = color
+    l.textAlignment = .center
+  }
+
+  private func roundButton(_ size: CGFloat, symbol: String, bg: UIColor, tint: UIColor, action: Selector) -> UIButton {
+    let b = UIButton(type: .system)
+    b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: size * 0.36, weight: .medium)), for: .normal)
+    b.tintColor = tint
+    b.backgroundColor = bg
+    b.layer.cornerRadius = size / 2
+    b.widthAnchor.constraint(equalToConstant: size).isActive = true
+    b.heightAnchor.constraint(equalToConstant: size).isActive = true
+    b.addTarget(self, action: action, for: .touchUpInside)
+    return b
+  }
+
+  /// A round button with its label under it.
+  private func cell(_ b: UIButton, _ l: UILabel) -> UIStackView {
+    style(l, 11.5, .medium, color: Ink.text2)
+    let s = UIStackView(arrangedSubviews: [b, l])
+    s.axis = .vertical
+    s.alignment = .center
+    s.spacing = 6
+    return s
+  }
+
+  /// Keeps a view at its own size inside a filling stack.
+  private func centered(_ v: UIView) -> UIStackView {
+    let s = UIStackView(arrangedSubviews: [v])
+    s.axis = .vertical
+    s.alignment = .center
+    return s
+  }
+
   private func build() {
+    view.backgroundColor = Ink.ground(dark: false)
     stack.axis = .vertical
-    stack.spacing = 0
     stack.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(stack)
 
-    // Header
-    let header = UIStackView()
-    header.axis = .horizontal
-    header.alignment = .center
+    // Minimise · account
     minimize.setImage(UIImage(systemName: "chevron.down"), for: .normal)
+    minimize.tintColor = Ink.text2
     minimize.accessibilityLabel = "Minimise"
     minimize.addTarget(self, action: #selector(tapMinimize), for: .touchUpInside)
     minimize.widthAnchor.constraint(equalToConstant: 44).isActive = true
     minimize.heightAnchor.constraint(equalToConstant: 44).isActive = true
-    account.font = .systemFont(ofSize: 12)
-    mosPill.axis = .horizontal
-    mosPill.alignment = .center
-    mosPill.spacing = 6
-    mosPill.isLayoutMarginsRelativeArrangement = true
-    mosPill.layoutMargins = UIEdgeInsets(top: 7, left: 10, bottom: 7, right: 10)
-    mosPill.layer.cornerRadius = 16
-    mosPill.isUserInteractionEnabled = true
-    mosPill.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapMos)))
-    qualityWord.font = .systemFont(ofSize: 12, weight: .bold)
-    mosText.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-    mosPill.addArrangedSubview(qualityBars)
-    mosPill.addArrangedSubview(qualityWord)
-    mosPill.addArrangedSubview(mosText)
-    header.addArrangedSubview(minimize)
-    header.addArrangedSubview(account)
-    header.addArrangedSubview(mosPill)
+    style(account, 12.5, color: Ink.text2)
+    let balance = UIView()
+    balance.widthAnchor.constraint(equalToConstant: 44).isActive = true
+    let header = UIStackView(arrangedSubviews: [minimize, account, balance])
+    header.axis = .horizontal
+    header.alignment = .center
 
-    // Second line on hold
-    secondBanner.axis = .horizontal
-    secondBanner.alignment = .center
-    secondBanner.isLayoutMarginsRelativeArrangement = true
-    secondBanner.layoutMargins = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 8)
-    secondBanner.layer.cornerRadius = 14
-    secondBanner.layer.borderWidth = 1
-    secondText.font = .systemFont(ofSize: 14)
-    secondText.textAlignment = .natural
-    secondSwap.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
-    secondSwap.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
-    secondSwap.layer.cornerRadius = 16
+    // The other call: on hold, waiting, or the transfer to complete.
+    style(secondText, 13, .semibold)
+    secondSwap.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
+    secondSwap.setTitleColor(Ink.text, for: .normal)
+    secondSwap.backgroundColor = UIColor(white: 1, alpha: 0.16)
+    secondSwap.contentEdgeInsets = UIEdgeInsets(top: 5, left: 12, bottom: 5, right: 12)
+    secondSwap.layer.cornerRadius = 14
     secondSwap.addTarget(self, action: #selector(tapSwap), for: .touchUpInside)
-    secondBanner.addArrangedSubview(secondText)
-    secondBanner.addArrangedSubview(secondSwap)
+    let secondPill = UIStackView(arrangedSubviews: [secondText, secondSwap])
+    secondPill.axis = .horizontal
+    secondPill.alignment = .center
+    secondPill.spacing = 8
+    secondPill.isLayoutMarginsRelativeArrangement = true
+    secondPill.layoutMargins = UIEdgeInsets(top: 5, left: 14, bottom: 5, right: 5)
+    secondPill.backgroundColor = Ink.pill
+    secondPill.layer.cornerRadius = 19
+    secondRow.axis = .vertical
+    secondRow.alignment = .center
+    secondRow.addArrangedSubview(secondPill)
 
-    // Caller
-    let caller = UIStackView()
+    // Caller, time, quality, tags
+    style(nameLabel, 30, .heavy)
+    nameLabel.adjustsFontSizeToFitWidth = true
+    nameLabel.minimumScaleFactor = 0.6
+    timerLabel.font = .monospacedDigitSystemFont(ofSize: 17, weight: .regular)
+    timerLabel.textColor = Ink.text2
+    style(statusLabel, 14, color: Ink.text2)
+    statusLabel.numberOfLines = 2
+    qualityPill.addTarget(self, action: #selector(tapQuality), for: .touchUpInside)
+    let lock = UIImageView(image: UIImage(systemName: "lock.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)))
+    lock.tintColor = Ink.text2
+    style(encryptedLabel, 12.5, color: Ink.text2)
+    encryptedTag.addArrangedSubview(lock)
+    encryptedTag.addArrangedSubview(encryptedLabel)
+    encryptedTag.axis = .horizontal
+    encryptedTag.alignment = .center
+    encryptedTag.spacing = 5
+    style(recLabel, 12.5, .semibold, color: Ink.rec)
+    let tags = UIStackView(arrangedSubviews: [encryptedTag, recLabel])
+    tags.axis = .horizontal
+    tags.spacing = 14
+    let caller = UIStackView(arrangedSubviews: [avatar, nameLabel, timerLabel, statusLabel, qualityPill, tags])
     caller.axis = .vertical
     caller.alignment = .center
-    caller.spacing = 4
-    avatar.textAlignment = .center
-    avatar.clipsToBounds = true
-    avatar.translatesAutoresizingMaskIntoConstraints = false
-    avatarSize = avatar.widthAnchor.constraint(equalToConstant: 108)
-    avatarSize.isActive = true
-    avatar.heightAnchor.constraint(equalTo: avatar.widthAnchor).isActive = true
-    nameLabel.font = .systemFont(ofSize: 26, weight: .bold)
-    nameLabel.textAlignment = .center
-    statusLabel.font = .systemFont(ofSize: 14)
-    timerLabel.font = .monospacedDigitSystemFont(ofSize: 18, weight: .regular)
-    caller.addArrangedSubview(avatar)
-    caller.setCustomSpacing(10, after: avatar)
-    caller.addArrangedSubview(nameLabel)
-    caller.addArrangedSubview(statusLabel)
-    caller.addArrangedSubview(timerLabel)
+    caller.spacing = 3
+    caller.setCustomSpacing(14, after: avatar)
+    caller.setCustomSpacing(14, after: statusLabel)
+    caller.setCustomSpacing(12, after: qualityPill)
 
-    // Details
-    details.axis = .vertical
-    details.spacing = 8
-    details.isLayoutMarginsRelativeArrangement = true
-    details.layoutMargins = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
-    details.layer.cornerRadius = 16
-    details.layer.borderWidth = 1
-    detailsTitle.font = .systemFont(ofSize: 13, weight: .bold)
-    detailsTitle.textAlignment = .natural
-    detailsRows.axis = .vertical
-    detailsRows.spacing = 6
-    details.addArrangedSubview(detailsTitle)
-    details.addArrangedSubview(detailsRows)
-
-    // Controls
-    grid.axis = .vertical
-    grid.spacing = 14
-    let keys = ["mute", "keypad", "speaker", "hold", "add", "transfer", "record", "message"]
-    for rowKeys in [Array(keys[0..<4]), Array(keys[4..<8])] {
-      let row = UIStackView()
-      row.axis = .horizontal
-      row.distribution = .fillEqually
-      for key in rowKeys {
-        let cell = UIStackView()
-        cell.axis = .vertical
-        cell.alignment = .center
-        cell.spacing = 6
-        let b = UIButton(type: .system)
-        b.accessibilityIdentifier = key
-        b.widthAnchor.constraint(equalToConstant: 62).isActive = true
-        b.heightAnchor.constraint(equalToConstant: 62).isActive = true
-        b.layer.cornerRadius = 31
-        b.layer.borderWidth = 1
-        b.addTarget(self, action: #selector(tapControl(_:)), for: .touchUpInside)
-        let l = label(12, .semibold)
-        cell.addArrangedSubview(b)
-        cell.addArrangedSubview(l)
-        row.addArrangedSubview(cell)
-        controls[key] = (b, l)
-      }
-      grid.addArrangedSubview(row)
+    // The dock: Mute, Speaker, Keypad, Hold.
+    let dockRow = UIStackView()
+    dockRow.axis = .horizontal
+    dockRow.distribution = .fillEqually
+    dockRow.isLayoutMarginsRelativeArrangement = true
+    dockRow.layoutMargins = UIEdgeInsets(top: 14, left: 6, bottom: 12, right: 6)
+    dockRow.backgroundColor = Ink.dock
+    dockRow.layer.cornerRadius = 28
+    for key in ["mute", "speaker", "keypad", "hold"] {
+      let b = roundButton(54, symbol: "mic.fill", bg: Ink.fill, tint: Ink.text, action: #selector(tapDock(_:)))
+      b.accessibilityIdentifier = key
+      let l = UILabel()
+      dock[key] = (b, l)
+      dockRow.addArrangedSubview(cell(b, l))
     }
 
-    hangup.setImage(UIImage(systemName: "phone.down.fill"), for: .normal)
-    hangup.accessibilityLabel = "Hang up"
-    hangup.layer.cornerRadius = 37
-    hangup.addTarget(self, action: #selector(tapHangup), for: .touchUpInside)
-    let hangupRow = UIStackView(arrangedSubviews: [hangup])
-    hangupRow.axis = .vertical
-    hangupRow.alignment = .center
-    hangup.widthAnchor.constraint(equalToConstant: 74).isActive = true
-    hangup.heightAnchor.constraint(equalToConstant: 74).isActive = true
+    // Transfer · End · More
+    let transferButton = roundButton(46, symbol: "arrow.turn.up.right", bg: Ink.fill, tint: Ink.text, action: #selector(tapTransfer))
+    let hang = UIButton(type: .system)
+    hang.setImage(UIImage(systemName: "phone.down.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)), for: .normal)
+    hang.tintColor = .white
+    hang.backgroundColor = Ink.end
+    hang.layer.cornerRadius = 30
+    hang.accessibilityLabel = "Hang up"
+    hang.widthAnchor.constraint(equalToConstant: 88).isActive = true
+    hang.heightAnchor.constraint(equalToConstant: 60).isActive = true
+    hang.addTarget(self, action: #selector(tapHangup), for: .touchUpInside)
+    moreButton = roundButton(46, symbol: "ellipsis", bg: Ink.fill, tint: Ink.text, action: #selector(tapMore))
+    let bottom = UIStackView(arrangedSubviews: [cell(transferButton, transferLabel), centered(hang), cell(moreButton, moreLabel)])
+    bottom.axis = .horizontal
+    bottom.distribution = .fillEqually
+    bottom.alignment = .center
 
     let spacerTop = UIView()
     let spacerMid = UIView()
     stack.addArrangedSubview(header)
-    stack.setCustomSpacing(8, after: header)
-    stack.addArrangedSubview(secondBanner)
+    stack.addArrangedSubview(secondRow)
     stack.addArrangedSubview(spacerTop)
     stack.addArrangedSubview(caller)
-    stack.setCustomSpacing(16, after: caller)
-    stack.addArrangedSubview(details)
     stack.addArrangedSubview(spacerMid)
-    stack.addArrangedSubview(grid)
-    stack.setCustomSpacing(18, after: grid)
-    stack.addArrangedSubview(hangupRow)
-    spacerMid.heightAnchor.constraint(equalTo: spacerTop.heightAnchor, multiplier: 2).isActive = true
+    stack.addArrangedSubview(dockRow)
+    stack.setCustomSpacing(18, after: dockRow)
+    stack.addArrangedSubview(bottom)
+    spacerMid.heightAnchor.constraint(equalTo: spacerTop.heightAnchor).isActive = true
 
     let g = view.safeAreaLayoutGuide
     NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: g.topAnchor, constant: 8),
-      stack.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -16),
-      stack.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 16),
-      stack.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -16),
+      stack.topAnchor.constraint(equalTo: g.topAnchor, constant: 4),
+      stack.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -14),
+      stack.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 14),
+      stack.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -14),
     ])
 
     buildKeypad()
-    applyPalette()
+    buildSheet()
   }
 
   private func buildKeypad() {
@@ -450,6 +518,7 @@ final class CallViewController: UIViewController {
     keypad.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(keypad)
     keypadDigits.font = .systemFont(ofSize: 34)
+    keypadDigits.textColor = Ink.text
     keypadDigits.text = " "
     keypad.addArrangedSubview(keypadDigits)
     for row in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["*", "0", "#"]] {
@@ -459,13 +528,13 @@ final class CallViewController: UIViewController {
       for d in row {
         let b = UIButton(type: .system)
         b.setTitle(d, for: .normal)
-        b.titleLabel?.font = .systemFont(ofSize: 28)
+        b.setTitleColor(Ink.text, for: .normal)
+        b.titleLabel?.font = .systemFont(ofSize: 28, weight: .medium)
+        b.backgroundColor = Ink.fill
         b.widthAnchor.constraint(equalToConstant: 74).isActive = true
         b.heightAnchor.constraint(equalToConstant: 74).isActive = true
         b.layer.cornerRadius = 37
-        b.layer.borderWidth = 1
         b.addTarget(self, action: #selector(tapKey(_:)), for: .touchUpInside)
-        keypadKeys.append(b)
         r.addArrangedSubview(b)
       }
       keypad.addArrangedSubview(r)
@@ -475,15 +544,9 @@ final class CallViewController: UIViewController {
     bottom.spacing = 40
     bottom.alignment = .center
     keypadHide.titleLabel?.font = .systemFont(ofSize: 15, weight: .bold)
+    keypadHide.setTitleColor(Ink.text2, for: .normal)
     keypadHide.addTarget(self, action: #selector(tapHideKeypad), for: .touchUpInside)
-    let end = UIButton(type: .system)
-    end.setImage(UIImage(systemName: "phone.down.fill"), for: .normal)
-    end.tintColor = .white
-    end.backgroundColor = UIColor(red: 0.97, green: 0.32, blue: 0.29, alpha: 1)
-    end.layer.cornerRadius = 37
-    end.widthAnchor.constraint(equalToConstant: 74).isActive = true
-    end.heightAnchor.constraint(equalToConstant: 74).isActive = true
-    end.addTarget(self, action: #selector(tapHangup), for: .touchUpInside)
+    let end = roundButton(74, symbol: "phone.down.fill", bg: Ink.end, tint: .white, action: #selector(tapHangup))
     bottom.addArrangedSubview(keypadHide)
     bottom.addArrangedSubview(end)
     keypad.addArrangedSubview(bottom)
@@ -494,64 +557,101 @@ final class CallViewController: UIViewController {
     ])
   }
 
-  private func detailCell(_ row: [String]) -> UIView {
-    let k = label(11, mono: true)
+  /// Call quality: the pill again, each direction's MOS, then every figure.
+  private func buildSheet() {
+    dim.backgroundColor = UIColor(white: 0, alpha: 0.5)
+    dim.isHidden = true
+    dim.translatesAutoresizingMaskIntoConstraints = false
+    dim.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(closeSheet)))
+    view.addSubview(dim)
+
+    sheet.backgroundColor = Ink.sheet
+    sheet.layer.cornerRadius = 26
+    sheet.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    sheet.isHidden = true
+    sheet.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(sheet)
+
+    let handle = UIView()
+    handle.backgroundColor = UIColor(white: 1, alpha: 0.2)
+    handle.layer.cornerRadius = 2.5
+    handle.widthAnchor.constraint(equalToConstant: 38).isActive = true
+    handle.heightAnchor.constraint(equalToConstant: 5).isActive = true
+
+    style(sheetTitle, 19, .heavy)
+    sheetTitle.textAlignment = .natural
+    let head = UIStackView(arrangedSubviews: [sheetTitle, sheetPill])
+    head.axis = .horizontal
+    head.alignment = .center
+    head.spacing = 10
+
+    func mosBox(_ title: UILabel, _ value: UILabel) -> UIStackView {
+      style(title, 11.5, color: Ink.text2)
+      title.textAlignment = .natural
+      value.font = .monospacedDigitSystemFont(ofSize: 24, weight: .heavy)
+      value.textColor = Ink.text
+      value.textAlignment = .natural
+      let box = UIStackView(arrangedSubviews: [title, value])
+      box.axis = .vertical
+      box.isLayoutMarginsRelativeArrangement = true
+      box.layoutMargins = UIEdgeInsets(top: 9, left: 12, bottom: 9, right: 12)
+      box.backgroundColor = UIColor(white: 1, alpha: 0.06)
+      box.layer.cornerRadius = 16
+      return box
+    }
+    let mosRow = UIStackView(arrangedSubviews: [mosBox(mosYouLabel, mosYou), mosBox(mosThemLabel, mosThem)])
+    mosRow.axis = .horizontal
+    mosRow.distribution = .fillEqually
+    mosRow.spacing = 8
+    sheetRows.axis = .vertical
+
+    let content = UIStackView(arrangedSubviews: [centered(handle), head, mosRow, sheetRows])
+    content.axis = .vertical
+    content.setCustomSpacing(14, after: content.arrangedSubviews[0])
+    content.setCustomSpacing(12, after: head)
+    content.setCustomSpacing(6, after: mosRow)
+    content.translatesAutoresizingMaskIntoConstraints = false
+    sheet.addSubview(content)
+
+    NSLayoutConstraint.activate([
+      dim.topAnchor.constraint(equalTo: view.topAnchor),
+      dim.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      dim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      dim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      sheet.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      sheet.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      sheet.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      content.topAnchor.constraint(equalTo: sheet.topAnchor, constant: 10),
+      content.leadingAnchor.constraint(equalTo: sheet.leadingAnchor, constant: 20),
+      content.trailingAnchor.constraint(equalTo: sheet.trailingAnchor, constant: -20),
+      content.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+    ])
+  }
+
+  private func detailRow(_ row: [String]) -> UIView {
+    let k = label(13, color: Ink.text2)
     k.text = row.first ?? ""
-    k.textColor = p.text2
     k.textAlignment = .natural
-    let v = label(11, mono: true)
+    let v = UILabel()
+    v.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+    v.textColor = Ink.text
     v.text = row.count > 1 ? row[1] : ""
-    v.textColor = p.text
     v.textAlignment = .right
     let s = UIStackView(arrangedSubviews: [k, v])
     s.axis = .horizontal
+    s.spacing = 12
+    s.isLayoutMarginsRelativeArrangement = true
+    s.layoutMargins = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
     return s
   }
 
-  private func setControl(_ key: String, _ symbol: String, _ title: String, on: Bool, danger: Bool = false) {
-    guard let (b, l) = controls[key] else { return }
-    b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)), for: .normal)
+  private func setDock(_ key: String, _ symbol: String, _ title: String, on: Bool) {
+    guard let (b, l) = dock[key] else { return }
+    b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)), for: .normal)
     b.accessibilityLabel = title
+    b.backgroundColor = on ? Ink.text : Ink.fill
+    b.tintColor = on ? Ink.ground(dark: false) : Ink.text
     l.text = title
-    l.textColor = p.text
-    if on {
-      b.backgroundColor = danger ? p.danger : p.text
-      b.tintColor = danger ? .white : p.bg
-      b.layer.borderColor = UIColor.clear.cgColor
-    } else {
-      b.backgroundColor = p.surface
-      b.tintColor = p.text
-      b.layer.borderColor = p.border.cgColor
-    }
-  }
-
-  private func applyPalette() {
-    view.backgroundColor = p.bg
-    setNeedsStatusBarAppearanceUpdate()
-    minimize.tintColor = p.text2
-    account.textColor = p.text2
-    secondBanner.backgroundColor = p.surface
-    secondBanner.layer.borderColor = p.border.cgColor
-    secondText.textColor = p.text
-    secondSwap.setTitleColor(p.accent, for: .normal)
-    secondSwap.backgroundColor = p.accentSoft
-    avatar.textColor = p.accent
-    avatar.backgroundColor = p.accentSoft
-    nameLabel.textColor = p.text
-    statusLabel.textColor = p.text2
-    timerLabel.textColor = p.text
-    details.backgroundColor = p.surface
-    details.layer.borderColor = p.border.cgColor
-    detailsTitle.textColor = p.text
-    hangup.backgroundColor = p.danger
-    hangup.tintColor = .white
-    keypadDigits.textColor = p.text
-    keypadHide.setTitleColor(p.accent, for: .normal)
-    for k in keypadKeys {
-      k.setTitleColor(p.text, for: .normal)
-      k.backgroundColor = p.surface
-      k.layer.borderColor = p.border.cgColor
-    }
   }
 
   private func initials(_ s: String) -> String {
@@ -559,6 +659,97 @@ final class CallViewController: UIViewController {
     guard let first = parts.first else { return "?" }
     if !(first.first?.isLetter ?? false) { return String(first.suffix(2)) }
     return (String(first.prefix(1)) + (parts.count > 1 ? String(parts[1].prefix(1)) : "")).uppercased()
+  }
+}
+
+/// The caller's initials on their colour, inside two faint rings; the view is
+/// 44 pt wider than the disc.
+final class RingAvatar: UIView {
+  private let middle = UIView()
+  private let disc = UILabel()
+
+  init(size: CGFloat, fontSize: CGFloat) {
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    backgroundColor = UIColor(white: 1, alpha: 0.03)
+    layer.cornerRadius = size / 2
+    middle.backgroundColor = UIColor(white: 1, alpha: 0.05)
+    middle.layer.cornerRadius = size / 2 - 10
+    middle.translatesAutoresizingMaskIntoConstraints = false
+    disc.textAlignment = .center
+    disc.font = .systemFont(ofSize: fontSize, weight: .bold)
+    disc.clipsToBounds = true
+    disc.layer.cornerRadius = size / 2 - 22
+    disc.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(middle)
+    addSubview(disc)
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: size),
+      heightAnchor.constraint(equalToConstant: size),
+      middle.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+      middle.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+      middle.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      middle.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      disc.topAnchor.constraint(equalTo: topAnchor, constant: 22),
+      disc.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -22),
+      disc.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22),
+      disc.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+  func set(title: String, initials: String) {
+    let (bg, fg) = Ink.avatar(title)
+    disc.backgroundColor = bg
+    disc.textColor = fg
+    disc.text = initials
+  }
+}
+
+/// Three bars, the grade word and the MOS on the grade's colour; a control,
+/// so the in-call one opens the quality sheet.
+final class QualityPill: UIControl {
+  private let bars = QualityBarsView()
+  private let word = UILabel()
+  private let mos = UILabel()
+
+  init(chevron: Bool) {
+    super.init(frame: .zero)
+    layer.cornerRadius = 17
+    word.font = .systemFont(ofSize: 13, weight: .bold)
+    mos.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
+    mos.textColor = Ink.text2
+    let arrow = UIImageView(image: UIImage(systemName: "chevron.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)))
+    arrow.tintColor = Ink.text2
+    arrow.isHidden = !chevron
+    let row = UIStackView(arrangedSubviews: [bars, word, mos, arrow])
+    row.axis = .horizontal
+    row.alignment = .center
+    row.spacing = 6
+    row.isUserInteractionEnabled = false
+    row.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(row)
+    NSLayoutConstraint.activate([
+      row.topAnchor.constraint(equalTo: topAnchor, constant: 7),
+      row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -7),
+      row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 11),
+      row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+    ])
+    isAccessibilityElement = true
+    accessibilityTraits = .button
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+  func set(level: Int, word w: String, mos m: String) {
+    let fg = Ink.grade(level)
+    backgroundColor = fg.withAlphaComponent(0.15)
+    bars.setQuality(level: level, litColor: fg, offColor: UIColor(white: 1, alpha: 0.25))
+    word.text = w
+    word.textColor = fg
+    mos.text = m
+    mos.isHidden = m.isEmpty
   }
 }
 

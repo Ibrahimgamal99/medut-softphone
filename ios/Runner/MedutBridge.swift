@@ -26,6 +26,12 @@ struct CallSnapshot {
   var quality: String { raw["quality"] as? String ?? "" }
   var qualityLevel: Int { (raw["qualityLevel"] as? NSNumber)?.intValue ?? 0 }
   var qualityWord: String { raw["qualityWord"] as? String ?? "" }
+  /// MOS of what you hear, and of what the other side hears ("" until measured).
+  var mosYou: String { raw["mosYou"] as? String ?? "" }
+  var mosThem: String { raw["mosThem"] as? String ?? "" }
+  var encrypted: Bool { raw["encrypted"] as? Bool ?? false }
+  /// ok | reconnecting | weak
+  var link: String { raw["link"] as? String ?? "ok" }
   var dark: Bool { raw["dark"] as? Bool ?? false }
   var rtl: Bool { raw["rtl"] as? Bool ?? false }
   var outgoing: Bool { raw["outgoing"] as? Bool ?? false }

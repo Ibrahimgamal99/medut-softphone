@@ -7,7 +7,9 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -29,36 +31,46 @@ import com.medut.generic.phone.MainActivity
 import com.medut.generic.phone.NativeBridge
 import com.medut.generic.phone.R
 
+// The ink surface: the same in both themes except the ground.
+private const val INK = 0xFF0F1418.toInt()
+private const val BLACK = 0xFF000000.toInt()
+private const val TEXT = 0xFFF4F6F8.toInt()
+private const val TEXT2 = 0xADFFFFFF.toInt() // 68 %
+private const val FILL = 0x1FFFFFFF // 12 %: round buttons
+private const val DOCK = 0x12FFFFFF // 7 %: the dock
+private const val PILL = 0x1AFFFFFF // 10 %
+private const val SHEET = 0xFF182027.toInt()
+private const val LINE = 0x14FFFFFF // 8 %
+private const val GOOD = 0xFF3DD49A.toInt()
+private const val FAIR = 0xFFE9B04A.toInt()
+private const val POOR = 0xFFFF5A5F.toInt()
+private const val REC = 0xFFFF8A8D.toInt()
+private const val END = 0xFFE5383B.toInt()
+private const val ON_GOOD = 0xFF04271A.toInt()
+
+/** (background, initials) per person: the app's dark avatar colours, picked the same way. */
+private val AVATARS = listOf(
+    0xFF163428.toInt() to 0xFF7DE3B8.toInt(),
+    0xFF25214A.toInt() to 0xFFB7AEFF.toInt(),
+    0xFF38261A.toInt() to 0xFFF4B27A.toInt(),
+    0xFF162A3D.toInt() to 0xFF8EC0F2.toInt(),
+)
+
 /**
- * Native ringing + in-call screen (design E). Plain Views, built in code, so it
- * paints in one frame on a cold answer and over the lock screen. It holds no
- * call state of its own: it renders [CallState.latest] and sends every tap to
- * Dart through [NativeBridge].
+ * Native ringing + in-call screen (Pocket). Plain Views, built in code, so it
+ * paints in one frame on a cold answer and over the lock screen. A dark "ink"
+ * surface in both themes, the way most phones show a call: the caller, the
+ * quality pill (tap it for every figure), four controls in a dock, then
+ * Transfer · End · More. It holds no call state of its own: it renders
+ * [CallState.latest] and sends every tap to Dart through [NativeBridge].
  */
 class CallActivity : Activity() {
 
-    private class Palette(dark: Boolean) {
-        val bg = if (dark) 0xFF0D1014.toInt() else 0xFFF6F8FA.toInt()
-        val surface = if (dark) 0xFF14181E.toInt() else 0xFFFFFFFF.toInt()
-        val surface2 = if (dark) 0xFF1B2027.toInt() else 0xFFEEF1F5.toInt()
-        val border = if (dark) 0xFF2A313A.toInt() else 0xFFD8DEE6.toInt()
-        val text = if (dark) 0xFFE8EDF3.toInt() else 0xFF1C2128.toInt()
-        val text2 = if (dark) 0xFF9AA4B2.toInt() else 0xFF5A6573.toInt()
-        val accent = if (dark) 0xFF4493F8.toInt() else 0xFF1F6FEB.toInt()
-        val accentSoft = if (dark) 0x294493F8 else 0xFFDDEBFF.toInt()
-        val success = if (dark) 0xFF3FB950.toInt() else 0xFF1A7F37.toInt()
-        val successSoft = if (dark) 0x1F3FB950 else 0xFFDAF5E1.toInt()
-        val onSuccess = if (dark) 0xFF0D1014.toInt() else 0xFFFFFFFF.toInt()
-        val danger = if (dark) 0xFFF85149.toInt() else 0xFFCF222E.toInt()
-        val warn = if (dark) 0xFFD29922.toInt() else 0xFF9A6700.toInt()
-        val warnSoft = if (dark) 0x24D29922 else 0xFFFFF3D1.toInt()
-    }
-
     private val ui = Handler(Looper.getMainLooper())
-    private var p = Palette(false)
-    private var paletteDark: Boolean? = null
     private var snap = CallSnapshot(emptyMap())
-    private var detailsOpen = false
+    private var ground = 0
+    /** The open sheet: "quality", "more" or null. */
+    private var sheet: String? = null
     private var keypadOpen = false
     private var dtmfTyped = ""
     private var proximity: PowerManager.WakeLock? = null
@@ -74,35 +86,51 @@ class CallActivity : Activity() {
     private lateinit var inNumber: TextView
     private lateinit var inBusy: TextView
     private lateinit var inMessage: TextView
-    private lateinit var inDecline: LinearLayout
-    private lateinit var inAnswer: LinearLayout
+    private lateinit var inDecline: TextView
+    private lateinit var inAnswer: TextView
 
     // In call
     private lateinit var call: LinearLayout
-    private lateinit var minimize: ImageView
     private lateinit var account: TextView
-    private lateinit var mosPill: LinearLayout
-    private lateinit var qualityBars: QualityBars
-    private lateinit var qualityWord: TextView
-    private lateinit var mosText: TextView
-    private lateinit var secondBanner: LinearLayout
+    private lateinit var secondPill: LinearLayout
     private lateinit var secondText: TextView
     private lateinit var secondSwap: TextView
     private lateinit var avatar: TextView
     private lateinit var name: TextView
-    private lateinit var status: TextView
     private lateinit var timer: TextView
-    private lateinit var details: LinearLayout
-    private lateinit var detailsTitle: TextView
-    private lateinit var detailsGrid: GridLayout
-    private lateinit var hangup: ImageView
-    private val controls = mutableMapOf<String, Pair<ImageView, TextView>>()
+    private lateinit var status: TextView
+    private lateinit var qualityPill: LinearLayout
+    private lateinit var qualityBars: QualityBars
+    private lateinit var qualityWord: TextView
+    private lateinit var mosText: TextView
+    private lateinit var encrypted: TextView
+    private lateinit var rec: TextView
+    private val dock = mutableMapOf<String, Pair<ImageView, TextView>>()
+    private lateinit var transfer: TextView
+    private lateinit var more: TextView
+
+    // Sheets
+    private lateinit var dim: View
+    private lateinit var qualitySheet: LinearLayout
+    private lateinit var sheetTitle: TextView
+    private lateinit var sheetPill: LinearLayout
+    private lateinit var sheetBars: QualityBars
+    private lateinit var sheetWord: TextView
+    private lateinit var sheetMos: TextView
+    private lateinit var mosYouLabel: TextView
+    private lateinit var mosYou: TextView
+    private lateinit var mosThemLabel: TextView
+    private lateinit var mosThem: TextView
+    private lateinit var sheetRows: LinearLayout
+    private lateinit var moreSheet: LinearLayout
+    private lateinit var moreAdd: TextView
+    private lateinit var moreRecord: TextView
+    private lateinit var moreMessage: TextView
 
     // Keypad
     private lateinit var keypad: LinearLayout
     private lateinit var keypadDigits: TextView
     private lateinit var keypadHide: TextView
-    private val keypadKeys = mutableListOf<TextView>()
 
     private val listener: (CallSnapshot) -> Unit = { s -> ui.post { render(s) } }
 
@@ -147,13 +175,19 @@ class CallActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // Back leaves the call running and shows the app, like the system dialer.
-        if (keypadOpen) {
-            keypadOpen = false
-            render(snap)
-            return
+        // Back closes a sheet or the keypad first, then leaves the call running
+        // and shows the app, like the system dialer.
+        when {
+            sheet != null -> {
+                sheet = null
+                render(snap)
+            }
+            keypadOpen -> {
+                keypadOpen = false
+                render(snap)
+            }
+            else -> MainActivity.open(this)
         }
-        MainActivity.open(this)
     }
 
     private fun handleAnswerExtra(intent: Intent?) {
@@ -188,111 +222,137 @@ class CallActivity : Activity() {
             finish()
             return
         }
-        if (paletteDark != s.dark) {
-            paletteDark = s.dark
-            p = Palette(s.dark)
-            applyPalette()
+        val g = if (s.dark) BLACK else INK
+        if (g != ground) {
+            ground = g
+            root.setBackgroundColor(g)
+            window.statusBarColor = g
+            window.navigationBarColor = g
         }
         root.layoutDirection = if (s.rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
 
         val isIncoming = s.phase == "incoming"
-        incoming.visibility = if (isIncoming) View.VISIBLE else View.GONE
-        call.visibility = if (!isIncoming && !keypadOpen) View.VISIBLE else View.GONE
-        keypad.visibility = if (!isIncoming && keypadOpen) View.VISIBLE else View.GONE
+        if (isIncoming) {
+            sheet = null
+            keypadOpen = false
+        }
+        incoming.visibility = vis(isIncoming)
+        call.visibility = vis(!isIncoming && !keypadOpen)
+        keypad.visibility = vis(!isIncoming && keypadOpen)
 
-        val initials = initials(s.title)
+        val (avBg, avFg) = avatarColors(s.title)
         if (isIncoming) {
             inAccount.text = if (s.account.isNotBlank()) s.label("incomingOn", "Incoming on") + " " + s.account
             else s.label("incomingCall", "Incoming call")
-            inAvatar.text = initials
+            inAvatar.text = initials(s.title)
+            inAvatar.background = rings(avBg)
+            inAvatar.setTextColor(avFg)
             inName.text = s.title
             inNumber.text = if (s.name.isNotBlank()) s.number else ""
             inBusy.text = s.label("busy", "Busy")
             inMessage.text = s.label("message", "Message")
-            (inDecline.getChildAt(1) as TextView).text = s.label("decline", "Decline")
-            (inAnswer.getChildAt(1) as TextView).text = s.label("answer", "Answer")
+            inDecline.text = s.label("decline", "Decline")
+            inAnswer.text = s.label("answer", "Answer")
+            renderSheets(s)
             setProximity(false)
             return
         }
 
         account.text = s.account
-        avatar.text = initials
+        avatar.text = initials(s.title)
+        avatar.background = rings(avBg)
+        avatar.setTextColor(avFg)
         name.text = s.title
-        status.text = s.status.ifBlank { s.number }
         updateTimer()
+        // Calling / ringing / on hold, or a connection in trouble; otherwise the
+        // number under a name until the call is answered.
+        val line = when {
+            s.phase == "outgoing" || s.phase == "held" || s.link != "ok" -> s.status
+            s.startedAt <= 0 && s.name.isNotBlank() -> s.number
+            else -> ""
+        }
+        status.text = line
+        status.visibility = vis(line.isNotBlank())
 
-        // Quality pill: 3 bars + word, MOS beside it, tap for details.
+        // Quality pill: 3 bars, the grade word and the MOS, in the grade's colour.
         if (s.qualityWord.isNotBlank()) {
-            mosPill.visibility = View.VISIBLE
-            val fg = when (s.qualityLevel) {
-                4, 3 -> p.success
-                2 -> p.warn
-                1 -> p.danger
-                else -> p.text2
-            }
-            mosPill.background = pill(fg and 0x00FFFFFF or 0x1F000000, 16f)
-            qualityBars.setQuality(s.qualityLevel, fg, p.text2 and 0x00FFFFFF or 0x40000000)
+            val fg = gradeColor(s.qualityLevel)
+            qualityPill.visibility = View.VISIBLE
+            qualityPill.background = pill(withAlpha(fg, 0x26), 18f)
+            qualityBars.setQuality(s.qualityLevel, fg, 0x40FFFFFF)
             qualityWord.text = s.qualityWord
             qualityWord.setTextColor(fg)
-            mosText.text = (if (s.mos.isNotBlank()) s.mos + " " else "") + if (detailsOpen) "▴" else "▾"
-            mosText.setTextColor(fg)
+            mosText.text = s.mos
+            mosText.visibility = vis(s.mos.isNotBlank())
         } else {
-            mosPill.visibility = View.INVISIBLE
+            qualityPill.visibility = View.GONE
         }
+        encrypted.text = s.label("encrypted", "Encrypted")
+        encrypted.visibility = vis(s.encrypted)
+        rec.text = "● " + s.label("recShort", "Rec")
+        rec.visibility = vis(s.recording)
 
-        // Details card
-        val rows = s.details
-        details.visibility = if (detailsOpen && rows.isNotEmpty()) View.VISIBLE else View.GONE
-        if (details.visibility == View.VISIBLE) {
-            detailsTitle.text = s.label("callDetails", "Call details")
-            detailsGrid.removeAllViews()
-            rows.forEach { r ->
-                detailsGrid.addView(detailCell(r.getOrElse(0) { "" }, r.getOrElse(1) { "" }))
-            }
-        }
-        val big = !detailsOpen || rows.isEmpty()
-        sizeAvatar(avatar, if (big) 108 else 76, if (big) 36f else 26f)
-
-        // Second line
         val second = s.second
         if (second != null) {
-            secondBanner.visibility = View.VISIBLE
+            secondPill.visibility = View.VISIBLE
             val sName = second["name"] as? String ?: ""
             secondText.text = second["text"] as? String ?: (sName + " · " + s.label("onHold", "On hold"))
             secondSwap.text = second["label"] as? String ?: s.label("swap", "Swap")
             secondAction = second["action"] as? String ?: "swap"
         } else {
-            secondBanner.visibility = View.GONE
+            secondPill.visibility = View.GONE
         }
 
-        // Controls
-        setControl("mute", if (s.muted) R.drawable.ic_mic_off else R.drawable.ic_mic,
-            if (s.muted) s.label("unmute", "Unmute") else s.label("mute", "Mute"), s.muted)
-        setControl("keypad", R.drawable.ic_dialpad, s.label("keypad", "Keypad"), false)
+        setDock("mute", if (s.muted) R.drawable.ic_mic_off else R.drawable.ic_mic, s.label("mute", "Mute"), s.muted)
         val routeIcon = if (s.route == "bluetooth") R.drawable.ic_bluetooth else R.drawable.ic_speaker
         val routeLabel = when (s.route) {
             "bluetooth" -> s.label("bluetooth", "Bluetooth")
             "wired" -> s.label("headset", "Headset")
             else -> s.label("speaker", "Speaker")
         }
-        setControl("speaker", routeIcon, routeLabel, s.route == "speaker" || s.route == "bluetooth")
-        setControl("hold", R.drawable.ic_pause,
-            if (s.held) s.label("resume", "Resume") else s.label("hold", "Hold"), s.held)
-        setControl("add", R.drawable.ic_add, s.label("addCall", "Add call"), false)
-        setControl("transfer", R.drawable.ic_transfer, s.label("transfer", "Transfer"), false)
-        setControl("record", R.drawable.ic_record,
-            if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record"),
-            s.recording, danger = true)
-        controls["record"]?.let { (img, t) ->
-            val v = if (s.canRecord) View.VISIBLE else View.INVISIBLE
-            img.visibility = v
-            t.visibility = v
-        }
-        setControl("message", R.drawable.ic_message, s.label("message", "Message"), false)
-
+        setDock("speaker", routeIcon, routeLabel, s.route == "speaker" || s.route == "bluetooth")
+        setDock("keypad", R.drawable.ic_dialpad, s.label("keypad", "Keypad"), false)
+        setDock("hold", R.drawable.ic_pause, if (s.held) s.label("resume", "Resume") else s.label("hold", "Hold"), s.held)
+        transfer.text = s.label("transfer", "Transfer")
+        more.text = s.label("more", "More")
         keypadHide.text = s.label("hide", "Hide")
+        renderSheets(s)
         // Screen-off at the ear is driven from Dart (proximity_screen_lock), so it
         // also works while the Flutter app is in front during a call.
+    }
+
+    private fun renderSheets(s: CallSnapshot) {
+        if (sheet == "quality" && (s.details.isEmpty() || s.phase == "incoming")) sheet = null
+        dim.visibility = vis(sheet != null)
+        qualitySheet.visibility = vis(sheet == "quality")
+        moreSheet.visibility = vis(sheet == "more")
+        if (sheet == "quality") {
+            val fg = gradeColor(s.qualityLevel)
+            sheetTitle.text = s.label("callQuality", "Call quality")
+            sheetPill.background = pill(withAlpha(fg, 0x26), 18f)
+            sheetBars.setQuality(s.qualityLevel, fg, 0x40FFFFFF)
+            sheetWord.text = s.qualityWord
+            sheetWord.setTextColor(fg)
+            sheetMos.text = s.mos
+            mosYouLabel.text = s.label("youHear", "You hear")
+            mosYou.text = s.mosYou.ifBlank { "—" }
+            mosThemLabel.text = s.label("theyHear", "They hear")
+            mosThem.text = s.mosThem.ifBlank { "—" }
+            sheetRows.removeAllViews()
+            s.details.forEachIndexed { i, r ->
+                if (i > 0) sheetRows.addView(View(this).apply {
+                    setBackgroundColor(LINE)
+                    layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
+                })
+                sheetRows.addView(detailRow(r.getOrElse(0) { "" }, r.getOrElse(1) { "" }))
+            }
+        }
+        if (sheet == "more") {
+            moreAdd.text = s.label("addCall", "Add call")
+            moreRecord.text = if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record")
+            moreRecord.visibility = vis(s.canRecord)
+            moreMessage.text = s.label("message", "Message")
+        }
     }
 
     private fun updateTimer() {
@@ -324,23 +384,24 @@ class CallActivity : Activity() {
 
     // ── Actions ──────────────────────────────────────────────────────────────
 
-    private fun onControl(key: String) {
+    private fun onDock(key: String) {
         val s = snap
         when (key) {
             "mute" -> NativeBridge.action(if (s.muted) "unmute" else "mute")
+            "speaker" -> chooseRoute(s)
             "keypad" -> {
                 keypadOpen = true
                 dtmfTyped = ""
                 keypadDigits.text = ""
                 render(s)
             }
-            "speaker" -> chooseRoute(s)
             "hold" -> NativeBridge.action(if (s.held) "unhold" else "hold")
-            "add" -> openApp("add")
-            "transfer" -> openApp("transfer")
-            "record" -> NativeBridge.action("record")
-            "message" -> openApp("message")
         }
+    }
+
+    private fun openSheet(which: String?) {
+        sheet = which
+        render(snap)
     }
 
     /** One tap toggles the speaker; with a headset connected, pick the output. */
@@ -362,6 +423,7 @@ class CallActivity : Activity() {
     }
 
     private fun openApp(route: String) {
+        sheet = null
         NativeBridge.action(route)
         MainActivity.open(this, route)
     }
@@ -371,118 +433,182 @@ class CallActivity : Activity() {
     private fun dp(v: Int): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
-    private fun pill(color: Int, radiusDp: Float, stroke: Int? = null): GradientDrawable =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = radiusDp * resources.displayMetrics.density
-            if (stroke != null) setStroke(dp(1), stroke)
-        }
+    private fun vis(on: Boolean) = if (on) View.VISIBLE else View.GONE
 
-    private fun oval(color: Int, stroke: Int? = null): GradientDrawable = GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
+    private fun withAlpha(color: Int, alpha: Int) = color and 0x00FFFFFF or (alpha shl 24)
+
+    private fun pill(color: Int, radiusDp: Float): GradientDrawable = GradientDrawable().apply {
         setColor(color)
-        if (stroke != null) setStroke(dp(1), stroke)
+        cornerRadius = radiusDp * resources.displayMetrics.density
     }
 
-    private fun text(sizeSp: Float, bold: Boolean = false, mono: Boolean = false): TextView =
+    private fun oval(color: Int): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(color)
+    }
+
+    /** The avatar disc inside two faint rings; the view is 44 dp wider than the disc. */
+    private fun rings(fill: Int): Drawable = LayerDrawable(arrayOf(oval(0x08FFFFFF), oval(0x0DFFFFFF), oval(fill))).apply {
+        setLayerInset(1, dp(10), dp(10), dp(10), dp(10))
+        setLayerInset(2, dp(22), dp(22), dp(22), dp(22))
+    }
+
+    private fun gradeColor(level: Int) = when (level) {
+        4, 3 -> GOOD
+        2 -> FAIR
+        1 -> POOR
+        else -> TEXT2
+    }
+
+    private fun avatarColors(title: String): Pair<Int, Int> {
+        var h = 0L
+        for (c in title) h = (h * 31 + c.code) and 0x7fffffffL
+        return AVATARS[(h % AVATARS.size).toInt()]
+    }
+
+    private fun text(sizeSp: Float, weight: Int = 400, color: Int = TEXT, mono: Boolean = false): TextView =
         TextView(this).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
             typeface = when {
                 mono -> Typeface.MONOSPACE
-                bold -> Typeface.create("sans-serif-medium", Typeface.BOLD)
+                Build.VERSION.SDK_INT >= 28 -> Typeface.create(Typeface.DEFAULT, weight, false)
+                weight >= 600 -> Typeface.create("sans-serif-medium", Typeface.BOLD)
                 else -> Typeface.create("sans-serif", Typeface.NORMAL)
             }
+            setTextColor(color)
             gravity = Gravity.CENTER
         }
 
     private fun lp(w: Int, h: Int, weight: Float = 0f) = LinearLayout.LayoutParams(w, h, weight)
 
-    private fun spacer(weight: Float = 1f) = View(this).apply { layoutParams = lp(0, 0, weight).apply { height = 0; width = ViewGroup.LayoutParams.MATCH_PARENT } }
+    private fun wrap() = lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-    private fun vspace(h: Int) = View(this).apply { layoutParams = lp(1, dp(h)) }
+    private fun spacer(weight: Float = 1f) = View(this).apply { layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, 0, weight) }
 
-    private fun avatarView(sizeDp: Int, textSp: Float) = text(textSp, bold = true).apply {
-        layoutParams = lp(dp(sizeDp), dp(sizeDp)).apply { gravity = Gravity.CENTER_HORIZONTAL }
-    }
-
-    private fun sizeAvatar(v: TextView, sizeDp: Int, textSp: Float) {
-        val l = v.layoutParams
-        if (l.width != dp(sizeDp)) {
-            l.width = dp(sizeDp)
-            l.height = dp(sizeDp)
-            v.layoutParams = l
-            v.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSp)
+    private fun icon(res: Int, sizeDp: Int, bg: Drawable?, tint: Int, description: String, onClick: () -> Unit) =
+        ImageView(this).apply {
+            setImageResource(res)
+            scaleType = ImageView.ScaleType.CENTER
+            layoutParams = lp(dp(sizeDp), dp(sizeDp))
+            background = bg
+            imageTintList = ColorStateList.valueOf(tint)
+            contentDescription = description
+            setOnClickListener { onClick() }
         }
-    }
 
-    private fun roundButton(icon: Int, sizeDp: Int, label: String, onClick: () -> Unit): LinearLayout {
+    /** A round button with its label under it, filling an equal share of a row. */
+    private fun cell(img: ImageView, labelSp: Float, labelWeight: Int = 500): Pair<LinearLayout, TextView> {
+        val label = text(labelSp, labelWeight, TEXT2).apply { setPadding(0, dp(6), 0, 0) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            addView(img)
+            addView(label)
         }
-        val img = ImageView(this).apply {
-            setImageResource(icon)
-            scaleType = ImageView.ScaleType.CENTER
-            layoutParams = lp(dp(sizeDp), dp(sizeDp))
-            contentDescription = label
-            setOnClickListener { onClick() }
+        return box to label
+    }
+
+    private fun handle() = View(this).apply {
+        background = pill(0x33FFFFFF, 3f)
+        layoutParams = lp(dp(38), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(14) }
+    }
+
+    private fun sheetPanel(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(20), dp(10), dp(20), dp(24))
+        isClickable = true // taps on the sheet don't reach the dim behind it
+        background = GradientDrawable().apply {
+            setColor(SHEET)
+            val r = 26f * resources.displayMetrics.density
+            cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
         }
-        val t = text(13f, bold = true).apply { this.text = label; setPadding(0, dp(8), 0, 0) }
-        box.addView(img)
-        box.addView(t)
-        return box
+        addView(handle())
+    }
+
+    private fun qualityPillView(): Triple<LinearLayout, QualityBars, Pair<TextView, TextView>> {
+        val bars = QualityBars(this)
+        val word = text(13f, 700).apply { setPadding(dp(7), 0, dp(6), 0) }
+        val mos = text(11.5f, color = TEXT2, mono = true)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(11), dp(6), dp(10), dp(6))
+            addView(bars)
+            addView(word)
+            addView(mos)
+        }
+        return Triple(box, bars, word to mos)
     }
 
     private fun buildViews() {
         root = FrameLayout(this)
         root.fitsSystemWindows = true
+        buildIncoming()
+        buildCall()
+        buildKeypad()
+        buildSheets()
+        root.setBackgroundColor(INK)
+        if (Build.VERSION.SDK_INT >= 23) {
+            // Light status-bar icons on the ink, in both themes.
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = 0
+        }
+    }
 
-        // ── Incoming ──
+    private fun buildIncoming() {
         incoming = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(16), dp(28), dp(16), dp(28))
+            setPadding(dp(16), dp(24), dp(16), dp(28))
         }
-        inAccount = text(13f).apply {
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            layoutParams = lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        inAccount = text(13f, color = TEXT2).apply {
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            background = pill(PILL, 16f)
+            layoutParams = wrap()
         }
-        inAvatar = avatarView(120, 42f)
-        inName = text(30f, bold = true).apply { setPadding(0, dp(24), 0, dp(4)) }
-        inNumber = text(16f)
+        inAvatar = text(40f, 700).apply { layoutParams = lp(dp(164), dp(164)) }
+        inName = text(30f, 800).apply { setPadding(0, dp(18), 0, dp(4)) }
+        inNumber = text(16f, color = TEXT2)
+
         val quick = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
-        inBusy = text(15f, bold = true).apply {
-            layoutParams = lp(0, dp(52), 1f).apply { marginEnd = dp(8) }
+        inBusy = text(15f, 600).apply {
+            background = pill(PILL, 24f)
+            layoutParams = lp(0, dp(48), 1f).apply { marginEnd = dp(8) }
             setOnClickListener {
                 Ringer.stop()
                 NativeBridge.action("busy")
             }
         }
-        inMessage = text(15f, bold = true).apply {
-            layoutParams = lp(0, dp(52), 1f)
+        inMessage = text(15f, 600).apply {
+            background = pill(PILL, 24f)
+            layoutParams = lp(0, dp(48), 1f)
             setOnClickListener { openApp("reply") }
         }
         quick.addView(inBusy)
         quick.addView(inMessage)
+
         val answerRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) }
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(28) }
         }
-        inDecline = bigCallButton(R.drawable.ic_call_end) {
+        val decline = cell(icon(R.drawable.ic_call_end, 72, oval(END), Color.WHITE, "Decline") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
             NativeBridge.action("decline")
-        }.apply { layoutParams = lp(0, dp(72), 1f).apply { marginEnd = dp(8) } }
-        inAnswer = bigCallButton(R.drawable.ic_call) {
+        }, 13f, 600)
+        val answer = cell(icon(R.drawable.ic_call, 72, oval(GOOD), ON_GOOD, "Answer") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
             NativeBridge.action("answer")
-        }.apply { layoutParams = lp(0, dp(72), 1f) }
-        answerRow.addView(inDecline)
-        answerRow.addView(inAnswer)
+        }, 13f, 600)
+        inDecline = decline.second
+        inAnswer = answer.second
+        answerRow.addView(decline.first)
+        answerRow.addView(answer.first)
 
         incoming.addView(inAccount)
         incoming.addView(spacer())
@@ -492,131 +618,136 @@ class CallActivity : Activity() {
         incoming.addView(spacer())
         incoming.addView(quick)
         incoming.addView(answerRow)
+        root.addView(incoming, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
 
-        // ── In call ──
+    private fun buildCall() {
         call = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(24))
+            setPadding(dp(14), dp(6), dp(14), dp(18))
         }
+
+        // Minimise · account
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        minimize = ImageView(this).apply {
-            setImageResource(R.drawable.ic_chevron_down)
-            scaleType = ImageView.ScaleType.CENTER
-            layoutParams = lp(dp(44), dp(44))
-            contentDescription = "Minimise"
-            setOnClickListener { MainActivity.open(this@CallActivity) }
-        }
-        account = text(12f).apply { layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
-        qualityBars = QualityBars(this)
-        qualityWord = text(12f, bold = true).apply { setPadding(dp(7), 0, dp(6), 0) }
-        mosText = text(11f, mono = true)
-        mosPill = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(7), dp(10), dp(7))
-            minimumHeight = dp(32)
-            addView(qualityBars)
-            addView(qualityWord)
-            addView(mosText)
-            setOnClickListener {
-                detailsOpen = !detailsOpen
-                render(snap)
-            }
-        }
-        header.addView(minimize)
+        header.addView(icon(R.drawable.ic_chevron_down, 44, null, TEXT2, "Minimise") { MainActivity.open(this) })
+        account = text(12.5f, color = TEXT2).apply { layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
         header.addView(account)
-        header.addView(mosPill)
+        header.addView(View(this).apply { layoutParams = lp(dp(44), 1) })
 
-        secondBanner = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(8), dp(8), dp(8))
-            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) }
-        }
-        secondText = text(14f).apply {
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        secondSwap = text(13f, bold = true).apply {
-            setPadding(dp(14), dp(8), dp(14), dp(8))
+        // The other call: on hold, waiting, or the transfer to complete.
+        secondText = text(13f, 600)
+        secondSwap = text(12.5f, 700).apply {
+            setPadding(dp(12), dp(5), dp(12), dp(5))
+            background = pill(0x29FFFFFF, 16f)
+            layoutParams = wrap().apply { marginStart = dp(8) }
             setOnClickListener { NativeBridge.action(secondAction) }
         }
-        secondBanner.addView(secondText)
-        secondBanner.addView(secondSwap)
-
-        val callerBlock = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(16), 0, dp(16))
-        }
-        avatar = avatarView(108, 36f)
-        name = text(26f, bold = true).apply { setPadding(0, dp(10), 0, 0) }
-        status = text(14f)
-        timer = text(18f, mono = true).apply { setPadding(0, dp(4), 0, 0) }
-        callerBlock.addView(avatar)
-        callerBlock.addView(name)
-        callerBlock.addView(status)
-        callerBlock.addView(timer)
-
-        details = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
-        }
-        detailsTitle = text(13f, bold = true).apply { gravity = Gravity.START }
-        detailsGrid = GridLayout(this).apply {
-            columnCount = 2
-            setPadding(0, dp(8), 0, 0)
-        }
-        details.addView(detailsTitle)
-        details.addView(detailsGrid)
-
-        val grid = GridLayout(this).apply {
-            columnCount = 4
-            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-        listOf("mute", "keypad", "speaker", "hold", "add", "transfer", "record", "message").forEach { key ->
-            val cell = roundButton(R.drawable.ic_mic, 62, key) { onControl(key) }
-            cell.layoutParams = GridLayout.LayoutParams(
-                GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f),
-            ).apply { width = 0; bottomMargin = dp(14) }
-            controls[key] = (cell.getChildAt(0) as ImageView) to (cell.getChildAt(1) as TextView)
-            grid.addView(cell)
+        secondPill = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(5), dp(5), dp(5))
+            background = pill(PILL, 20f)
+            layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(4) }
+            addView(secondText)
+            addView(secondSwap)
         }
 
-        hangup = ImageView(this).apply {
-            setImageResource(R.drawable.ic_call_end)
-            scaleType = ImageView.ScaleType.CENTER
-            layoutParams = lp(dp(74), dp(74)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(6) }
-            contentDescription = "Hang up"
-            setOnClickListener { NativeBridge.action("hangup") }
+        // Caller, time, quality, tags
+        avatar = text(36f, 700).apply { layoutParams = lp(dp(148), dp(148)).apply { gravity = Gravity.CENTER_HORIZONTAL } }
+        name = text(30f, 800).apply { setPadding(dp(8), dp(14), dp(8), 0) }
+        timer = text(17f, color = TEXT2).apply { fontFeatureSettings = "tnum" }
+        status = text(14f, color = TEXT2).apply { setPadding(dp(8), dp(2), dp(8), 0) }
+        val q = qualityPillView()
+        qualityPill = q.first.apply {
+            layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(14) }
+            contentDescription = "Call quality"
+            setOnClickListener { openSheet("quality") }
         }
+        qualityBars = q.second
+        qualityWord = q.third.first
+        mosText = q.third.second
+        qualityPill.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_down)
+            imageTintList = ColorStateList.valueOf(TEXT2)
+            rotation = -90f
+            layoutParams = lp(dp(16), dp(16)).apply { marginStart = dp(2) }
+        })
+        encrypted = text(12.5f, color = TEXT2).apply {
+            val lock = getDrawable(R.drawable.ic_lock)?.mutate()?.apply { setBounds(0, 0, dp(14), dp(14)) }
+            setCompoundDrawablesRelative(lock, null, null, null)
+            compoundDrawableTintList = ColorStateList.valueOf(TEXT2)
+            compoundDrawablePadding = dp(5)
+            layoutParams = wrap().apply { marginEnd = dp(14) }
+        }
+        rec = text(12.5f, 600, REC).apply { layoutParams = wrap() }
+        val tags = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+            addView(encrypted)
+            addView(rec)
+        }
+
+        // The dock: Mute, Speaker, Keypad, Hold.
+        val dockRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(6), dp(14), dp(6), dp(12))
+            background = pill(DOCK, 28f)
+        }
+        listOf("mute", "speaker", "keypad", "hold").forEach { key ->
+            val img = icon(R.drawable.ic_mic, 54, oval(FILL), TEXT, key) { onDock(key) }
+            val (box, label) = cell(img, 11.5f)
+            dock[key] = img to label
+            dockRow.addView(box)
+        }
+
+        // Transfer · End · More
+        val bottom = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) }
+        }
+        val t = cell(icon(R.drawable.ic_transfer, 46, oval(FILL), TEXT, "Transfer") { openApp("transfer") }, 11.5f)
+        transfer = t.second
+        val hang = icon(R.drawable.ic_call_end, 0, pill(END, 29f), Color.WHITE, "Hang up") { NativeBridge.action("hangup") }.apply {
+            layoutParams = lp(dp(88), dp(60))
+        }
+        val m = cell(icon(R.drawable.ic_more, 46, oval(FILL), TEXT, "More") { openSheet("more") }, 11.5f)
+        more = m.second
+        bottom.addView(t.first)
+        bottom.addView(hang)
+        bottom.addView(m.first)
 
         call.addView(header)
-        call.addView(secondBanner)
-        call.addView(spacer(0.5f))
-        call.addView(callerBlock)
-        call.addView(details)
+        call.addView(secondPill)
         call.addView(spacer())
-        call.addView(grid)
-        call.addView(hangup)
+        call.addView(avatar)
+        call.addView(name)
+        call.addView(timer)
+        call.addView(status)
+        call.addView(qualityPill)
+        call.addView(tags)
+        call.addView(spacer())
+        call.addView(dockRow)
+        call.addView(bottom)
+        root.addView(call, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
 
-        // ── Keypad ──
+    private fun buildKeypad() {
         keypad = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(32), dp(24), dp(32), dp(24))
         }
-        keypadDigits = text(34f).apply {
-            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64))
-        }
+        keypadDigits = text(34f).apply { layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)) }
         val keys = GridLayout(this).apply { columnCount = 3 }
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#").forEach { d ->
-            val k = text(28f).apply {
+            keys.addView(text(28f, 500).apply {
                 this.text = d
+                background = oval(FILL)
                 layoutParams = GridLayout.LayoutParams().apply {
                     width = dp(74); height = dp(74)
                     setMargins(dp(10), dp(7), dp(10), dp(7))
@@ -626,140 +757,124 @@ class CallActivity : Activity() {
                     keypadDigits.text = dtmfTyped
                     NativeBridge.action("dtmf", mapOf("digit" to d))
                 }
-            }
-            keypadKeys.add(k)
-            keys.addView(k)
+            })
         }
-        val keypadBottom = LinearLayout(this).apply {
+        val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) }
         }
-        keypadHide = text(15f, bold = true).apply {
+        keypadHide = text(15f, 600, TEXT2).apply {
             layoutParams = lp(0, dp(56), 1f)
             setOnClickListener {
                 keypadOpen = false
                 render(snap)
             }
         }
-        val keypadHangup = ImageView(this).apply {
-            setImageResource(R.drawable.ic_call_end)
-            scaleType = ImageView.ScaleType.CENTER
-            layoutParams = lp(dp(74), dp(74))
-            contentDescription = "Hang up"
-            setOnClickListener { NativeBridge.action("hangup") }
-        }
-        keypadBottom.addView(keypadHide)
-        keypadBottom.addView(keypadHangup)
-        keypadBottom.addView(View(this).apply { layoutParams = lp(0, 1, 1f) })
+        bottom.addView(keypadHide)
+        bottom.addView(icon(R.drawable.ic_call_end, 74, oval(END), Color.WHITE, "Hang up") { NativeBridge.action("hangup") })
+        bottom.addView(View(this).apply { layoutParams = lp(0, 1, 1f) })
         keypad.addView(spacer())
         keypad.addView(keypadDigits)
         keypad.addView(keys)
-        keypad.addView(keypadBottom)
-
-        val full = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        root.addView(incoming, full)
-        root.addView(call, FrameLayout.LayoutParams(full))
-        root.addView(keypad, FrameLayout.LayoutParams(full))
-        applyPalette()
+        keypad.addView(bottom)
+        root.addView(keypad, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    private fun bigCallButton(icon: Int, onClick: () -> Unit): LinearLayout =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setOnClickListener { onClick() }
-            addView(ImageView(this@CallActivity).apply { setImageResource(icon) })
-            addView(text(17f, bold = true).apply { setPadding(dp(10), 0, 0, 0) })
+    private fun buildSheets() {
+        dim = View(this).apply {
+            setBackgroundColor(0x80000000.toInt())
+            setOnClickListener { openSheet(null) }
         }
+        root.addView(dim, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val bottom = { FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM) }
 
-    private fun detailCell(k: String, v: String): View = LinearLayout(this).apply {
+        // Call quality: the pill again, each direction's MOS, then every figure.
+        qualitySheet = sheetPanel()
+        val head = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
+        }
+        sheetTitle = text(19f, 800).apply {
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val sp = qualityPillView()
+        sheetPill = sp.first
+        sheetBars = sp.second
+        sheetWord = sp.third.first
+        sheetMos = sp.third.second
+        head.addView(sheetTitle)
+        head.addView(sheetPill)
+
+        val mosRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(6) }
+        }
+        fun mosBox(endMargin: Int): Pair<TextView, TextView> {
+            val label = text(11.5f, color = TEXT2).apply { gravity = Gravity.START }
+            val value = text(24f, 800).apply { gravity = Gravity.START; fontFeatureSettings = "tnum" }
+            mosRow.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(9), dp(12), dp(9))
+                background = pill(0x0FFFFFFF, 16f)
+                layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = endMargin }
+                addView(label)
+                addView(value)
+            })
+            return label to value
+        }
+        mosBox(dp(8)).let { mosYouLabel = it.first; mosYou = it.second }
+        mosBox(0).let { mosThemLabel = it.first; mosThem = it.second }
+        sheetRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        qualitySheet.addView(head)
+        qualitySheet.addView(mosRow)
+        qualitySheet.addView(sheetRows)
+        root.addView(qualitySheet, bottom())
+
+        // More: what doesn't fit in the dock.
+        moreSheet = sheetPanel()
+        fun row(res: Int, onClick: () -> Unit) = text(16f, 600).apply {
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(0, dp(14), 0, dp(14))
+            setCompoundDrawablesRelativeWithIntrinsicBounds(res, 0, 0, 0)
+            compoundDrawableTintList = ColorStateList.valueOf(TEXT)
+            compoundDrawablePadding = dp(16)
+            setOnClickListener { onClick() }
+            moreSheet.addView(this)
+        }
+        moreAdd = row(R.drawable.ic_add) { openApp("add") }
+        moreRecord = row(R.drawable.ic_record) {
+            NativeBridge.action("record")
+            openSheet(null)
+        }
+        moreMessage = row(R.drawable.ic_message) { openApp("message") }
+        root.addView(moreSheet, bottom())
+    }
+
+    private fun detailRow(k: String, v: String): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
-        setPadding(0, dp(5), 0, 0)
-        layoutParams = GridLayout.LayoutParams(
-            GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f),
-        ).apply { width = 0; marginEnd = dp(12) }
-        addView(text(11f, mono = true).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(0, dp(8), 0, dp(8))
+        addView(text(13f, color = TEXT2).apply {
             this.text = k
-            setTextColor(p.text2)
             gravity = Gravity.START
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         })
-        addView(text(11f, mono = true).apply {
+        addView(text(12f, mono = true).apply {
             this.text = v
-            setTextColor(p.text)
             gravity = Gravity.END
         })
     }
 
-    private fun setControl(key: String, icon: Int, label: String, on: Boolean, danger: Boolean = false) {
-        val (img, t) = controls[key] ?: return
-        img.setImageResource(icon)
+    private fun setDock(key: String, res: Int, label: String, on: Boolean) {
+        val (img, t) = dock[key] ?: return
+        img.setImageResource(res)
         img.contentDescription = label
+        img.background = oval(if (on) TEXT else FILL)
+        img.imageTintList = ColorStateList.valueOf(if (on) INK else TEXT)
         t.text = label
-        t.setTextColor(p.text)
-        if (on) {
-            val bg = if (danger) p.danger else p.text
-            img.background = oval(bg)
-            img.imageTintList = ColorStateList.valueOf(if (danger) Color.WHITE else p.bg)
-        } else {
-            img.background = oval(p.surface, p.border)
-            img.imageTintList = ColorStateList.valueOf(p.text)
-        }
-    }
-
-    private fun applyPalette() {
-        root.setBackgroundColor(p.bg)
-        window.statusBarColor = p.bg
-        window.navigationBarColor = p.bg
-        if (Build.VERSION.SDK_INT >= 23) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = if (paletteDark == true) 0 else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        }
-
-        inAccount.setTextColor(p.text2)
-        inAccount.background = pill(p.surface, 16f, p.border)
-        inAvatar.setTextColor(p.accent)
-        inAvatar.background = oval(p.accentSoft)
-        inName.setTextColor(p.text)
-        inNumber.setTextColor(p.text2)
-        listOf(inBusy, inMessage).forEach {
-            it.setTextColor(p.text)
-            it.background = pill(p.surface, 18f, p.border)
-        }
-        inDecline.background = pill(p.danger, 24f)
-        (inDecline.getChildAt(0) as ImageView).imageTintList = ColorStateList.valueOf(Color.WHITE)
-        (inDecline.getChildAt(1) as TextView).setTextColor(Color.WHITE)
-        inAnswer.background = pill(p.success, 24f)
-        (inAnswer.getChildAt(0) as ImageView).imageTintList = ColorStateList.valueOf(p.onSuccess)
-        (inAnswer.getChildAt(1) as TextView).setTextColor(p.onSuccess)
-
-        minimize.imageTintList = ColorStateList.valueOf(p.text2)
-        account.setTextColor(p.text2)
-        secondBanner.background = pill(p.surface, 14f, p.border)
-        secondText.setTextColor(p.text)
-        secondSwap.setTextColor(p.accent)
-        secondSwap.background = pill(p.accentSoft, 16f)
-        avatar.setTextColor(p.accent)
-        avatar.background = oval(p.accentSoft)
-        name.setTextColor(p.text)
-        status.setTextColor(p.text2)
-        timer.setTextColor(p.text)
-        details.background = pill(p.surface, 16f, p.border)
-        detailsTitle.setTextColor(p.text)
-        hangup.background = oval(p.danger)
-        hangup.imageTintList = ColorStateList.valueOf(Color.WHITE)
-
-        keypadDigits.setTextColor(p.text)
-        keypadKeys.forEach {
-            it.setTextColor(p.text)
-            it.background = oval(p.surface, p.border)
-        }
-        keypadHide.setTextColor(p.accent)
-        (keypad.getChildAt(3) as LinearLayout).getChildAt(1).apply {
-            background = oval(p.danger)
-            (this as ImageView).imageTintList = ColorStateList.valueOf(Color.WHITE)
-        }
     }
 
     private fun initials(s: String): String {

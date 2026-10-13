@@ -371,5 +371,18 @@
   "nNumbers": {
     "one": "1 number",
     "other": "{} numbers"
-  }
+  },
+  "more": "More",
+  "callQuality": "Call quality",
+  "youHear": "You hear",
+  "theyHear": "They hear",
+  "encrypted": "Encrypted",
+  "recShort": "Rec",
+  "qJitter": "Jitter",
+  "qLoss": "Packet loss",
+  "qRtt": "Round trip",
+  "qCodec": "Codec",
+  "qSrtp": "Encryption",
+  "qIce": "Network path",
+  "qJbuf": "Jitter buffer"
 }

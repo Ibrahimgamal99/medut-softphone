@@ -25,7 +25,7 @@ object CallNotifications {
     const val ID_SERVICE = 1002
     const val ID_MISSED = 1003
 
-    private const val GREEN = 0xFF1A7F37.toInt()
+    private const val GREEN = 0xFF08805A.toInt() // the app's green, white text stays readable
 
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
