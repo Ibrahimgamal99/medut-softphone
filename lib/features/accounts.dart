@@ -12,8 +12,9 @@ import 'account_edit.dart';
 import 'settings_screen.dart';
 import 'sign_in.dart';
 
-/// Design E · Accounts: every PBX account with its live registration state
-/// in plain words plus the SIP detail, and which account places a call.
+/// Accounts (from the avatar on the keypad): every PBX account with its live
+/// registration state in plain words plus the SIP detail, and which account
+/// places a call.
 class AccountsScreen extends ConsumerWidget {
   const AccountsScreen({super.key});
 
@@ -27,31 +28,35 @@ class AccountsScreen extends ConsumerWidget {
     void openEdit([SipAccountConfig? a]) => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => a == null ? const SignInScreen(another: true) : AccountEditScreen(existing: a)));
 
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
-      Row(children: [
-        Text('tabAccounts'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
-        const Spacer(),
-        RoundIcon(
-          icon: Icons.settings_outlined,
-          tooltip: 'settings'.tr(),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
-        ),
-        const SizedBox(width: 8),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(backgroundColor: t.accent, foregroundColor: t.onAccent, shape: const StadiumBorder(), minimumSize: const Size(0, 44)),
-          onPressed: openEdit,
-          icon: const Icon(Icons.add, size: 18),
-          label: Text('add'.tr()),
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('tabAccounts'.tr(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+        actions: [
+          IconButton(
+            tooltip: 'settings'.tr(),
+            icon: Icon(Icons.settings_outlined, color: t.text2),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 12),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: openEdit,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text('add'.tr()),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
+        const ReachabilityBanner(),
+        for (final a in accounts) ...[
+          _AccountCard(cfg: a, rt: sip.runtimes[a.id], onEdit: () => openEdit(a)),
+          const SizedBox(height: 10),
+        ],
+        if (accounts.length > 1) const _DialRulesCard(),
       ]),
-      const SizedBox(height: 12),
-      const ReachabilityBanner(),
-      for (final a in accounts) ...[
-        _AccountCard(cfg: a, rt: sip.runtimes[a.id], onEdit: () => openEdit(a)),
-        const SizedBox(height: 10),
-      ],
-      if (accounts.length > 1) const _DialRulesCard(),
-    ]);
+    );
   }
 }
 

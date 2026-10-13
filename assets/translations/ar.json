@@ -47,8 +47,8 @@
   "twoCallsMax": "يمكنك إجراء مكالمتين في وقت واحد فقط",
   "callFailed": "تعذّر إجراء المكالمة",
   "tabKeypad": "الاتصال",
-  "tabActivity": "النشاط",
-  "tabTeam": "الفريق",
+  "tabCalls": "المكالمات",
+  "tabPeople": "الأشخاص",
   "tabAccounts": "الحسابات",
   "dialHint": "رقم داخلي أو رقم هاتف أو عنوان SIP",
   "voicemail": "البريد الصوتي",
@@ -349,5 +349,8 @@
   "nameOnCalls": "اسمك في المكالمات",
   "allTechnical": "كل الإعدادات التقنية",
   "allTechnicalSub": "المنافذ، الترميزات، NAT، DTMF، الترويسات",
-  "otherLanguage": "English"
+  "otherLanguage": "English",
+  "callFrom": "الاتصال من",
+  "manageAccounts": "إدارة الحسابات",
+  "manageAccountsSub": "إضافة الحسابات أو تعديلها أو تشغيلها وإيقافها"
 }

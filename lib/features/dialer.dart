@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,10 +9,11 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../core/db.dart';
 import '../core/providers.dart';
-import '../core/settings.dart';
 import '../core/theme.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
+import 'keypad_sheets.dart';
+import 'settings_screen.dart';
 import 'sign_in.dart';
 
 /// Ask for the microphone before the first call; returns false if refused.
@@ -26,10 +28,11 @@ Future<void> placeCall(BuildContext context, WidgetRef ref, String number, {Stri
   ref.read(sipProvider).dial(number, accountId: accountId, name: name);
 }
 
+/// Pocket · Keypad: you, the account that places the call and voicemail on
+/// top; the number with live matches; big round keys.
 class DialerScreen extends ConsumerStatefulWidget {
-  const DialerScreen({super.key, required this.addCallMode, required this.onOpenAccounts});
+  const DialerScreen({super.key, required this.addCallMode});
   final ValueNotifier<bool> addCallMode;
-  final VoidCallback onOpenAccounts;
 
   @override
   ConsumerState<DialerScreen> createState() => _DialerScreenState();
@@ -39,22 +42,24 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
   String _number = '';
   String? _accountId;
   List<CallRecord> _recent = const [];
+  // Kept from initState: ref can't be used in dispose.
+  late final LocalDb _db = ref.read(dbProvider);
 
   @override
   void initState() {
     super.initState();
     _loadRecent();
-    ref.read(dbProvider).addListener(_loadRecent);
+    _db.addListener(_loadRecent);
   }
 
   @override
   void dispose() {
-    ref.read(dbProvider).removeListener(_loadRecent);
+    _db.removeListener(_loadRecent);
     super.dispose();
   }
 
   Future<void> _loadRecent() async {
-    final r = await ref.read(dbProvider).calls(limit: 200);
+    final r = await _db.calls(limit: 200);
     if (mounted) setState(() => _recent = r);
   }
 
@@ -111,11 +116,6 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
     return out;
   }
 
-  static const _keys = [
-    ('1', ''), ('2', 'ABC'), ('3', 'DEF'), ('4', 'GHI'), ('5', 'JKL'), ('6', 'MNO'),
-    ('7', 'PQRS'), ('8', 'TUV'), ('9', 'WXYZ'), ('*', ''), ('0', '+'), ('#', ''),
-  ];
-
   void _press(String d) {
     HapticFeedback.selectionClick();
     setState(() => _number = (_number + d).length > 40 ? _number : _number + d);
@@ -141,106 +141,119 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
     if (sip.hasCall) setState(() => _number = '');
   }
 
+  Future<void> _pickAccount(String? selectedId) async {
+    if (selectedId == null) {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignInScreen(another: true)));
+      return;
+    }
+    final id = await showAccountSheet(context, selectedId: selectedId);
+    if (id != null && mounted) setState(() => _accountId = id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final sip = ref.watch(sipProvider);
     final store = ref.watch(accountsProvider);
     final settings = ref.watch(settingsProvider);
-    final enabled = store.accounts.where((a) => a.enabled).toList();
     final selected = (_accountId != null ? store.byId(_accountId!) : null) ?? store.defaultAccount;
     final rt = selected == null ? null : sip.runtimes[selected.id];
-    final status = settings.effectiveStatus();
+    final reg = rt?.status ?? RegStatus.off;
+    final me = selected == null ? '?' : (selected.displayName.isNotEmpty ? selected.displayName : selected.user);
     final match = _matchFor(_number);
     ref.watch(contactsProvider); // contacts join the matches once loaded
     final matches = _number.isEmpty ? const <_Match>[] : _matches(_number);
 
     return Column(children: [
-      // Header: your status, the account and its live state, voicemail.
+      // You (status, accounts, settings) · the account that places the call · voicemail.
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
         child: Row(children: [
-          Avatar(
-            selected?.displayName.isNotEmpty == true ? selected!.displayName : (selected?.user ?? '?'),
-            size: 44,
-            dot: switch (status) {
-              MyStatus.available => t.success,
-              MyStatus.silent => t.warn,
-              MyStatus.dnd => t.danger,
-            },
+          Semantics(
+            button: true,
+            label: 'yourStatus'.tr(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => showMeSheet(context),
+              child: Avatar(me, size: 40, dot: statusColor(t, settings.effectiveStatus())),
+            ),
           ),
-          const SizedBox(width: 10),
           Expanded(
-            child: selected == null
-                ? InkWell(
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignInScreen(another: true))),
-                    child: Text('noAccountsYet'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: t.accent)),
-                  )
-                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${selected.label} · ${selected.user}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text(regText(rt), style: mono(context, color: regColor(t, rt?.status ?? RegStatus.off))),
-                  ]),
+            child: Center(
+              child: _AccountPill(
+                label: selected?.label ?? 'noAccountsYet'.tr(),
+                dot: selected == null ? null : regColor(t, reg),
+                onTap: () => _pickAccount(selected?.id),
+              ),
+            ),
           ),
           if (rt != null)
             Stack(clipBehavior: Clip.none, children: [
               RoundIcon(
                 icon: Icons.voicemail,
+                size: 40,
                 tooltip: 'voicemail'.tr(),
                 onTap: () => placeCall(context, ref, selected!.voicemail, accountId: selected.id, name: 'voicemail'.tr()),
               ),
               if (rt.mwi.newVoice > 0)
                 PositionedDirectional(
-                  top: -2,
-                  end: -2,
+                  top: -3,
+                  end: -3,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(color: t.purple, borderRadius: BorderRadius.circular(9)),
-                    child: Text('${rt.mwi.newVoice}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                    constraints: const BoxConstraints(minWidth: 17),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(color: t.danger, borderRadius: BorderRadius.circular(9)),
+                    child: Text('${rt.mwi.newVoice}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                   ),
                 ),
-            ]),
+            ])
+          else
+            const SizedBox(width: 40),
         ]),
       ),
-      // Account switcher (C), only when there is more than one.
-      if (enabled.length > 1)
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              for (final a in enabled)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: Pill(
-                    label: a.label,
-                    selected: a.id == selected?.id,
-                    leading: Dot(regColor(t, sip.runtimes[a.id]?.status ?? RegStatus.off)),
-                    onTap: () => setState(() => _accountId = a.id),
-                  ),
-                ),
-            ],
+      // Said only when something is wrong: a registered account stays quiet.
+      if (selected != null && reg != RegStatus.registered)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => _pickAccount(selected.id),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Dot(regColor(t, reg)),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(regText(rt),
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: regColor(t, reg), fontWeight: FontWeight.w600)),
+              ),
+            ]),
           ),
         ),
+      // Android blocking calls from ringing (battery saver, full-screen alerts).
+      const Padding(padding: EdgeInsets.fromLTRB(16, 10, 16, 0), child: ReachabilityBanner()),
       ValueListenableBuilder<bool>(
         valueListenable: widget.addCallMode,
         builder: (_, adding, _) => !adding || !sip.hasCall
             ? const SizedBox.shrink()
             : Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                child: ECard(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Container(
+                  padding: const EdgeInsetsDirectional.fromSTEB(14, 4, 4, 4),
+                  decoration: BoxDecoration(color: t.warnSoft, borderRadius: BorderRadius.circular(18)),
                   child: Row(children: [
                     Icon(Icons.pause_circle_outline, color: t.warn),
                     const SizedBox(width: 10),
-                    Expanded(child: Text('${'addCallTitle'.tr()} · ${sip.focused?.title ?? ''} ${'onHold'.tr()}')),
+                    Expanded(
+                      child: Text('${'addCallTitle'.tr()} · ${sip.focused?.title ?? ''} ${'onHold'.tr()}',
+                          style: TextStyle(color: t.warn, fontWeight: FontWeight.w600)),
+                    ),
                     TextButton(onPressed: () => widget.addCallMode.value = false, child: Text('cancel'.tr())),
                   ]),
                 ),
               ),
       ),
-      // Matches above the number, then the number itself.
+      // Matches above the number, then the number and who it is.
       Expanded(
         child: GestureDetector(
           onLongPress: _paste,
@@ -265,81 +278,42 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                 fit: BoxFit.scaleDown,
                 child: Text(_number.isEmpty ? ' ' : _number,
                     textDirection: ui.TextDirection.ltr,
-                    style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                    style: const TextStyle(
+                        fontSize: 36, fontWeight: FontWeight.w600, letterSpacing: 0.5, fontFeatures: [FontFeature.tabularFigures()])),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             SizedBox(
-              height: 30,
+              height: 32,
               child: match != null
-                  ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      if (match.$2 != null) ...[Dot(match.$2!), const SizedBox(width: 8)],
-                      Text(match.$1, style: TextStyle(fontSize: 13, color: t.text2)),
-                    ])
+                  ? Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(color: t.accentSoft, borderRadius: BorderRadius.circular(16)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          if (match.$2 != null) ...[Dot(match.$2!), const SizedBox(width: 7)],
+                          Flexible(
+                            child: Text(match.$1,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.accent)),
+                          ),
+                        ]),
+                      ),
+                    )
                   : (_number.isEmpty
-                      ? Text('dialHint'.tr(), style: TextStyle(fontSize: 13, color: t.text2))
+                      ? Center(child: Text('dialHint'.tr(), style: TextStyle(fontSize: 13, color: t.text2)))
                       : const SizedBox.shrink()),
             ),
             const SizedBox(height: 10),
           ]),
         ),
       ),
-      // Keypad
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36),
-        child: GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.35,
-          children: [
-            for (final k in _keys)
-              Center(
-                child: _Key(
-                  digit: k.$1,
-                  letters: k.$2,
-                  onTap: () => _press(k.$1),
-                  onLongPress: k.$1 == '0' ? () => _press('+') : null,
-                ),
-              ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(36, 14, 36, 14),
-        child: Row(children: [
-          const Expanded(child: SizedBox()),
-          Semantics(
-            button: true,
-            label: 'call'.tr(),
-            child: Material(
-              color: t.success,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _call,
-                child: SizedBox(width: 74, height: 74, child: Icon(Icons.call, size: 30, color: t.onSuccess)),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: _number.isEmpty
-                  ? const SizedBox(width: 52)
-                  : IconButton(
-                      tooltip: 'delete'.tr(),
-                      iconSize: 26,
-                      color: t.text2,
-                      onPressed: () => setState(() => _number = _number.substring(0, _number.length - 1)),
-                      icon: GestureDetector(
-                        onLongPress: () => setState(() => _number = ''),
-                        child: const Icon(Icons.backspace_outlined),
-                      ),
-                    ),
-            ),
-          ),
-        ]),
+      _Keypad(
+        onKey: _press,
+        onCall: _call,
+        onBackspace: _number.isEmpty ? null : () => setState(() => _number = _number.substring(0, _number.length - 1)),
+        onClear: () => setState(() => _number = ''),
       ),
     ]);
   }
@@ -360,9 +334,117 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
   }
 }
 
+class _AccountPill extends StatelessWidget {
+  const _AccountPill({required this.label, required this.dot, required this.onTap});
+  final String label;
+  final Color? dot;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Material(
+      color: t.surface,
+      shape: StadiumBorder(side: BorderSide(color: t.border)),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 10, 0),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (dot != null) ...[Dot(dot!), const SizedBox(width: 8)],
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: dot == null ? t.accent : t.text)),
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.expand_more, size: 18, color: t.text2),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Round keys sized to the screen (smaller phones get smaller keys rather
+/// than a squeezed number area), then call and backspace.
+class _Keypad extends StatelessWidget {
+  const _Keypad({required this.onKey, required this.onCall, required this.onBackspace, required this.onClear});
+  final ValueChanged<String> onKey;
+  final VoidCallback onCall;
+  final VoidCallback? onBackspace, onClear;
+
+  static const _keys = [
+    ('1', ''), ('2', 'ABC'), ('3', 'DEF'), ('4', 'GHI'), ('5', 'JKL'), ('6', 'MNO'),
+    ('7', 'PQRS'), ('8', 'TUV'), ('9', 'WXYZ'), ('*', ''), ('0', '+'), ('#', ''),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return LayoutBuilder(builder: (context, box) {
+      final size = math.min((box.maxWidth - 48) / 3.76, MediaQuery.sizeOf(context).height * 0.092).clamp(54.0, 78.0);
+      final gap = size * 0.38;
+      Widget row(List<Widget> cells) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (var i = 0; i < cells.length; i++) ...[if (i > 0) SizedBox(width: gap), cells[i]],
+          ]);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(children: [
+          for (var r = 0; r < 4; r++) ...[
+            row([
+              for (final k in _keys.sublist(r * 3, r * 3 + 3))
+                _Key(
+                  digit: k.$1,
+                  letters: k.$2,
+                  size: size,
+                  onTap: () => onKey(k.$1),
+                  onLongPress: k.$1 == '0' ? () => onKey('+') : null,
+                ),
+            ]),
+            SizedBox(height: size * 0.17),
+          ],
+          row([
+            SizedBox(width: size),
+            Semantics(
+              button: true,
+              label: 'call'.tr(),
+              child: Material(
+                color: t.accent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onCall,
+                  child: SizedBox.square(dimension: size * 1.04, child: Icon(Icons.call, size: size * 0.4, color: t.onAccent)),
+                ),
+              ),
+            ),
+            SizedBox.square(
+              dimension: size,
+              child: onBackspace == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'delete'.tr(),
+                      iconSize: 26,
+                      color: t.text2,
+                      onPressed: onBackspace,
+                      icon: GestureDetector(onLongPress: onClear, child: const Icon(Icons.backspace_outlined)),
+                    ),
+            ),
+          ]),
+        ]),
+      );
+    });
+  }
+}
+
 class _Key extends StatelessWidget {
-  const _Key({required this.digit, required this.letters, required this.onTap, this.onLongPress});
+  const _Key({required this.digit, required this.letters, required this.size, required this.onTap, this.onLongPress});
   final String digit, letters;
+  final double size;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -373,20 +455,20 @@ class _Key extends StatelessWidget {
       button: true,
       label: digit,
       child: Material(
-        color: t.surface,
-        shape: CircleBorder(side: BorderSide(color: t.border)),
+        color: t.surface2,
+        shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
           onLongPress: onLongPress,
-          child: SizedBox(
-            width: 74,
-            height: 74,
+          child: SizedBox.square(
+            dimension: size,
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(digit, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w500, height: 1)),
+              Text(digit, style: TextStyle(fontSize: size * 0.39, fontWeight: FontWeight.w500, height: 1)),
               SizedBox(
-                height: 13,
-                child: Text(letters, style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: t.text2)),
+                height: size * 0.17,
+                child: Text(letters,
+                    style: TextStyle(fontSize: size * 0.125, fontWeight: FontWeight.w700, letterSpacing: 1.8, color: t.text2)),
               ),
             ]),
           ),
@@ -425,8 +507,8 @@ class _MatchList extends ConsumerWidget {
         final m = matches[i];
         final label = m.name.isNotEmpty ? m.name : m.number;
         final (tint, icon) = switch (m.source) {
-          _Source.team => (t.accent, Icons.badge_outlined),
-          _Source.contact => (t.success, null),
+          _Source.team => (t.accent, null),
+          _Source.contact => (t.purple, null),
           _Source.recent => (t.text2, Icons.history),
         };
         return InkWell(
@@ -437,13 +519,13 @@ class _MatchList extends ConsumerWidget {
             child: Row(children: [
               Stack(clipBehavior: Clip.none, children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: tint.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: tint.withValues(alpha: 0.14), shape: BoxShape.circle),
                   child: icon != null
                       ? Icon(icon, size: 18, color: tint)
-                      : Text(label.characters.first.toUpperCase(), style: TextStyle(color: tint, fontWeight: FontWeight.w700)),
+                      : Text(initials(label), style: TextStyle(color: tint, fontWeight: FontWeight.w700, fontSize: 13)),
                 ),
                 if (m.source == _Source.team)
                   PositionedDirectional(
@@ -463,13 +545,13 @@ class _MatchList extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                   if (m.name.isNotEmpty) _highlight(context, m.number),
                 ]),
               ),
               IconButton(
                 tooltip: 'call'.tr(),
-                icon: Icon(Icons.call, size: 20, color: t.success),
+                icon: Icon(Icons.call, size: 20, color: t.accent),
                 onPressed: () => onCall(m),
               ),
             ]),

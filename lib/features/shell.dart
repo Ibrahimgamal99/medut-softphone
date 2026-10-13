@@ -9,15 +9,15 @@ import '../core/providers.dart';
 import '../core/theme.dart';
 import '../sip/native_bridge.dart';
 import '../sip/sip_service.dart';
-import 'accounts.dart';
 import 'activity.dart';
 import 'chat.dart';
 import 'dialer.dart';
 import 'team.dart';
 import 'transfer_sheet.dart';
 
-/// Bottom tabs (Keypad · Activity · Team · Accounts) and the bar that returns
-/// to a call running on the native screen.
+/// Bottom tabs (Calls · Keypad · People) and the bar that returns to a call
+/// running on the native screen. Accounts and settings open from the avatar
+/// on the keypad.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -26,7 +26,7 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _tab = 0;
+  int _tab = 1; // Keypad
   final _addCallMode = ValueNotifier<bool>(false);
   final _subs = <StreamSubscription<dynamic>>[];
 
@@ -60,7 +60,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case 'transfer':
         if (call != null) showTransferSheet(context);
       case 'add':
-        setState(() => _tab = 0);
+        setState(() => _tab = 1);
         _addCallMode.value = true;
       case 'message':
       case 'reply':
@@ -73,7 +73,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         final name = sip.nameFor(peer);
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(peer: peer, title: name.isNotEmpty ? name : peer)));
       case 'activity':
-        setState(() => _tab = 1);
+        setState(() => _tab = 0);
         ref.read(settingsProvider).activitySeenAt = DateTime.now();
         sip.missedSeen();
     }
@@ -90,10 +90,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           if (sip.hasCall) _ReturnToCallBar(sip: sip),
           Expanded(
             child: IndexedStack(index: _tab, children: [
-              DialerScreen(addCallMode: _addCallMode, onOpenAccounts: () => setState(() => _tab = 3)),
               const ActivityScreen(),
+              DialerScreen(addCallMode: _addCallMode),
               const TeamScreen(),
-              const AccountsScreen(),
             ]),
           ),
         ]),
@@ -102,7 +101,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         index: _tab,
         onTap: (i) {
           setState(() => _tab = i);
-          if (i == 1) {
+          if (i == 0) {
             ref.read(settingsProvider).activitySeenAt = DateTime.now();
             ref.read(sipProvider).missedSeen();
           }
@@ -173,13 +172,12 @@ class _BottomNav extends ConsumerWidget {
     final db = ref.watch(dbProvider);
     final seen = ref.watch(settingsProvider).activitySeenAt;
     final items = [
+      (Icons.schedule, 'tabCalls'.tr()),
       (Icons.dialpad, 'tabKeypad'.tr()),
-      (Icons.schedule, 'tabActivity'.tr()),
-      (Icons.groups_outlined, 'tabTeam'.tr()),
-      (Icons.dns_outlined, 'tabAccounts'.tr()),
+      (Icons.people_outline, 'tabPeople'.tr()),
     ];
     return Container(
-      decoration: BoxDecoration(color: t.nav, border: Border(top: BorderSide(color: t.border))),
+      color: t.nav,
       child: SafeArea(
         top: false,
         child: Padding(
@@ -206,7 +204,7 @@ class _BottomNav extends ConsumerWidget {
                             ),
                             child: Icon(items[i].$1, size: 21, color: i == index ? t.accent : t.text2),
                           ),
-                          if (i == 1)
+                          if (i == 0)
                             FutureBuilder<int>(
                               future: _badge(db, seen),
                               builder: (_, s) => (s.data ?? 0) == 0

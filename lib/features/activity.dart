@@ -43,7 +43,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Text('tabActivity'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+        child: Text('tabCalls'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
       ),
       SizedBox(
         height: 38,

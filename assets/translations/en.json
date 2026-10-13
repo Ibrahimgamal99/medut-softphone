@@ -47,8 +47,8 @@
   "twoCallsMax": "You can have two calls at once",
   "callFailed": "Couldn't place the call",
   "tabKeypad": "Keypad",
-  "tabActivity": "Activity",
-  "tabTeam": "Team",
+  "tabCalls": "Calls",
+  "tabPeople": "People",
   "tabAccounts": "Accounts",
   "dialHint": "Extension, number or SIP address",
   "voicemail": "Voicemail",
@@ -349,5 +349,8 @@
   "nameOnCalls": "Your name on calls",
   "allTechnical": "All technical settings",
   "allTechnicalSub": "ports, codecs, NAT, DTMF, headers",
-  "otherLanguage": "العربية"
+  "otherLanguage": "العربية",
+  "callFrom": "Call from",
+  "manageAccounts": "Manage accounts",
+  "manageAccountsSub": "Add, edit, or turn accounts on and off"
 }

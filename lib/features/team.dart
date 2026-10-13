@@ -37,7 +37,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Text('tabTeam'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+        child: Text('tabPeople'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
       ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -66,7 +66,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                 Expanded(
                   child: Padding(
                     padding: EdgeInsetsDirectional.only(end: s == MyStatus.dnd ? 0 : 6),
-                    child: _StatusButton(status: s, selected: status == s, onTap: () => settings.status = s),
+                    child: StatusButton(status: s, selected: status == s, onTap: () => settings.status = s),
                   ),
                 ),
             ]),
@@ -123,8 +123,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
   }
 }
 
-class _StatusButton extends StatelessWidget {
-  const _StatusButton({required this.status, required this.selected, required this.onTap});
+/// One of Available / Silent / Do not disturb, with its colour dot.
+class StatusButton extends StatelessWidget {
+  const StatusButton({super.key, required this.status, required this.selected, required this.onTap});
   final MyStatus status;
   final bool selected;
   final VoidCallback onTap;
