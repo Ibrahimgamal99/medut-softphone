@@ -352,5 +352,11 @@
   "otherLanguage": "العربية",
   "callFrom": "Call from",
   "manageAccounts": "Manage accounts",
-  "manageAccountsSub": "Add, edit, or turn accounts on and off"
+  "manageAccountsSub": "Add, edit, or turn accounts on and off",
+  "searchCalls": "Name, number or message",
+  "noMatches": "Nothing matches",
+  "missedCount": {
+    "one": "Missed · 1 call",
+    "other": "Missed · {} calls"
+  }
 }

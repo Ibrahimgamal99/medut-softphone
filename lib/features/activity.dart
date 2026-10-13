@@ -18,8 +18,8 @@ import 'dialer.dart';
 
 enum _Filter { all, missed, recorded, messages }
 
-/// Design E · Activity: voicemail count on top, then calls, recordings and
-/// messages in one list.
+/// Pocket · Calls: voicemail on top, then calls (missed ones from the same
+/// number folded together), recordings and messages, with search.
 class ActivityScreen extends ConsumerStatefulWidget {
   const ActivityScreen({super.key});
 
@@ -29,6 +29,19 @@ class ActivityScreen extends ConsumerStatefulWidget {
 
 class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   _Filter _filter = _Filter.all;
+  bool _searching = false;
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _closeSearch() => setState(() {
+        _searching = false;
+        _search.clear();
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -39,67 +52,85 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final newVm = mwi.fold<int>(0, (a, r) => a + r.mwi.newVoice);
     final oldVm = mwi.fold<int>(0, (a, r) => a + r.mwi.oldVoice);
     final urgent = mwi.fold<int>(0, (a, r) => a + r.mwi.newUrgent);
+    final query = _search.text.trim();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Text('tabCalls'.tr(), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 10, 12, 10),
+        child: SizedBox(
+          height: 48,
+          child: _searching
+              ? Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _search,
+                      autofocus: true,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: 'searchCalls'.tr(),
+                      ),
+                    ),
+                  ),
+                  IconButton(tooltip: 'close'.tr(), icon: const Icon(Icons.close), onPressed: _closeSearch),
+                ])
+              : Row(children: [
+                  Expanded(
+                    child: Text('tabCalls'.tr(),
+                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
+                  ),
+                  RoundIcon(icon: Icons.search, size: 40, tooltip: 'search'.tr(), onTap: () => setState(() => _searching = true)),
+                ]),
+        ),
       ),
-      SizedBox(
-        height: 38,
-        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
-          for (final f in _Filter.values)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 8),
-              child: Pill(
-                label: switch (f) {
-                  _Filter.all => 'filterAll'.tr(),
-                  _Filter.missed => 'filterMissed'.tr(),
-                  _Filter.recorded => 'filterRecorded'.tr(),
-                  _Filter.messages => 'filterMessages'.tr(),
-                },
-                selected: _filter == f,
-                onTap: () => setState(() => _filter = f),
-              ),
-            ),
-        ]),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _FilterTrack(value: _filter, onChanged: (f) => setState(() => _filter = f)),
       ),
-      const SizedBox(height: 10),
-      if (newVm > 0 || oldVm > 0)
+      const SizedBox(height: 12),
+      if ((newVm > 0 || oldVm > 0) && query.isEmpty)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: ECard(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: t.purpleSoft, borderRadius: BorderRadius.circular(12)),
-                child: Icon(Icons.voicemail, color: t.purple),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('newVoicemails'.tr(namedArgs: {'n': '$newVm'}), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                  Text('voicemailSub'.tr(namedArgs: {'u': '$urgent', 'o': '$oldVm'}), style: TextStyle(fontSize: 12, color: t.text2)),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: Material(
+            color: t.accentSoft,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                final rt = mwi.first;
+                placeCall(context, ref, rt.cfg.voicemail, accountId: rt.cfg.id, name: 'voicemail'.tr());
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+                    child: Icon(Icons.play_arrow_rounded, color: t.onAccent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('newVoicemails'.tr(namedArgs: {'n': '$newVm'}),
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      Text('voicemailSub'.tr(namedArgs: {'u': '$urgent', 'o': '$oldVm'}),
+                          style: TextStyle(fontSize: 12.5, color: t.text2)),
+                    ]),
+                  ),
+                  Text('listen'.tr(), style: TextStyle(color: t.accent, fontWeight: FontWeight.w700)),
                 ]),
               ),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: t.purple, foregroundColor: Colors.white, shape: const StadiumBorder()),
-                onPressed: () {
-                  final rt = mwi.first;
-                  placeCall(context, ref, rt.cfg.voicemail, accountId: rt.cfg.id, name: 'voicemail'.tr());
-                },
-                child: Text('listen'.tr()),
-              ),
-            ]),
+            ),
           ),
         ),
       Expanded(
         child: _filter == _Filter.messages
             ? FutureBuilder<List<ChatMessage>>(
                 future: db.conversations(),
-                builder: (_, s) => _ConversationList(items: s.data ?? const []),
+                builder: (_, s) => _ConversationList(items: s.data ?? const [], query: query),
               )
             : FutureBuilder<List<CallRecord>>(
                 future: db.calls(),
@@ -107,11 +138,91 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   var items = s.data ?? const <CallRecord>[];
                   if (_filter == _Filter.missed) items = items.where((c) => c.result == CallResult.missed).toList();
                   if (_filter == _Filter.recorded) items = items.where((c) => c.recordingPath.isNotEmpty).toList();
-                  return _CallList(items: items);
+                  if (query.isNotEmpty) items = items.where((c) => _matches(query, [c.name, c.number])).toList();
+                  return _CallList(items: items, searching: query.isNotEmpty);
                 },
               ),
       ),
     ]);
+  }
+}
+
+/// Text in any of [fields]; a number typed with spaces, dashes or brackets
+/// matches on its digits.
+bool _matches(String query, List<String> fields) {
+  final q = query.toLowerCase();
+  final digits = RegExp(r'^[\d\s\-+().]+$').hasMatch(q) ? q.replaceAll(RegExp(r'\D'), '') : '';
+  return fields.any((f) => f.toLowerCase().contains(q) || (digits.isNotEmpty && f.replaceAll(RegExp(r'\D'), '').contains(digits)));
+}
+
+/// All · Missed · Recorded · Messages on one pill track.
+class _FilterTrack extends StatelessWidget {
+  const _FilterTrack({required this.value, required this.onChanged});
+  final _Filter value;
+  final ValueChanged<_Filter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: t.surface2, borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final f in _Filter.values)
+          Semantics(
+            selected: f == value,
+            button: true,
+            child: GestureDetector(
+              onTap: () => onChanged(f),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
+                decoration: BoxDecoration(
+                  color: f == value ? t.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(17),
+                  boxShadow: f == value ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 3, offset: const Offset(0, 1))] : null,
+                ),
+                child: Text(
+                  switch (f) {
+                    _Filter.all => 'filterAll'.tr(),
+                    _Filter.missed => 'filterMissed'.tr(),
+                    _Filter.recorded => 'filterRecorded'.tr(),
+                    _Filter.messages => 'filterMessages'.tr(),
+                  },
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: f == value ? t.text : t.text2),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Centered icon and a line, for an empty list.
+class _Empty extends StatelessWidget {
+  const _Empty({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: t.surface2, shape: BoxShape.circle),
+            child: Icon(icon, color: t.text2, size: 28),
+          ),
+          const SizedBox(height: 12),
+          Text(text, textAlign: TextAlign.center, style: TextStyle(color: t.text2)),
+        ]),
+      ),
+    );
   }
 }
 
@@ -128,119 +239,135 @@ String _duration(int sec) => sec >= 3600
     ? '${sec ~/ 3600}:${(sec ~/ 60 % 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}'
     : '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')}';
 
+/// Consecutive missed calls from one number on one day become one row with
+/// a count; anything with a recording or quality figures stays its own row.
+List<(CallRecord, int)> groupMissed(List<CallRecord> items) {
+  final out = <(CallRecord, int)>[];
+  for (final c in items) {
+    if (out.isNotEmpty) {
+      final (last, n) = out.last;
+      final sameDay = DateUtils.isSameDay(last.startedAt, c.startedAt);
+      if (sameDay && last.number == c.number && last.result == CallResult.missed && c.result == CallResult.missed) {
+        out[out.length - 1] = (last, n + 1);
+        continue;
+      }
+    }
+    out.add((c, 1));
+  }
+  return out;
+}
+
 class _CallList extends ConsumerWidget {
-  const _CallList({required this.items});
+  const _CallList({required this.items, required this.searching});
   final List<CallRecord> items;
+  final bool searching;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = context.t;
     if (items.isEmpty) {
-      return Center(child: Text('noActivity'.tr(), style: TextStyle(color: t.text2)));
+      return _Empty(icon: searching ? Icons.search_off : Icons.schedule, text: (searching ? 'noMatches' : 'noActivity').tr());
     }
+    final manyAccounts = ref.watch(accountsProvider).accounts.length > 1;
     final rows = <Widget>[];
     String? lastDay;
-    for (final c in items) {
+    for (final (c, count) in groupMissed(items)) {
       final day = _dayLabel(c.startedAt);
       if (day != lastDay) {
-        rows.add(SectionLabel(day));
+        rows.add(Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 20, 4),
+          child: Text(day, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: context.t.text2)),
+        ));
         lastDay = day;
       }
-      rows.add(_CallRow(c));
+      rows.add(_CallRow(c, count: count, showAccount: manyAccounts));
     }
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: rows);
+    return ListView(padding: const EdgeInsets.only(bottom: 16), children: rows);
   }
 }
 
 class _CallRow extends ConsumerWidget {
-  const _CallRow(this.c);
+  const _CallRow(this.c, {required this.count, required this.showAccount});
   final CallRecord c;
+  final int count;
+  final bool showAccount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final missed = c.result == CallResult.missed;
-    final (icon, fg, bg) = c.recordingPath.isNotEmpty
-        ? (Icons.fiber_manual_record, t.warn, t.warnSoft)
-        : switch (c.result) {
-            CallResult.missed => (Icons.call_missed, t.missed, t.dangerSoft),
-            CallResult.failed => (Icons.error_outline, t.danger, t.dangerSoft),
-            _ => c.direction == CallDirection.incoming
-                ? (Icons.call_received, t.success, t.successSoft)
-                : (Icons.call_made, t.text2, t.surface2),
-          };
-    final meta = <String>[
-      switch (c.result) {
-        CallResult.missed => 'missed'.tr(),
-        CallResult.declined => 'declined'.tr(),
-        CallResult.failed => 'failed'.tr(),
-        _ => c.durationSec > 0 ? _duration(c.durationSec) : (c.direction == CallDirection.incoming ? 'incoming'.tr() : 'outgoing'.tr()),
-      },
-      '${'via'.tr()} ${c.accountName}',
-    ].join(' · ');
-    final recLabel = c.recordingPath.isEmpty
-        ? ''
-        : '${'recorded'.tr()}${c.recordingSec != null ? ' ${_duration(c.recordingSec!)}' : ''}';
+    final recorded = c.recordingPath.isNotEmpty;
     final level = callQualityLevel(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct);
     final poor = c.hasQos && level <= 2;
-    final tech = !c.hasQos
-        ? ''
-        : '${c.mos != null ? 'MOS ${c.mos!.toStringAsFixed(1)} · ' : ''}${c.codec} · ${c.transport}${poor ? ' · ${'poorLine'.tr()}' : ''}';
+    final icon = switch (c.result) {
+      CallResult.missed => Icons.call_missed,
+      CallResult.failed => Icons.error_outline,
+      _ => c.direction == CallDirection.incoming ? Icons.call_received : Icons.call_made,
+    };
+    final what = switch (c.result) {
+      CallResult.missed => count > 1 ? 'missedCount'.plural(count) : 'missed'.tr(),
+      CallResult.declined => 'declined'.tr(),
+      CallResult.failed => 'failed'.tr(),
+      _ => c.durationSec > 0 ? _duration(c.durationSec) : (c.direction == CallDirection.incoming ? 'incoming'.tr() : 'outgoing'.tr()),
+    };
+    final sub = TextStyle(fontSize: 12.5, color: missed ? t.missed : t.text2);
+    final warn = TextStyle(fontSize: 12.5, color: t.warn, fontWeight: FontWeight.w600);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: ECard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        onTap: () => _showDetail(context, ref, c),
+    return InkWell(
+      onTap: () => _showDetail(context, ref, c),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 8, 8, 8),
         child: Row(children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, size: 18, color: fg),
-          ),
+          Avatar(c.title, size: 44, colors: missed ? (t.dangerSoft, t.missed) : null),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(c.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: missed ? t.missed : t.text)),
-              Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: t.text2)),
-              if (recLabel.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.mic, size: 13, color: t.warn),
-                    const SizedBox(width: 3),
-                    Text(recLabel, style: TextStyle(fontSize: 12, color: t.warn, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              if (tech.isNotEmpty) Text(tech, style: mono(context, color: poor ? t.warn : t.text2)),
+                  style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: missed ? t.missed : t.text)),
+              const SizedBox(height: 1),
+              Text.rich(
+                TextSpan(style: sub, children: [
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 4),
+                      child: Icon(icon, size: 13, color: sub.color),
+                    ),
+                  ),
+                  TextSpan(text: what),
+                  if (recorded)
+                    TextSpan(
+                      text: ' · ${'recorded'.tr()}${c.recordingSec != null ? ' ${_duration(c.recordingSec!)}' : ''}',
+                      style: warn,
+                    ),
+                  if (poor) TextSpan(text: ' · ${'poorLine'.tr()}', style: warn),
+                  if (showAccount) TextSpan(text: ' · ${c.accountName}'),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ]),
           ),
-          if (c.recordingPath.isNotEmpty)
-            IconButton(
-              tooltip: 'play'.tr(),
-              icon: Icon(Icons.play_circle_fill, color: t.warn, size: 30),
-              onPressed: () => _showDetail(context, ref, c, play: true),
-            ),
+          const SizedBox(width: 8),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(DateFormat.Hm().format(c.startedAt), style: TextStyle(fontSize: 12, color: t.text2)),
+            Text(DateFormat.Hm().format(c.startedAt), style: TextStyle(fontSize: 12, color: t.grey)),
             if (c.hasQos) ...[
               const SizedBox(height: 6),
               QualityBars(mos: c.mos, rttMs: c.rttMs, jitterMs: c.jitterMs, lossPct: c.lossPct, barWidth: 3),
             ],
           ]),
-          const SizedBox(width: 6),
-          RoundIcon(
-            icon: Icons.call,
-            size: 38,
-            tooltip: 'call'.tr(),
-            bg: t.successSoft,
-            color: t.success,
-            onTap: () => placeCall(context, ref, c.number, accountId: c.accountId, name: c.name),
-          ),
+          recorded
+              ? IconButton(
+                  tooltip: 'play'.tr(),
+                  icon: Icon(Icons.play_circle_fill, color: t.warn, size: 30),
+                  onPressed: () => _showDetail(context, ref, c, play: true),
+                )
+              : IconButton(
+                  tooltip: 'call'.tr(),
+                  icon: Icon(Icons.call_outlined, color: t.accent, size: 22),
+                  onPressed: () => placeCall(context, ref, c.number, accountId: c.accountId, name: c.name),
+                ),
         ]),
       ),
     );
@@ -463,39 +590,60 @@ class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
 }
 
 class _ConversationList extends ConsumerWidget {
-  const _ConversationList({required this.items});
+  const _ConversationList({required this.items, required this.query});
   final List<ChatMessage> items;
+  final String query;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final contacts = ref.watch(contactsProvider);
+    final sip = ref.read(sipProvider);
+    String titleFor(String peer) {
+      final name = sip.nameFor(peer);
+      if (name.isNotEmpty) return name;
+      final contact = contacts.nameFor(peer);
+      return contact.isNotEmpty ? contact : peer;
+    }
+
+    final shown = query.isEmpty ? items : items.where((m) => _matches(query, [m.peer, titleFor(m.peer), m.body])).toList();
     return Stack(children: [
-      if (items.isEmpty)
-        Center(child: Text('noMessages'.tr(), style: TextStyle(color: t.text2)))
+      if (shown.isEmpty)
+        _Empty(icon: query.isEmpty ? Icons.chat_bubble_outline : Icons.search_off, text: (query.isEmpty ? 'noMessages' : 'noMatches').tr())
       else
-        ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-          itemCount: items.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
+        ListView.builder(
+          padding: const EdgeInsets.only(top: 4, bottom: 88),
+          itemCount: shown.length,
           itemBuilder: (_, i) {
-            final m = items[i];
-            final name = ref.read(sipProvider).nameFor(m.peer);
-            final title = name.isNotEmpty ? name : (contacts.nameFor(m.peer).isNotEmpty ? contacts.nameFor(m.peer) : m.peer);
-            return ECard(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            final m = shown[i];
+            final title = titleFor(m.peer);
+            final unread = !m.read && !m.outgoing;
+            return InkWell(
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(peer: m.peer, title: title))),
-              child: Row(children: [
-                Avatar(title, size: 40),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title, style: TextStyle(fontWeight: m.read || m.outgoing ? FontWeight.w600 : FontWeight.w800)),
-                    Text(m.body, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: t.text2)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(children: [
+                  Avatar(title, size: 44),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 15.5, fontWeight: unread ? FontWeight.w800 : FontWeight.w700)),
+                      Text(m.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: unread ? t.text : t.text2)),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(DateFormat.Hm().format(m.at), style: TextStyle(fontSize: 12, color: unread ? t.accent : t.grey)),
+                    if (unread) ...[const SizedBox(height: 6), Dot(t.accent)],
                   ]),
-                ),
-                Text(DateFormat.Hm().format(m.at), style: TextStyle(fontSize: 12, color: t.text2)),
-              ]),
+                ]),
+              ),
             );
           },
         ),
@@ -506,6 +654,7 @@ class _ConversationList extends ConsumerWidget {
           tooltip: 'newChat'.tr(),
           backgroundColor: t.accent,
           foregroundColor: t.onAccent,
+          shape: const StadiumBorder(),
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChatScreen(peer: '', title: ''))),
           child: const Icon(Icons.edit_outlined),
         ),

@@ -27,6 +27,7 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.purpleSoft,
     required this.grey,
     required this.nav,
+    required this.avatars,
     required this.dark,
   });
 
@@ -35,6 +36,9 @@ class Tokens extends ThemeExtension<Tokens> {
   final Color success, successSoft, onSuccess;
   final Color danger, dangerSoft, missed, warn, warnSoft, info;
   final Color purple, purpleSoft, grey, nav;
+
+  /// (background, initials) pairs; a person keeps the same one everywhere.
+  final List<(Color, Color)> avatars;
   final bool dark;
 
   /// Pocket: cool neutrals, one green that is both the brand and "call".
@@ -61,6 +65,12 @@ class Tokens extends ThemeExtension<Tokens> {
     purpleSoft: Color(0xFFE7E3FB),
     grey: Color(0xFF9097A1),
     nav: Color(0xFFF3F4F6),
+    avatars: [
+      (Color(0xFFDCF2E8), Color(0xFF0B6B4A)),
+      (Color(0xFFE7E3FB), Color(0xFF4B3BB0)),
+      (Color(0xFFFBE8D7), Color(0xFF9A4A12)),
+      (Color(0xFFDFEBF8), Color(0xFF1D5C99)),
+    ],
     dark: false,
   );
 
@@ -87,6 +97,12 @@ class Tokens extends ThemeExtension<Tokens> {
     purpleSoft: Color(0x29B7AEFF),
     grey: Color(0xFF6F7781),
     nav: Color(0xFF0C0E10),
+    avatars: [
+      (Color(0xFF163428), Color(0xFF7DE3B8)),
+      (Color(0xFF25214A), Color(0xFFB7AEFF)),
+      (Color(0xFF38261A), Color(0xFFF4B27A)),
+      (Color(0xFF162A3D), Color(0xFF8EC0F2)),
+    ],
     dark: true,
   );
 

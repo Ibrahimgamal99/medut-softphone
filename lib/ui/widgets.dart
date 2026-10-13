@@ -16,15 +16,19 @@ String initials(String s) {
   return (first.characters.first + (parts.length > 1 ? parts[1].characters.first : '')).toUpperCase();
 }
 
+/// Initials on a colour picked from the name, so a person looks the same in
+/// every list; [colors] overrides it (a missed call is red).
 class Avatar extends StatelessWidget {
-  const Avatar(this.title, {super.key, this.size = 40, this.dot});
+  const Avatar(this.title, {super.key, this.size = 40, this.dot, this.colors});
   final String title;
   final double size;
   final Color? dot;
+  final (Color, Color)? colors;
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final (bg, fg) = colors ?? t.avatars[title.codeUnits.fold<int>(0, (h, c) => (h * 31 + c) & 0x7fffffff) % t.avatars.length];
     return SizedBox(
       width: size,
       height: size,
@@ -33,9 +37,8 @@ class Avatar extends StatelessWidget {
           width: size,
           height: size,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
-          child: Text(initials(title),
-              style: TextStyle(color: t.accent, fontWeight: FontWeight.w700, fontSize: size * 0.34)),
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: Text(initials(title), style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: size * 0.34)),
         ),
         if (dot != null)
           PositionedDirectional(
@@ -44,7 +47,7 @@ class Avatar extends StatelessWidget {
             child: Container(
               width: size * 0.32,
               height: size * 0.32,
-              decoration: BoxDecoration(color: dot, shape: BoxShape.circle, border: Border.all(color: t.surface, width: 2)),
+              decoration: BoxDecoration(color: dot, shape: BoxShape.circle, border: Border.all(color: t.bg, width: 2)),
             ),
           ),
       ]),
