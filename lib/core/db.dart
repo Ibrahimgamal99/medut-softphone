@@ -295,6 +295,22 @@ class LocalDb extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteCalls(List<int> ids) async {
+    if (ids.isEmpty) return;
+    await _db.delete('calls', where: 'id IN (${List.filled(ids.length, '?').join(',')})', whereArgs: ids);
+    notifyListeners();
+  }
+
+  /// Puts deleted calls back as they were, ids and all (Undo).
+  Future<void> restoreCalls(List<CallRecord> calls) async {
+    final batch = _db.batch();
+    for (final c in calls) {
+      batch.insert('calls', {'id': c.id, ...c.toRow()}, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+    notifyListeners();
+  }
+
   Future<void> addMessage(ChatMessage m) async {
     await _db.insert('messages', m.toRow());
     notifyListeners();
@@ -304,6 +320,10 @@ class LocalDb extends ChangeNotifier {
       (await _db.query('messages', where: 'peer = ?', whereArgs: [peer], orderBy: 'at ASC'))
           .map(ChatMessage.fromRow)
           .toList();
+
+  /// Recent messages from every conversation, newest first.
+  Future<List<ChatMessage>> messages({int limit = 300}) async =>
+      (await _db.query('messages', orderBy: 'at DESC', limit: limit)).map(ChatMessage.fromRow).toList();
 
   /// The last message of each conversation, newest first.
   Future<List<ChatMessage>> conversations() async => (await _db.rawQuery('''

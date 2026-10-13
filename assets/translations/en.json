@@ -554,5 +554,20 @@
   "voiceQuality": "Voice quality",
   "logLines": "{n} lines",
   "on": "On",
-  "statusDndShort": "DND"
+  "statusDndShort": "DND",
+  "undo": "Undo",
+  "callsDeleted": {
+    "one": "Call deleted",
+    "other": "{} calls deleted"
+  },
+  "details": "Details",
+  "technicalDetails": "Technical details",
+  "copyNumber": "Copy number",
+  "copyCallDetails": "Copy call details",
+  "youHeard": "You heard",
+  "theyHeard": "They heard",
+  "rang": "Rang",
+  "talk": "Talk",
+  "endedThem": "Them",
+  "sipCodeShort": "Code"
 }

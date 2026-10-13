@@ -1,0 +1,838 @@
+<title>Medut Call History</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Figtree:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: same review page as the directions page. Three idea cards, then one band per state (the list, then a tapped call) with the three phones side by side, then a comparison table. The page chrome stays quiet; the Pocket phones carry the colour. */
+:root{
+  --bg:#EFF1F4; --panel:#FFFFFF; --fg:#15181C; --fg2:#59616C; --line:#D9DEE4;
+  --bezel:#1A1D21; --bezel-edge:#30353B; --tag:#08805A;
+  --f-ui:"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0B0D0F; --panel:#15181C; --fg:#E8EBEE; --fg2:#9AA2AC; --line:#2A2F35;
+  --bezel:#030405; --bezel-edge:#2C3137; --tag:#3DD49A; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0B0D0F; --panel:#15181C; --fg:#E8EBEE; --fg2:#9AA2AC; --line:#2A2F35;
+  --bezel:#030405; --bezel-edge:#2C3137; --tag:#3DD49A; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--f-ui)}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:32px 60px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+
+/* ---------- page chrome ---------- */
+.top{display:grid;gap:14px;padding-bottom:30px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--fg2)}
+h1{font-size:clamp(30px,4.4vw,46px);line-height:1.04;letter-spacing:-.025em;margin:0;font-weight:700;text-wrap:balance}
+.lede{max-width:68ch;color:var(--fg2);margin:0;font-size:16px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:4px;font-size:13px;color:var(--fg2)}
+.pseg{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--panel);gap:2px}
+.pseg button{border:0;background:none;padding:5px 12px;border-radius:7px;font-weight:600;font-size:13px;color:var(--fg2);cursor:pointer}
+.pseg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+
+.ideas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:12px}
+@media (max-width:920px){.ideas{grid-template-columns:minmax(0,1fr)}}
+.idea{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.idea-h{display:flex;align-items:center;gap:10px}
+.idea-h h2{margin:0;font-size:20px;letter-spacing:-.01em}
+.tag{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;font:700 12px/1 var(--f-mono);color:var(--bg);background:var(--tag);flex:none}
+.idea p{margin:0;color:var(--fg2);font-size:14px}
+.idea dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;padding-top:12px;border-top:1px solid var(--line)}
+.idea dt{color:var(--fg2)} .idea dd{margin:0}
+
+.screen{padding-block:34px 18px;border-top:1px solid var(--line)}
+.sh{display:grid;gap:4px;margin-bottom:20px;max-width:72ch}
+.sh h2{margin:0;font-size:25px;letter-spacing:-.015em;text-wrap:balance}
+.sh p{margin:0;color:var(--fg2)}
+.row{display:flex;gap:30px;justify-content:space-between;overflow-x:auto;padding:6px 6px 14px;scroll-snap-type:x mandatory;scrollbar-width:thin}
+.cell{margin:0;flex:0 0 300px;display:flex;flex-direction:column;gap:14px;scroll-snap-align:center}
+.cell figcaption{display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.cap-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.cell ul{margin:0;padding-left:18px;color:var(--fg2);display:grid;gap:4px}
+.cell ul b{color:var(--fg);font-weight:600}
+.try{font-size:12.5px;color:var(--fg2);font-family:var(--f-mono)}
+
+.cmp-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+table.cmp{border-collapse:collapse;width:100%;min-width:780px;font-size:13.5px}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--line)}
+.cmp thead th{font-size:12px;font-weight:700;color:var(--fg)}
+.cmp thead th .tag{width:20px;height:20px;font-size:11px;margin-right:6px;vertical-align:-4px}
+.cmp tbody th{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg2);font-weight:600;white-space:nowrap}
+.cmp td{color:var(--fg2)}
+.cmp tr:last-child th,.cmp tr:last-child td{border-bottom:0}
+.lvl{display:inline-block;font:600 11px/1 var(--f-mono);padding:4px 7px;border-radius:6px;border:1px solid var(--line);color:var(--fg);margin-right:6px}
+.foot{font-size:13px;color:var(--fg2);margin-top:14px;max-width:72ch}
+
+/* ---------- phone frame ---------- */
+.ph{width:300px;height:640px;border-radius:46px;background:var(--bezel);padding:9px;box-shadow:0 0 0 1px var(--bezel-edge),0 24px 50px -26px rgba(0,0,0,.5);flex:none}
+.scr{height:100%;border-radius:37px;overflow:hidden;position:relative;display:flex;flex-direction:column;font-family:var(--s-ff);background:var(--s-bg);color:var(--s-tx);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.scr::before{content:"";position:absolute;top:10px;left:50%;width:82px;height:23px;margin-left:-41px;border-radius:13px;background:#000;z-index:9}
+.scr .i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sb{flex:none;height:42px;padding:6px 26px 0;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:12.5px}
+.sb span:last-child{display:flex;gap:5px;align-items:center}
+.sb svg{height:11px;fill:currentColor}
+.body{flex:1;min-height:0;overflow:hidden;position:relative}
+.mono{font-family:var(--s-mf)}
+
+/* Pocket tokens (from lib/core/theme.dart) */
+.P{--s-ff:"Figtree",system-ui,sans-serif;--s-mf:"DM Mono",ui-monospace,monospace;
+  --s-bg:#F3F4F6;--s-sf:#FFFFFF;--s-sf2:#E9ECEF;--s-bd:#E0E3E8;--s-tx:#0E1116;--s-tx2:#5D6470;--s-mu:#9097A1;
+  --s-ac:#08805A;--s-acs:#DCF2E8;--s-onac:#FFFFFF;--s-bad:#E5383B;--s-bads:#FDE6E6;--s-warn:#9A6700;--s-warns:#FDF1DC;
+  --s-dim:rgba(14,17,22,.38);--s-sh:rgba(14,17,22,.08);
+  --s-p1b:#DCF2E8;--s-p1f:#0B6B4A;--s-p2b:#E7E3FB;--s-p2f:#4B3BB0;--s-p3b:#FBE8D7;--s-p3f:#9A4A12;--s-p4b:#DFEBF8;--s-p4f:#1D5C99}
+#stage[data-mode="dark"] .P{
+  --s-bg:#0C0E10;--s-sf:#16191C;--s-sf2:#1F2327;--s-bd:#2A2F34;--s-tx:#F2F4F6;--s-tx2:#A0A8B2;--s-mu:#6F7781;
+  --s-ac:#3DD49A;--s-acs:rgba(61,212,154,.14);--s-onac:#04271A;--s-bad:#FF5A5F;--s-bads:rgba(255,90,95,.15);--s-warn:#E9B04A;--s-warns:rgba(233,176,74,.14);
+  --s-dim:rgba(0,0,0,.6);--s-sh:rgba(0,0,0,.4);
+  --s-p1b:#163428;--s-p1f:#7DE3B8;--s-p2b:#25214A;--s-p2f:#B7AEFF;--s-p3b:#38261A;--s-p3f:#F4B27A;--s-p4b:#162A3D;--s-p4f:#8EC0F2}
+.p1{background:var(--s-p1b);color:var(--s-p1f)}.p2{background:var(--s-p2b);color:var(--s-p2f)}.p3{background:var(--s-p3b);color:var(--s-p3f)}.p4{background:var(--s-p4b);color:var(--s-p4f)}
+.pm{background:var(--s-bads);color:var(--s-bad)}.pg{background:var(--s-sf2);color:var(--s-tx2)}
+
+/* shared phone parts */
+.hd{flex:none;display:flex;align-items:center;gap:8px;padding:2px 14px 10px 18px}
+.hd > b{flex:1;font-size:29px;font-weight:800;letter-spacing:-.035em;line-height:1}
+.stp{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:var(--s-sf);box-shadow:0 1px 0 var(--s-bd);font-size:11.5px;font-weight:700}
+.stp i{width:7px;height:7px;border-radius:50%;background:var(--s-ac)}
+.ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--s-sf);box-shadow:0 1px 0 var(--s-bd);flex:none;color:var(--s-tx)}
+.ic .i{width:16px;height:16px}
+.trk{display:inline-flex;padding:3px;border-radius:17px;background:var(--s-sf2);margin:0 0 4px 16px;align-self:flex-start}
+.trk span{padding:5px 12px;border-radius:14px;font-size:11.5px;font-weight:700;color:var(--s-tx2)}
+.trk span.on{background:var(--s-sf);color:var(--s-tx);box-shadow:0 1px 3px var(--s-sh)}
+.day{font-size:11px;font-weight:700;color:var(--s-tx2);padding:10px 18px 3px}
+.av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:700;flex:none}
+.t{flex:1;min-width:0}
+.t > b{display:block;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t > small{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--s-tx2);white-space:nowrap;overflow:hidden;margin-top:1px}
+.t > small .i{width:11px;height:11px;stroke-width:2.2}
+.t > small span{overflow:hidden;text-overflow:ellipsis}
+.rd{color:var(--s-bad)!important}
+.am{color:var(--s-warn);font-weight:600}
+.okc{color:var(--s-ac);font-weight:600}
+.qb{display:inline-flex;align-items:flex-end;gap:2px;height:10px;flex:none}
+.qb i{width:3px;border-radius:1.5px;background:var(--s-ac)}
+.qb i:nth-child(1){height:4.5px}.qb i:nth-child(2){height:7px}.qb i:nth-child(3){height:10px}
+.qb.f i{background:var(--s-warn)}
+.qb.f i:nth-child(3){background:var(--s-tx2);opacity:.25}
+.qb.lg{height:13px;gap:2.5px}.qb.lg i{width:4px;border-radius:2px}
+.qb.lg i:nth-child(1){height:6px}.qb.lg i:nth-child(2){height:9.5px}.qb.lg i:nth-child(3){height:13px}
+.nav{flex:none;display:flex;justify-content:space-around;padding:7px 26px 15px;background:var(--s-bg);position:relative;z-index:2}
+.nav span{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--s-mu);position:relative}
+.nav .o{width:52px;height:28px;border-radius:14px;display:grid;place-items:center}
+.nav span.on{color:var(--s-tx)}
+.nav span.on .o{background:var(--s-acs);color:var(--s-ac)}
+.nav em{position:absolute;top:-3px;left:50%;margin-left:7px;min-width:16px;height:16px;border-radius:8px;background:var(--s-bad);color:#fff;font:700 9.5px/16px var(--s-ff);text-align:center;font-style:normal;padding:0 4px}
+.handle{width:38px;height:5px;border-radius:3px;background:var(--s-bd);margin:0 auto 4px;flex:none}
+.pbtn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--s-warn);color:var(--s-bg);flex:none;border:0;padding:0;cursor:pointer}
+.pbtn .i{width:13px;height:13px;fill:currentColor;stroke:none}
+.wave{flex:1;min-width:0;display:flex;align-items:center;gap:2px;height:26px}
+.wave i{flex:1;border-radius:1px;background:var(--s-warn);opacity:.35;min-width:2px}
+.wave i.on{opacity:1}
+.bk{width:34px;height:34px;display:grid;place-items:center;color:var(--s-tx)}
+.bk .i{width:22px;height:22px}
+
+/* ---------- A · Call back ---------- */
+.owe-h{display:flex;align-items:center;gap:7px;padding:0 18px 6px;font-size:12.5px;font-weight:800}
+.owe-h em{font-style:normal;background:var(--s-bad);color:#fff;font-size:10px;line-height:16px;min-width:18px;text-align:center;border-radius:8px;padding:0 5px}
+.owe-h span{margin-left:auto;font-size:11px;color:var(--s-tx2);font-weight:600}
+.owe{margin:0 12px 10px;background:var(--s-sf);border-radius:18px;box-shadow:0 1px 0 var(--s-bd);overflow:hidden}
+.ow{display:flex;align-items:center;gap:10px;padding:9px 9px 9px 12px}
+.ow + .ow{border-top:1px solid var(--s-bd)}
+.ow .av{width:34px;height:34px;font-size:11.5px}
+.go{display:flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:15px;background:var(--s-ac);color:var(--s-onac);font:700 11.5px var(--s-ff);border:0;cursor:pointer;flex:none}
+.go.alt{background:var(--s-sf2);color:var(--s-tx)}
+.go .i{width:12px;height:12px;stroke-width:2.2}
+.owe-done{display:none;align-items:center;gap:8px;padding:12px 14px;font-size:12px;color:var(--s-tx2)}
+.owe-done .i{width:15px;height:15px;color:var(--s-ac);stroke-width:2.4}
+.owe.empty .owe-done{display:flex}
+.li{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 18px;background:var(--s-bg);position:relative}
+.li .r{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:10.5px;color:var(--s-mu);flex:none;font-variant-numeric:tabular-nums}
+.li .cb{width:30px;height:30px;display:grid;place-items:center;color:var(--s-ac);flex:none}
+.li .cb .i{width:17px;height:17px}
+.swp{position:relative;background:var(--s-ac);overflow:hidden}
+.swp .under{position:absolute;inset:0 auto 0 0;width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--s-onac);font-size:10.5px;font-weight:700}
+.swp .under .i{width:16px;height:16px}
+.swp .li{transform:translateX(70px);border-radius:16px 0 0 16px;box-shadow:-6px 0 14px -8px var(--s-sh)}
+.toast{position:absolute;left:12px;right:12px;bottom:8px;z-index:4;background:var(--s-tx);color:var(--s-bg);border-radius:14px;padding:10px 8px 10px 14px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.toast button{border:0;background:none;color:var(--s-ac);font:800 12px var(--s-ff);cursor:pointer;padding:4px 8px}
+#stage[data-mode="light"] .toast button{color:#3DD49A}
+
+.dim{position:absolute;inset:0;background:var(--s-dim);z-index:3}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:calc(100% - 56px);z-index:4;background:var(--s-sf);border-radius:26px 26px 0 0;padding:8px 16px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.who{display:flex;gap:12px;align-items:center}
+.who .av{width:46px;height:46px;font-size:15px}
+.who b{display:block;font-size:18px;font-weight:800;letter-spacing:-.015em}
+.who small{display:block;font-size:11.5px;color:var(--s-tx2)}
+.acts{display:grid;grid-template-columns:1fr 1fr 42px;gap:8px}
+.acts span{height:42px;border-radius:21px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:13px;background:var(--s-sf2)}
+.acts span .i{width:16px;height:16px}
+.acts .pri{background:var(--s-ac);color:var(--s-onac)}
+.player{display:flex;align-items:center;gap:10px;padding:9px 12px 9px 9px;border-radius:18px;background:var(--s-warns)}
+.player .tm{font:500 10.5px var(--s-mf);color:var(--s-tx2);flex:none}
+.qrow{display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:16px;background:var(--s-bg);border:0;width:100%;cursor:pointer;text-align:left;font-family:var(--s-ff);color:var(--s-tx)}
+.qrow b{font-size:13px;font-weight:700;color:var(--s-ac)}
+.qrow .mos{font:500 11px var(--s-mf);color:var(--s-tx2)}
+.qrow .lab{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--s-tx2);display:flex;align-items:center;gap:2px}
+.qrow .lab .i{width:15px;height:15px;transition:transform .2s}
+.qrow[aria-expanded="true"] .lab .i{transform:rotate(180deg)}
+.qmore{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:-4px}
+.qmore div{background:var(--s-bg);border-radius:12px;padding:7px 10px}
+.qmore small{display:block;font-size:10px;color:var(--s-tx2)}
+.qmore b{font:500 13px var(--s-mf)}
+.qmore b em{font-style:normal;font-family:var(--s-ff);font-size:10px;color:var(--s-ac);font-weight:700;margin-left:4px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.facts div{background:var(--s-bg);border-radius:12px;padding:7px 10px;min-width:0}
+.facts small{display:block;font-size:10px;color:var(--s-tx2)}
+.facts b{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tech{display:flex;align-items:center;gap:10px;padding:10px 2px 2px;border-top:1px solid var(--s-bd)}
+.tech .t > small{font-family:var(--s-mf);font-size:10px}
+.tech > .i{width:16px;height:16px;color:var(--s-mu)}
+.dang{display:flex;justify-content:space-between;padding:2px 2px 0;font-size:12.5px;font-weight:700;color:var(--s-bad)}
+
+/* ---------- B · People ---------- */
+.pr{display:block;margin:0 8px;padding:7px 8px 7px 10px;border-radius:18px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pr-in{display:flex;align-items:center;gap:10px}
+.pr:hover{background:color-mix(in srgb,var(--s-sf) 55%,transparent)}
+.pr.open{background:var(--s-sf);box-shadow:0 1px 0 var(--s-bd);margin-block:3px}
+.strip{display:flex;gap:3px;margin-top:4px;flex-wrap:nowrap;overflow:hidden}
+.ev{display:inline-flex;align-items:center;gap:2px;height:17px;padding:0 5px;border-radius:6px;background:var(--s-sf2);font:500 9.5px var(--s-mf);color:var(--s-tx2);flex:none}
+.ev .i{width:9px;height:9px;stroke-width:2.6}
+.ev.m{background:var(--s-bads);color:var(--s-bad)}
+.ev.r{background:var(--s-warns);color:var(--s-warn)}
+.ev.msg{max-width:150px;font-family:var(--s-ff);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;line-height:17px}
+.pr .r{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:10.5px;color:var(--s-mu);flex:none;font-variant-numeric:tabular-nums}
+.bdg{background:var(--s-bad);color:#fff;font:700 9.5px/15px var(--s-ff);border-radius:8px;padding:0 5px;min-width:16px;text-align:center}
+.nest{display:none;margin:6px 0 0 48px}
+.pr.open .nest{display:block}
+.pr.open .strip{display:none}
+.nr{display:flex;align-items:center;gap:7px;font-size:11.5px;padding:6px 0;border-top:1px solid var(--s-bd)}
+.nr > .i{width:12px;height:12px;stroke-width:2.2;color:var(--s-tx2)}
+.nr .tm{font:500 10.5px var(--s-mf);color:var(--s-tx2);width:32px;flex:none}
+.nr .dur{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nr .mini{width:24px;height:24px;border-radius:50%;background:var(--s-warn);color:var(--s-bg);display:grid;place-items:center;flex:none}
+.nr .mini .i{width:9px;height:9px;fill:currentColor;stroke:none}
+.nr.see{justify-content:center;color:var(--s-ac);font-weight:700}
+.chev{width:15px;height:15px;color:var(--s-mu);transition:transform .2s}
+.pr.open .chev{transform:rotate(180deg)}
+
+.pp-top{flex:none;display:flex;align-items:center;gap:6px;padding:0 12px}
+.pp-top .sp{flex:1}
+.pp-who{text-align:center;padding:2px 16px 10px}
+.pp-av{width:70px;height:70px;font-size:23px;margin:0 auto 8px;position:relative}
+.pp-av::after{content:"";position:absolute;right:2px;bottom:2px;width:14px;height:14px;border-radius:50%;background:var(--s-ac);border:3px solid var(--s-bg)}
+.pp-who b{display:block;font-size:22px;font-weight:800;letter-spacing:-.025em}
+.pp-who small{display:block;font-size:12px;color:var(--s-tx2)}
+.pp-who .pres{color:var(--s-ac);font-weight:700}
+.pp-acts{display:flex;justify-content:center;gap:22px;padding:2px 0 12px}
+.pp-acts span{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--s-tx2)}
+.pp-acts i{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--s-sf);box-shadow:0 1px 0 var(--s-bd);color:var(--s-tx)}
+.pp-acts .pri i{background:var(--s-ac);color:var(--s-onac);box-shadow:none}
+.pp-acts .i{width:19px;height:19px}
+.pp-stats{margin:0 12px 4px;display:grid;grid-template-columns:repeat(3,1fr);background:var(--s-sf);border-radius:16px;box-shadow:0 1px 0 var(--s-bd)}
+.pp-stats div{padding:8px 11px;min-width:0}
+.pp-stats div + div{border-left:1px solid var(--s-bd)}
+.pp-stats small{font-size:10px;color:var(--s-tx2);display:block}
+.pp-stats b{font-size:14px;font-weight:800;display:flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hc{margin:3px 12px;padding:9px 11px;border-radius:16px;background:var(--s-sf);box-shadow:0 1px 0 var(--s-bd);display:grid;gap:7px}
+.hc-in{display:flex;align-items:center;gap:8px}
+.hc-in > .i{width:13px;height:13px;stroke-width:2.2;color:var(--s-tx2)}
+.hc-in .tx{flex:1;min-width:0;font-size:12.5px;font-weight:700}
+.hc-in .tx small{font-weight:500;color:var(--s-tx2);font-size:11px;margin-left:4px}
+.hc-in .tm{font:500 10.5px var(--s-mf);color:var(--s-mu)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font:400 10px var(--s-mf);padding:3px 7px;border-radius:7px;background:var(--s-bg);color:var(--s-tx2)}
+.chip b{color:var(--s-tx);font-weight:500}
+.chip.lnk{background:none;color:var(--s-ac);font-family:var(--s-ff);font-weight:700;font-size:11px;padding-inline:2px}
+.hc .player{padding:6px 10px 6px 6px;border-radius:14px}
+.hc .pbtn{width:28px;height:28px}
+.bub{margin:3px 12px 3px 40px;justify-self:end;background:var(--s-acs);border-radius:14px 14px 4px 14px;padding:7px 10px;font-size:12px;display:flex;flex-direction:column;align-items:flex-end}
+.bub small{font:500 9.5px var(--s-mf);color:var(--s-tx2)}
+.hrow{display:flex;align-items:center;gap:8px;margin:0 12px;padding:8px 11px;font-size:12.5px}
+.hrow > .i{width:13px;height:13px;stroke-width:2.2;color:var(--s-tx2)}
+.hrow .tx{flex:1;font-weight:600}
+.hrow .tm{font:500 10.5px var(--s-mf);color:var(--s-mu)}
+
+/* ---------- C · Timeline ---------- */
+.wk{flex:none;display:grid;grid-template-columns:repeat(7,1fr);padding:0 10px 8px}
+.wk div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--s-tx2);font-weight:600}
+.wk b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;color:var(--s-tx);font-weight:700;font-variant-numeric:tabular-nums}
+.wk .on b{background:var(--s-ac);color:var(--s-onac)}
+.wk .off b{color:var(--s-mu);font-weight:500}
+.wk .dots{display:flex;gap:2px;height:5px}
+.wk .dots i{width:5px;height:5px;border-radius:50%;background:var(--s-mu);opacity:.6}
+.wk .dots i.m{background:var(--s-bad);opacity:1}
+.sum{flex:none;margin:0 12px 6px;display:grid;grid-template-columns:repeat(3,1fr);background:var(--s-sf);border-radius:16px;box-shadow:0 1px 0 var(--s-bd)}
+.sum div{padding:7px 12px}
+.sum div + div{border-left:1px solid var(--s-bd)}
+.sum b{display:block;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.sum small{font-size:10px;color:var(--s-tx2)}
+.tl{position:relative;padding:2px 0 0}
+.tl::before{content:"";position:absolute;left:53px;top:0;bottom:0;width:2px;background:var(--s-bd)}
+.er{display:grid;grid-template-columns:44px 20px minmax(0,1fr);align-items:center;min-height:46px;padding-right:12px}
+.er .tm{font:500 10.5px var(--s-mf);color:var(--s-tx2);text-align:right;font-variant-numeric:tabular-nums}
+.node{width:10px;height:10px;border-radius:50%;background:var(--s-ac);justify-self:center;box-shadow:0 0 0 3px var(--s-bg);position:relative;z-index:1;margin-left:1px}
+.node.m{background:var(--s-bad)}
+.node.mo{background:var(--s-bg);border:2px solid var(--s-bad)}
+.node.f{background:var(--s-warn)}
+.node.msg{border-radius:3px;background:var(--s-p2f)}
+.er .c{min-width:0;display:flex;flex-direction:column;gap:4px;padding:5px 0 5px 4px}
+.er .ln{display:flex;align-items:center;gap:6px;min-width:0}
+.er .ln b{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.er .ln .qb{margin-left:auto}
+.er .ln .tg{font-size:10.5px;color:var(--s-tx2);white-space:nowrap}
+.er .ln .cb{margin-left:auto;color:var(--s-ac);display:grid;place-items:center}
+.er .ln .cb .i{width:16px;height:16px}
+.er.miss .ln b{color:var(--s-bad)}
+.br{display:flex;align-items:center;gap:6px;font:500 10px var(--s-mf);color:var(--s-tx2)}
+.bar{height:14px;border-radius:7px;background:var(--s-ac);opacity:.85;flex:none}
+.bar.fair{background:var(--s-warn)}
+.bar.rec{height:22px;border-radius:11px;background:var(--s-warns);opacity:1;display:flex;align-items:center;gap:1.5px;padding:0 7px 0 3px;position:relative;overflow:hidden;cursor:pointer;border:0}
+.bar.rec .pl{width:16px;height:16px;border-radius:50%;background:var(--s-warn);color:var(--s-bg);display:grid;place-items:center;flex:none;margin-right:2px}
+.bar.rec .pl .i{width:7px;height:7px;fill:currentColor;stroke:none}
+.bar.rec i{flex:1;background:var(--s-warn);border-radius:1px;opacity:.55;min-width:1.5px}
+.bar.rec::after{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--s-warn);opacity:.22;pointer-events:none}
+.bar.rec.playing::after{animation:prog 6s linear forwards}
+@keyframes prog{to{width:100%}}
+.msgline{font-size:11.5px;color:var(--s-tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--s-sf);padding:4px 9px;border-radius:10px 10px 10px 3px;align-self:flex-start;max-width:100%}
+
+.rc{padding:0 16px;display:flex;flex-direction:column;gap:10px}
+.rc-tl{background:var(--s-sf);border-radius:18px;box-shadow:0 1px 0 var(--s-bd);padding:6px 12px;position:relative}
+.rs{display:grid;grid-template-columns:58px 16px minmax(0,1fr);align-items:start;padding:6px 0;position:relative}
+.rs .tm{font:500 10.5px var(--s-mf);color:var(--s-tx2);padding-top:1px}
+.rs .node{margin-top:3px;box-shadow:0 0 0 3px var(--s-sf);justify-self:start}
+.rs b{display:block;font-size:12.5px;font-weight:700}
+.rs small{display:block;font-size:10.5px;color:var(--s-tx2)}
+.rc-tl::before{content:"";position:absolute;left:75px;top:18px;bottom:18px;width:2px;background:var(--s-bd)}
+.rs.talk{padding:2px 0}
+.rs.talk .seg{width:4px;height:44px;border-radius:2px;background:var(--s-ac);margin-left:3px}
+.rs.talk .tk{display:flex;flex-direction:column;justify-content:center;height:44px;gap:4px}
+.rs.talk .tk span{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;background:var(--s-warns);color:var(--s-warn);font-size:10.5px;font-weight:700;padding:3px 8px 3px 4px;border-radius:999px}
+.rs.talk .tk span i{width:15px;height:15px;border-radius:50%;background:var(--s-warn);color:var(--s-bg);display:grid;place-items:center}
+.rs.talk .tk span .i{width:7px;height:7px;fill:currentColor;stroke:none}
+.rc-q{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rc-q div{background:var(--s-sf);border-radius:16px;box-shadow:0 1px 0 var(--s-bd);padding:8px 12px}
+.rc-q small{display:block;font-size:10.5px;color:var(--s-tx2)}
+.rc-q b{display:flex;align-items:center;gap:7px;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.rc-q em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--s-ac)}
+.rc-m{background:var(--s-sf);border-radius:16px;box-shadow:0 1px 0 var(--s-bd);padding:2px 12px}
+.rm{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px}
+.rm + .rm{border-top:1px solid var(--s-bd)}
+.rm span{flex:1;color:var(--s-tx2)}
+.rm b{font:500 12px var(--s-mf)}
+.rm small{font-size:10px;color:var(--s-mu);width:46px;text-align:right}
+.rm .i{width:13px;height:13px;color:var(--s-ac);stroke-width:2.6}
+.rc-btn{display:flex;align-items:center;justify-content:center;gap:7px;height:42px;border-radius:21px;border:1.5px solid var(--s-bd);font-weight:700;font-size:13px}
+.rc-btn .i{width:15px;height:15px}
+
+@media (prefers-reduced-motion: reduce){.bar.rec.playing::after{animation:none;width:40%}.qrow .lab .i,.chev{transition:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-micoff" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M3 3l18 18"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="6" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="18" cy="5" r="1.6"/><circle cx="6" cy="11" r="1.6"/><circle cx="12" cy="11" r="1.6"/><circle cx="18" cy="11" r="1.6"/><circle cx="6" cy="17" r="1.6"/><circle cx="12" cy="17" r="1.6"/><circle cx="18" cy="17" r="1.6"/><circle cx="12" cy="22" r="1.6"/></g></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+    <symbol id="i-useradd" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
+    <symbol id="i-xfer" viewBox="0 0 24 24"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></symbol>
+    <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/><path d="m18 9-6 6M12 9l6 6"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 17h4v4h-4z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-cr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-cd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-cl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-vm" viewBox="0 0 24 24"><circle cx="6" cy="12" r="4"/><circle cx="18" cy="12" r="4"/><path d="M6 16h12"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-in" viewBox="0 0 24 24"><path d="M17 7 7 17M17 17H7V7"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></g></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-squares" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><rect x="3.5" y="9" width="2.8" height="6" rx="1.4"/><rect x="8.2" y="5.5" width="2.8" height="13" rx="1.4"/><rect x="12.9" y="2.5" width="2.8" height="19" rx="1.4"/><rect x="17.6" y="7" width="2.8" height="10" rx="1.4"/></g></symbol>
+    <symbol id="i-sig" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx=".7"/><rect x="4.6" y="5" width="3" height="6" rx=".7"/><rect x="9.2" y="2.5" width="3" height="8.5" rx=".7"/><rect x="13.8" y="0" width="3" height="11" rx=".7"/></symbol>
+    <symbol id="i-bat" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.2" fill="none" stroke="currentColor" stroke-opacity=".45"/><rect x="2.2" y="2.2" width="16" height="7.6" rx="1.8"/><rect x="23.6" y="4" width="1.8" height="4" rx=".8" fill-opacity=".45"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap" id="stage" data-mode="light">
+
+<header class="top">
+  <span class="eyebrow">Medut softphone · Pocket · Calls tab</span>
+  <h1>Three ways to show call history</h1>
+  <p class="lede">The same calls drawn three ways: a missed number you still owe, Mona you already called back, a recorded call with Sara, a shaky line from Reception, a message from Omar and a failed call from yesterday. Each design keeps the Pocket look and the 3-bar quality pill, and tapping a call still shows every figure the app saves.</p>
+  <div class="controls">
+    <span>Phones</span>
+    <div class="pseg" role="group" aria-label="Phone theme">
+      <button type="button" data-mode="light" aria-pressed="true">Light</button>
+      <button type="button" data-mode="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+</header>
+
+<section class="ideas" aria-label="The three designs">
+  <article class="idea">
+    <div class="idea-h"><span class="tag">A</span><h2>Call back</h2></div>
+    <p>Missed calls you haven't returned sit on top as a short to-do list. A missed call leaves it when you call that number back. Everything below is the plain list you have today.</p>
+    <dl><dt>Good for</dt><dd>A front desk or sales line, where every missed call needs an answer.</dd><dt>Gives up</dt><dd>The to-do block takes the top of the screen until it's empty.</dd></dl>
+  </article>
+  <article class="idea">
+    <div class="idea-h"><span class="tag">B</span><h2>People</h2></div>
+    <p>One row per person, not per call. Their calls today show as small chips under the name, and messages sit in the same row. Tap the row to open their calls inline.</p>
+    <dl><dt>Good for</dt><dd>A team that calls the same extensions all day.</dd><dt>Gives up</dt><dd>One call takes an extra tap to reach.</dd></dl>
+  </article>
+  <article class="idea">
+    <div class="idea-h"><span class="tag">C</span><h2>Timeline</h2></div>
+    <p>Your day on a time rail. Talk time is drawn to scale, recordings play from the rail, and a week strip jumps between days. Tapping a call opens a step-by-step record of it.</p>
+    <dl><dt>Good for</dt><dd>Reviewing a day and sorting out bad lines with the PBX admin.</dd><dt>Gives up</dt><dd>Fewer calls per screen, and the most custom drawing to build.</dd></dl>
+  </article>
+</section>
+
+<!-- ============================ THE LIST ============================ -->
+<section class="screen" id="s-list">
+  <div class="sh">
+    <span class="eyebrow">State 1 · the Calls tab</span>
+    <h2>The list</h2>
+    <p>What you see when you open the Calls tab on Tuesday morning: 8 calls today, 3 of them missed.</p>
+  </div>
+  <div class="row">
+
+    <!-- A · list -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P" id="a-list">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="hd"><b>Calls</b><span class="stp"><i></i>Available</span><span class="ic"><svg class="i"><use href="#i-search"/></svg></span></div>
+        <div class="body">
+          <div class="owe-h">To call back <em id="a-count">3</em><span>Oldest last</span></div>
+          <div class="owe" id="a-owe">
+            <div class="ow" data-owe="0100 987 6543">
+              <span class="av pm">01</span>
+              <span class="t"><b class="rd">0100 987 6543</b><small><svg class="i rd"><use href="#i-in"/></svg><span>2 missed · 10:24</span></small></span>
+              <button type="button" class="go"><svg class="i"><use href="#i-phone"/></svg>Call back</button>
+            </div>
+            <div class="ow" data-owe="0122 555 0198">
+              <span class="av pg">01</span>
+              <span class="t"><b>0122 555 0198</b><small><svg class="i am"><use href="#i-out"/></svg><span class="am">Failed · 503</span></small></span>
+              <button type="button" class="go alt"><svg class="i"><use href="#i-phone"/></svg>Retry</button>
+            </div>
+            <div class="ow" data-owe="0111 420 7781">
+              <span class="av pm">01</span>
+              <span class="t"><b class="rd">0111 420 7781</b><small><svg class="i rd"><use href="#i-in"/></svg><span>2 missed · Mon</span></small></span>
+              <button type="button" class="go"><svg class="i"><use href="#i-phone"/></svg>Call back</button>
+            </div>
+            <div class="owe-done"><svg class="i"><use href="#i-check"/></svg>You've returned every call.</div>
+          </div>
+          <div class="trk"><span class="on">All</span><span>Recorded</span><span>Messages</span></div>
+          <div class="day">Today</div>
+          <div class="li">
+            <span class="av p3">MH</span>
+            <span class="t"><b>Mona Hassan</b><small><svg class="i okc"><use href="#i-check"/></svg><span><span class="okc">Called back</span> · 2:40</span></small></span>
+            <span class="r">10:05<span class="qb"><i></i><i></i><i></i></span></span>
+            <span class="cb"><svg class="i"><use href="#i-phone"/></svg></span>
+          </div>
+          <div class="li">
+            <span class="av p1">SA</span>
+            <span class="t"><b>Sara Adel</b><small><svg class="i"><use href="#i-out"/></svg><span>4:12 · <span class="am">● Recorded</span></span></small></span>
+            <span class="r">09:58<span class="qb"><i></i><i></i><i></i></span></span>
+            <span class="cb"><svg class="i"><use href="#i-phone"/></svg></span>
+          </div>
+          <div class="li">
+            <span class="av p1">SA</span>
+            <span class="t"><b>Sara Adel</b><small><svg class="i"><use href="#i-in"/></svg><span>1:20</span></small></span>
+            <span class="r">09:30<span class="qb"><i></i><i></i><i></i></span></span>
+            <span class="cb"><svg class="i"><use href="#i-phone"/></svg></span>
+          </div>
+          <div class="swp">
+            <span class="under"><svg class="i"><use href="#i-phone"/></svg>Call</span>
+            <div class="li">
+              <span class="av p4">RE</span>
+              <span class="t"><b>Reception · 220</b><small><svg class="i"><use href="#i-in"/></svg><span>1:05 · <span class="am">Poor line</span></span></small></span>
+              <span class="r">09:12<span class="qb f"><i></i><i></i><i></i></span></span>
+            </div>
+          </div>
+          <div class="li">
+            <span class="av p2">KN</span>
+            <span class="t"><b>Karim Nabil</b><small><svg class="i"><use href="#i-in"/></svg><span>7:51</span></small></span>
+            <span class="r">08:05<span class="qb"><i></i><i></i><i></i></span></span>
+            <span class="cb"><svg class="i"><use href="#i-phone"/></svg></span>
+          </div>
+          <div class="toast" id="a-toast" hidden><span id="a-toast-t">Calling…</span><button type="button" id="a-undo">Undo</button></div>
+        </div>
+        <div class="nav"><span class="on"><span class="o"><svg class="i"><use href="#i-clock"/></svg></span>Calls<em id="a-badge">3</em></span><span><span class="o"><svg class="i"><use href="#i-grid"/></svg></span>Keypad</span><span><span class="o"><svg class="i"><use href="#i-users"/></svg></span>People</span></div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">A</span>Call back</div>
+        <ul>
+          <li><b>A to-do block on top</b> holds missed calls from numbers you haven't called since, plus calls that didn't connect, with a Retry button.</li>
+          <li>Once you call a number back it leaves the block, and the old missed row in the list says <b>Called back</b>.</li>
+          <li><b>Swipe a row right to call</b> (shown on Reception). The red badge on the tab counts only calls you still owe.</li>
+        </ul>
+        <span class="try">Try it: tap Call back.</span>
+      </figcaption>
+    </figure>
+
+    <!-- B · list -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="hd"><b>Calls</b><span class="stp"><i></i>Available</span><span class="ic"><svg class="i"><use href="#i-search"/></svg></span></div>
+        <div class="body" id="b-list">
+          <div class="trk"><span class="on">Everyone</span><span>Missed</span><span>Recorded</span></div>
+          <div class="day">Today</div>
+
+          <div class="pr" role="button" tabindex="0" aria-expanded="false">
+            <div class="pr-in">
+              <span class="av pm">01</span>
+              <span class="t"><b class="rd">0100 987 6543</b><span class="strip"><span class="ev m"><svg class="i"><use href="#i-in"/></svg>10:21</span><span class="ev m"><svg class="i"><use href="#i-in"/></svg>10:24</span></span></span>
+              <span class="r">10:24<span class="bdg">2</span></span>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i rd"><use href="#i-in"/></svg><span class="tm">10:24</span><span class="dur rd">Missed · rang 22 s</span></div>
+              <div class="nr"><svg class="i rd"><use href="#i-in"/></svg><span class="tm">10:21</span><span class="dur rd">Missed · rang 30 s</span></div>
+            </div>
+          </div>
+
+          <div class="pr" role="button" tabindex="0" aria-expanded="false">
+            <div class="pr-in">
+              <span class="av p3">MH</span>
+              <span class="t"><b>Mona Hassan</b><span class="strip"><span class="ev m"><svg class="i"><use href="#i-in"/></svg>10:02</span><span class="ev"><svg class="i"><use href="#i-out"/></svg>2:40</span></span></span>
+              <span class="r">10:05<span class="qb"><i></i><i></i><i></i></span></span>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i"><use href="#i-out"/></svg><span class="tm">10:05</span><span class="dur">Outgoing · 2:40</span><span class="qb"><i></i><i></i><i></i></span></div>
+              <div class="nr"><svg class="i rd"><use href="#i-in"/></svg><span class="tm">10:02</span><span class="dur rd">Missed</span></div>
+            </div>
+          </div>
+
+          <div class="pr open" role="button" tabindex="0" aria-expanded="true">
+            <div class="pr-in">
+              <span class="av p1">SA</span>
+              <span class="t"><b>Sara Adel</b><span class="strip"><span class="ev"><svg class="i"><use href="#i-in"/></svg>1:20</span><span class="ev r"><svg class="i"><use href="#i-out"/></svg>4:12</span></span></span>
+              <svg class="i chev"><use href="#i-cd"/></svg>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i"><use href="#i-out"/></svg><span class="tm">09:58</span><span class="dur">4:12 · <span class="am">Recorded</span></span><span class="qb"><i></i><i></i><i></i></span><span class="mini"><svg class="i"><use href="#i-play"/></svg></span></div>
+              <div class="nr"><svg class="i"><use href="#i-in"/></svg><span class="tm">09:30</span><span class="dur">Incoming · 1:20</span><span class="qb"><i></i><i></i><i></i></span></div>
+              <div class="nr see">All calls with Sara</div>
+            </div>
+          </div>
+
+          <div class="pr" role="button" tabindex="0" aria-expanded="false">
+            <div class="pr-in">
+              <span class="av p4">RE</span>
+              <span class="t"><b>Reception · 220</b><span class="strip"><span class="ev"><svg class="i"><use href="#i-in"/></svg>1:05</span></span></span>
+              <span class="r">09:12<span class="qb f"><i></i><i></i><i></i></span></span>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i"><use href="#i-in"/></svg><span class="tm">09:12</span><span class="dur">1:05 · <span class="am">Poor line</span></span><span class="qb f"><i></i><i></i><i></i></span></div>
+            </div>
+          </div>
+
+          <div class="pr" role="button" tabindex="0" aria-expanded="false">
+            <div class="pr-in">
+              <span class="av p2">OF</span>
+              <span class="t"><b>Omar Fathy</b><span class="strip"><span class="ev msg">Can you call me back after the meeting?</span></span></span>
+              <span class="r">08:40</span>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i"><use href="#i-msg"/></svg><span class="tm">08:40</span><span class="dur">“Can you call me back after the meeting?”</span></div>
+              <div class="nr see">Reply</div>
+            </div>
+          </div>
+
+          <div class="pr" role="button" tabindex="0" aria-expanded="false">
+            <div class="pr-in">
+              <span class="av p2">KN</span>
+              <span class="t"><b>Karim Nabil</b><span class="strip"><span class="ev"><svg class="i"><use href="#i-in"/></svg>7:51</span></span></span>
+              <span class="r">08:05<span class="qb"><i></i><i></i><i></i></span></span>
+            </div>
+            <div class="nest">
+              <div class="nr"><svg class="i"><use href="#i-in"/></svg><span class="tm">08:05</span><span class="dur">Incoming · 7:51</span><span class="qb"><i></i><i></i><i></i></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="nav"><span class="on"><span class="o"><svg class="i"><use href="#i-clock"/></svg></span>Calls<em>3</em></span><span><span class="o"><svg class="i"><use href="#i-grid"/></svg></span>Keypad</span><span><span class="o"><svg class="i"><use href="#i-users"/></svg></span>People</span></div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">B</span>People</div>
+        <ul>
+          <li><b>One row per person per day.</b> Chips under the name show each call in order: red for missed, amber for recorded, the talk time for the rest.</li>
+          <li><b>Messages share the row</b>, so the Messages filter goes away.</li>
+          <li>Tap a row to open that person's calls in place, with quality bars and a play button for recordings.</li>
+        </ul>
+        <span class="try">Try it: tap any person.</span>
+      </figcaption>
+    </figure>
+
+    <!-- C · list -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="hd"><b>Calls</b><span class="stp"><i></i>Available</span><span class="ic"><svg class="i"><use href="#i-search"/></svg></span></div>
+        <div class="wk" aria-label="This week">
+          <div>W<b>7</b><span class="dots"><i></i><i></i><i></i></span></div>
+          <div>T<b>8</b><span class="dots"><i></i><i></i></span></div>
+          <div>F<b>9</b><span class="dots"><i></i></span></div>
+          <div class="off">S<b>10</b><span class="dots"></span></div>
+          <div class="off">S<b>11</b><span class="dots"></span></div>
+          <div>M<b>12</b><span class="dots"><i></i><i></i><i class="m"></i></span></div>
+          <div class="on">T<b>13</b><span class="dots"><i></i><i></i><i class="m"></i></span></div>
+        </div>
+        <div class="sum"><div><b>8</b><small>calls</small></div><div><b>17:08</b><small>talk time</small></div><div><b class="rd">3</b><small>missed</small></div></div>
+        <div class="body">
+          <div class="tl">
+            <div class="er miss"><span class="tm">10:24</span><span class="node m"></span><span class="c"><span class="ln"><b>0100 987 6543</b><span class="tg rd">Missed ×2</span><span class="cb"><svg class="i"><use href="#i-phone"/></svg></span></span></span></div>
+            <div class="er"><span class="tm">10:05</span><span class="node"></span><span class="c"><span class="ln"><b>Mona Hassan</b><span class="tg okc">called back</span><span class="qb"><i></i><i></i><i></i></span></span><span class="br"><span class="bar" style="width:51px"></span>2:40</span></span></div>
+            <div class="er"><span class="tm">10:02</span><span class="node mo"></span><span class="c"><span class="ln"><b>Mona Hassan</b><span class="tg">Missed</span></span></span></div>
+            <div class="er"><span class="tm">09:58</span><span class="node"></span><span class="c"><span class="ln"><b>Sara Adel</b><span class="qb"><i></i><i></i><i></i></span></span><span class="br"><button type="button" class="bar rec" id="c-play" style="width:96px" aria-label="Play the recording with Sara Adel"><span class="pl"><svg class="i"><use href="#i-play"/></svg></span><i style="height:5px"></i><i style="height:10px"></i><i style="height:7px"></i><i style="height:13px"></i><i style="height:8px"></i><i style="height:11px"></i><i style="height:5px"></i><i style="height:9px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:10px"></i><i style="height:4px"></i><i style="height:8px"></i><i style="height:11px"></i><i style="height:6px"></i><i style="height:9px"></i><i style="height:5px"></i></button>4:12 <span class="am">rec</span></span></span></div>
+            <div class="er"><span class="tm">09:30</span><span class="node"></span><span class="c"><span class="ln"><b>Sara Adel</b><span class="qb"><i></i><i></i><i></i></span></span><span class="br"><span class="bar" style="width:25px"></span>1:20</span></span></div>
+            <div class="er"><span class="tm">09:12</span><span class="node f"></span><span class="c"><span class="ln"><b>Reception · 220</b><span class="qb f"><i></i><i></i><i></i></span></span><span class="br"><span class="bar fair" style="width:21px"></span>1:05 · <span class="am">poor line</span></span></span></div>
+            <div class="er"><span class="tm">08:40</span><span class="node msg"></span><span class="c"><span class="ln"><b>Omar Fathy</b></span><span class="msgline">Can you call me back after the meeting?</span></span></div>
+            <div class="er"><span class="tm">08:05</span><span class="node"></span><span class="c"><span class="ln"><b>Karim Nabil</b><span class="qb"><i></i><i></i><i></i></span></span><span class="br"><span class="bar" style="width:150px"></span>7:51</span></span></div>
+          </div>
+        </div>
+        <div class="nav"><span class="on"><span class="o"><svg class="i"><use href="#i-clock"/></svg></span>Calls<em>3</em></span><span><span class="o"><svg class="i"><use href="#i-grid"/></svg></span>Keypad</span><span><span class="o"><svg class="i"><use href="#i-users"/></svg></span>People</span></div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">C</span>Timeline</div>
+        <ul>
+          <li><b>A week strip</b> on top: dots for calls on each day, red when a missed call is still open. Tap a day to jump to it.</li>
+          <li><b>Talk time drawn to scale</b>, so Karim's 7:51 call stands out. The bar takes the quality colour.</li>
+          <li><b>Recordings play from the rail.</b> A missed call you returned turns into a hollow red dot.</li>
+        </ul>
+        <span class="try">Try it: tap Sara's waveform.</span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============================ TAP A CALL ============================ -->
+<section class="screen" id="s-detail">
+  <div class="sh">
+    <span class="eyebrow">State 2 · after tapping Sara's recorded call</span>
+    <h2>Tap a call</h2>
+    <p>Each design opens the call differently. All three keep the full list of figures (MOS both ways, jitter, loss, round trip, codec, SRTP, ICE, Call-ID) one tap away.</p>
+  </div>
+  <div class="row">
+
+    <!-- A · sheet -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="hd"><b>Calls</b><span class="stp"><i></i>Available</span><span class="ic"><svg class="i"><use href="#i-search"/></svg></span></div>
+        <div class="body">
+          <div class="owe-h">To call back <em>3</em></div>
+          <div class="owe">
+            <div class="ow"><span class="av pm">01</span><span class="t"><b class="rd">0100 987 6543</b><small><span>2 missed · 10:24</span></small></span><span class="go"><svg class="i"><use href="#i-phone"/></svg>Call back</span></div>
+            <div class="ow"><span class="av pg">01</span><span class="t"><b>0122 555 0198</b><small><span class="am">Failed · 503</span></small></span><span class="go alt">Retry</span></div>
+          </div>
+          <div class="trk"><span class="on">All</span><span>Recorded</span><span>Messages</span></div>
+          <div class="day">Today</div>
+          <div class="li"><span class="av p3">MH</span><span class="t"><b>Mona Hassan</b><small><span>Called back · 2:40</span></small></span></div>
+          <div class="li"><span class="av p1">SA</span><span class="t"><b>Sara Adel</b><small><span>4:12 · Recorded</span></small></span></div>
+        </div>
+          <div class="dim"></div>
+          <div class="sheet">
+            <div class="handle"></div>
+            <div class="who"><span class="av p1">SA</span><span><b>Sara Adel</b><small>214 · Outgoing · Today 09:58</small></span></div>
+            <div class="acts"><span class="pri"><svg class="i"><use href="#i-phone"/></svg>Call</span><span><svg class="i"><use href="#i-msg"/></svg>Message</span><span><svg class="i"><use href="#i-dots"/></svg></span></div>
+            <div class="player"><span class="pbtn"><svg class="i"><use href="#i-play"/></svg></span><span class="wave"><i class="on" style="height:9px"></i><i class="on" style="height:16px"></i><i class="on" style="height:11px"></i><i class="on" style="height:20px"></i><i class="on" style="height:13px"></i><i class="on" style="height:7px"></i><i style="height:17px"></i><i style="height:10px"></i><i style="height:22px"></i><i style="height:14px"></i><i style="height:8px"></i><i style="height:18px"></i><i style="height:11px"></i><i style="height:15px"></i><i style="height:6px"></i><i style="height:12px"></i><i style="height:19px"></i><i style="height:9px"></i><i style="height:13px"></i><i style="height:7px"></i></span><span class="tm">1:24 / 4:12</span></div>
+            <button type="button" class="qrow" id="a-q" aria-expanded="false" aria-controls="a-qmore"><span class="qb lg"><i></i><i></i><i></i></span><b>Excellent</b><span class="mos">MOS 4.4</span><span class="lab">Details<svg class="i"><use href="#i-cd"/></svg></span></button>
+            <div class="qmore" id="a-qmore" hidden>
+              <div><small>You heard</small><b>4.4<em>Excellent</em></b></div>
+              <div><small>They heard</small><b>4.3<em>Excellent</em></b></div>
+              <div><small>Jitter</small><b>6 ms</b></div>
+              <div><small>Loss</small><b>0.0 %</b></div>
+              <div><small>Round trip</small><b>48 ms</b></div>
+              <div><small>Codec</small><b>Opus 48k</b></div>
+            </div>
+            <div class="facts"><div><small>Rang</small><b>6 s</b></div><div><small>Talk</small><b>4:12</b></div><div><small>Ended by</small><b>You</b></div></div>
+            <div class="tech"><svg class="i"><use href="#i-file"/></svg><span class="t"><b>Technical details</b><small>TLS · SRTP · ICE direct · Call-ID 7f3a…</small></span><svg class="i"><use href="#i-cr"/></svg></div>
+            <div class="dang"><span>Block number</span><span>Delete</span></div>
+          </div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">A</span>Call back · a sheet</div>
+        <ul>
+          <li>Today's bottom sheet, tidied. <b>Call and Message first</b>, then the recording, then quality.</li>
+          <li><b>The quality pill is a button.</b> It opens MOS both ways, jitter, loss, round trip and codec.</li>
+          <li>The long table moves behind <b>Technical details</b>.</li>
+        </ul>
+        <span class="try">Try it: tap Excellent.</span>
+      </figcaption>
+    </figure>
+
+    <!-- B · person page -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="pp-top"><span class="bk"><svg class="i"><use href="#i-cl"/></svg></span><span class="sp"></span><span class="ic"><svg class="i"><use href="#i-star"/></svg></span><span class="ic"><svg class="i"><use href="#i-dots"/></svg></span></div>
+        <div class="body">
+          <div class="pp-who"><span class="av p1 pp-av">SA</span><b>Sara Adel</b><small>Ext 214 · <span class="pres">Available</span></small></div>
+          <div class="pp-acts"><span class="pri"><i><svg class="i"><use href="#i-phone"/></svg></i>Call</span><span><i><svg class="i"><use href="#i-msg"/></svg></i>Message</span><span><i><svg class="i"><use href="#i-copy"/></svg></i>Copy</span></div>
+          <div class="pp-stats"><div><small>This month</small><b>14 calls</b></div><div><small>Talked</small><b>1:12 h</b></div><div><small>Usually</small><b><span class="qb"><i></i><i></i><i></i></span>Good</b></div></div>
+          <div class="day">Today</div>
+          <div class="hc">
+            <div class="hc-in"><svg class="i"><use href="#i-out"/></svg><span class="tx">4:12<small>Outgoing</small></span><span class="qb"><i></i><i></i><i></i></span><span class="tm">09:58</span></div>
+            <div class="player"><span class="pbtn"><svg class="i"><use href="#i-play"/></svg></span><span class="wave"><i style="height:7px"></i><i style="height:13px"></i><i style="height:9px"></i><i style="height:16px"></i><i style="height:11px"></i><i style="height:6px"></i><i style="height:14px"></i><i style="height:8px"></i><i style="height:17px"></i><i style="height:10px"></i><i style="height:6px"></i><i style="height:14px"></i><i style="height:9px"></i><i style="height:12px"></i><i style="height:5px"></i></span><span class="tm">4:12</span></div>
+            <div class="chips"><span class="chip">MOS <b>4.4</b> / <b>4.3</b></span><span class="chip">jitter <b>6 ms</b></span><span class="chip">loss <b>0 %</b></span><span class="chip">rtt <b>48 ms</b></span><span class="chip lnk">All details</span></div>
+          </div>
+          <div class="hrow"><svg class="i"><use href="#i-in"/></svg><span class="tx">1:20 <span style="color:var(--s-tx2);font-weight:500">Incoming</span></span><span class="qb"><i></i><i></i><i></i></span><span class="tm">09:30</span></div>
+          <div class="day">Yesterday</div>
+          <div class="bub">Sent the contract, see page 3<small>15:41</small></div>
+          <div class="hrow"><svg class="i"><use href="#i-in"/></svg><span class="tx">12:30 <span style="color:var(--s-tx2);font-weight:500">Incoming</span></span><span class="qb"><i></i><i></i><i></i></span><span class="tm">15:20</span></div>
+        </div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">B</span>People · a person page</div>
+        <ul>
+          <li><b>Tapping opens the person</b>, not one call: live status, Call, Message, and how calls with them usually sound.</li>
+          <li><b>Calls and messages in one thread</b>, newest first. The tapped call opens with its player and figures.</li>
+          <li>The same page opens from the People tab.</li>
+        </ul>
+      </figcaption>
+    </figure>
+
+    <!-- C · receipt -->
+    <figure class="cell">
+      <div class="ph"><div class="scr P">
+        <div class="sb"><span>10:31</span><span><svg viewBox="0 0 17 11" width="17"><use href="#i-sig"/></svg><svg viewBox="0 0 26 12" width="25"><use href="#i-bat"/></svg></span></div>
+        <div class="pp-top"><span class="bk"><svg class="i"><use href="#i-cl"/></svg></span><span class="sp"></span><span class="ic"><svg class="i"><use href="#i-phone"/></svg></span><span class="ic"><svg class="i"><use href="#i-dots"/></svg></span></div>
+        <div class="body">
+          <div class="rc">
+            <div class="who"><span class="av p1">SA</span><span><b>Sara Adel</b><small>214 · Outgoing · Tue 13 Oct</small></span></div>
+            <div class="rc-tl">
+              <div class="rs"><span class="tm">09:58:02</span><span class="node" style="background:var(--s-mu)"></span><span><b>Dialed 214</b><small>Office PBX · TLS</small></span></div>
+              <div class="rs"><span class="tm">09:58:08</span><span class="node"></span><span><b>Answered</b><small>Rang 6 s · set up in 312 ms</small></span></div>
+              <div class="rs talk"><span class="tm"></span><span class="seg"></span><span class="tk"><small style="font-size:10.5px;color:var(--s-tx2)">Talked 4:12</small><span><i><svg class="i"><use href="#i-play"/></svg></i>Recording 4:12</span></span></div>
+              <div class="rs"><span class="tm">10:02:20</span><span class="node" style="background:var(--s-tx)"></span><span><b>You hung up</b><small>Normal end of call</small></span></div>
+            </div>
+            <div class="rc-q">
+              <div><small>You heard</small><b><span class="qb lg"><i></i><i></i><i></i></span>4.4</b><em>Excellent</em></div>
+              <div><small>They heard</small><b><span class="qb lg"><i></i><i></i><i></i></span>4.3</b><em>Excellent</em></div>
+            </div>
+            <div class="rc-m">
+              <div class="rm"><span>Jitter</span><b>6 ms</b><small>&lt; 20</small><svg class="i"><use href="#i-check"/></svg></div>
+              <div class="rm"><span>Loss</span><b>0.0 %</b><small>&lt; 1</small><svg class="i"><use href="#i-check"/></svg></div>
+              <div class="rm"><span>Round trip</span><b>48 ms</b><small>&lt; 150</small><svg class="i"><use href="#i-check"/></svg></div>
+              <div class="rm"><span>Codec · SRTP · ICE</span><b style="font-size:10.5px">Opus · AES128 · direct</b></div>
+            </div>
+            <div class="rc-btn"><svg class="i"><use href="#i-copy"/></svg>Copy for PBX support</div>
+          </div>
+        </div>
+      </div></div>
+      <figcaption>
+        <div class="cap-h"><span class="tag">C</span>Timeline · a call record</div>
+        <ul>
+          <li><b>The call step by step:</b> dialed, answered, talked, who hung up and why, to the second.</li>
+          <li>Each figure sits next to its target, so a bad value shows up without reading numbers.</li>
+          <li><b>Copy for PBX support</b> copies times, codes and the Call-ID as text to paste to an admin.</li>
+        </ul>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============================ COMPARE ============================ -->
+<section class="screen" id="s-compare">
+  <div class="sh">
+    <span class="eyebrow">Side by side</span>
+    <h2>How they differ</h2>
+  </div>
+  <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th scope="col"></th><th scope="col"><span class="tag">A</span>Call back</th><th scope="col"><span class="tag">B</span>People</th><th scope="col"><span class="tag">C</span>Timeline</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">On top</th><td>Calls you still owe</td><td>The people you talked to</td><td>The week, and today's totals</td></tr>
+        <tr><th scope="row">Missed calls</th><td>Stay on top until you call back</td><td>Red count and red chips on the person</td><td>Red dots on the rail and the week strip</td></tr>
+        <tr><th scope="row">Failed calls</th><td>In the to-do block with Retry and the SIP code</td><td>A chip under the person</td><td>An amber dot with the SIP code</td></tr>
+        <tr><th scope="row">Recordings</th><td>Amber tag, plays in the sheet</td><td>Amber chip, plays in the open row</td><td>Waveform on the rail, plays in place</td></tr>
+        <tr><th scope="row">Messages</th><td>Their own filter, as today</td><td>In the person's row and thread</td><td>Bubbles on the rail</td></tr>
+        <tr><th scope="row">Quality</th><td colspan="3">All three keep the 3-bar pill on every answered call. Tapping it shows every figure.</td></tr>
+        <tr><th scope="row">Calls per screen</th><td>5 under the to-do block, 9 when it's empty</td><td>About 7 people</td><td>About 8 calls</td></tr>
+        <tr><th scope="row">New data to save</th><td>A "dismissed" flag, so you can clear a missed call without calling</td><td>None</td><td>None. The record uses times the app already saves</td></tr>
+        <tr><th scope="row">Work to build</th><td><span class="lvl">small</span>The current list plus one block on top</td><td><span class="lvl">medium</span>Grouping by person and a new person page</td><td><span class="lvl">medium+</span>A custom rail, the week strip and the call record</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="foot">The parts mix well: A's to-do block works on top of B or C, and C's call record can replace the sheet in A or B. Tell me which design to build, or which parts to combine.</p>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var stage=document.getElementById("stage");
+  function setMode(m){
+    stage.setAttribute("data-mode",m);
+    document.querySelectorAll(".pseg button").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.mode===m))});
+  }
+  var root=document.documentElement.getAttribute("data-theme");
+  var dark=root?root==="dark":(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);
+  setMode(dark?"dark":"light");
+  document.querySelectorAll(".pseg button").forEach(function(b){b.addEventListener("click",function(){setMode(b.dataset.mode)})});
+
+  // A: Call back clears a row from the to-do block, with Undo.
+  var owe=document.getElementById("a-owe"),count=document.getElementById("a-count"),badge=document.getElementById("a-badge");
+  var toast=document.getElementById("a-toast"),toastT=document.getElementById("a-toast-t"),last=null,timer=null;
+  function recount(){
+    var n=owe.querySelectorAll(".ow:not([hidden])").length;
+    count.textContent=n;badge.textContent=n;badge.hidden=n===0;count.hidden=n===0;
+    owe.classList.toggle("empty",n===0);
+  }
+  owe.querySelectorAll(".go").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var row=btn.closest(".ow");row.hidden=true;last=row;recount();
+      toastT.textContent=(btn.classList.contains("alt")?"Calling ":"Calling back ")+row.dataset.owe;
+      toast.hidden=false;clearTimeout(timer);timer=setTimeout(function(){toast.hidden=true},4000);
+    });
+  });
+  document.getElementById("a-undo").addEventListener("click",function(){
+    if(last){last.hidden=false;last=null;recount()}
+    toast.hidden=true;
+  });
+
+  // A: the quality pill opens every figure.
+  var q=document.getElementById("a-q"),qm=document.getElementById("a-qmore");
+  q.addEventListener("click",function(){var open=qm.hidden;qm.hidden=!open;q.setAttribute("aria-expanded",String(open))});
+
+  // B: one person open at a time.
+  var rows=document.querySelectorAll("#b-list .pr");
+  function toggle(r){
+    var open=!r.classList.contains("open");
+    rows.forEach(function(o){o.classList.remove("open");o.setAttribute("aria-expanded","false")});
+    if(open){r.classList.add("open");r.setAttribute("aria-expanded","true")}
+  }
+  rows.forEach(function(r){
+    r.addEventListener("click",function(){toggle(r)});
+    r.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle(r)}});
+  });
+
+  // C: play the recording from the rail.
+  var cp=document.getElementById("c-play");
+  cp.addEventListener("click",function(){
+    cp.classList.remove("playing");void cp.offsetWidth;cp.classList.add("playing");
+  });
+})();
+</script>

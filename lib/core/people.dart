@@ -50,6 +50,14 @@ bool sameNumber(String a, String b) {
   return x.isNotEmpty && x == tail(b);
 }
 
+/// One key for every way of writing a number (see [sameNumber]); a SIP name
+/// with no digits keys on itself.
+String numberKey(String number) {
+  final d = number.replaceAll(RegExp(r'\D'), '');
+  if (d.isEmpty) return number.trim().toLowerCase();
+  return d.length > 9 ? d.substring(d.length - 9) : d;
+}
+
 /// Text in any of [fields]; a number typed with spaces, dashes or brackets
 /// matches on its digits.
 bool matchesQuery(String query, List<String> fields) {

@@ -562,5 +562,24 @@
   "voiceQuality": "جودة الصوت",
   "logLines": "{n} سطر",
   "on": "مفعّل",
-  "statusDndShort": "عدم الإزعاج"
+  "statusDndShort": "عدم الإزعاج",
+  "undo": "تراجع",
+  "callsDeleted": {
+    "zero": "لم تُحذف أي مكالمة",
+    "one": "حُذفت مكالمة",
+    "two": "حُذفت مكالمتان",
+    "few": "حُذفت {} مكالمات",
+    "many": "حُذفت {} مكالمة",
+    "other": "حُذفت {} مكالمة"
+  },
+  "details": "التفاصيل",
+  "technicalDetails": "التفاصيل التقنية",
+  "copyNumber": "نسخ الرقم",
+  "copyCallDetails": "نسخ تفاصيل المكالمة",
+  "youHeard": "ما سمعته",
+  "theyHeard": "ما سمعه الطرف الآخر",
+  "rang": "الرنين",
+  "talk": "المحادثة",
+  "endedThem": "الطرف الآخر",
+  "sipCodeShort": "الرمز"
 }
