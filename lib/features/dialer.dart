@@ -63,7 +63,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
   String? _matchSig;
   List<_Match> _matchCache = const [];
 
-  /// Echo-style live matches while dialing: colleagues (extensions), the
+  /// Live matches while dialing: colleagues (extensions), the
   /// phone's contacts and recent numbers whose NUMBER contains the typed
   /// digits. When the list is long each source keeps a fair share.
   List<_Match> _matches(String query) {
@@ -240,7 +240,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                 ),
               ),
       ),
-      // Matches (Echo style) above the number, then the number itself.
+      // Matches above the number, then the number itself.
       Expanded(
         child: GestureDetector(
           onLongPress: _paste,
@@ -404,7 +404,7 @@ class _Match {
   final _Source source;
 }
 
-/// Samsung / Echo-style list: tap a row to put its number in the field, tap
+/// Match list: tap a row to put its number in the field, tap
 /// the green handset to call it. The typed digits are highlighted.
 class _MatchList extends ConsumerWidget {
   const _MatchList({required this.matches, required this.query, required this.onFill, required this.onCall});

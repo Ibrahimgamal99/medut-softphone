@@ -128,7 +128,7 @@ final class CallViewController: UIViewController {
     statusLabel.text = s.status.isEmpty ? s.number : s.status
     updateTimer()
 
-    // Quality pill: Echo's 3 bars + word, MOS beside it, tap for details.
+    // Quality pill: 3 bars + word, MOS beside it, tap for details.
     if s.qualityWord.isEmpty {
       mosPill.isHidden = true
     } else {
@@ -562,7 +562,7 @@ final class CallViewController: UIViewController {
   }
 }
 
-/// Three rising signal bars for call quality, as in Echo.
+/// Three rising signal bars for call quality.
 final class QualityBarsView: UIView {
   private let barWidth: CGFloat = 4
   private var gap: CGFloat { barWidth * 0.7 }

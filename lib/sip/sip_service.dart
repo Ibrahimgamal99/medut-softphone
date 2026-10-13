@@ -181,7 +181,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     _push();
   }
 
-  // Mobile tuning carried over from Echo.
+  // Mobile tuning.
   MedutConfig _medutConfig() => MedutConfig(
         userAgent: 'Medut/0.1 (${Platform.operatingSystem})',
         iceGatheringTimeoutMs: 800,
@@ -1219,7 +1219,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'recording': f.recording,
       'silent': settings.effectiveStatus() == MyStatus.silent,
       'mos': s == null ? '' : fmt(mos, 1),
-      // Echo's 3-bar grade. "Checking…" until the first sample, a link in
+      // 3-bar grade. "Checking…" until the first sample, a link in
       // trouble (reconnecting, stalled media) is never better than poor.
       'qualityLevel': level,
       'qualityWord': settings.showCallQuality && f.phase == Phase.active ? tr(qualityWordKey(level)) : '',

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Design E tokens: Echo's palette, in light and dark.
+/// Design tokens: the app palette, in light and dark.
 @immutable
 class Tokens extends ThemeExtension<Tokens> {
   const Tokens({

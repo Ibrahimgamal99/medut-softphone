@@ -75,7 +75,7 @@ void main() {
     });
   });
 
-  group('call quality (Echo grade)', () {
+  group('call quality grade', () {
     test('checking until a sample', () => expect(callQualityLevel(), 0));
     test('excellent needs a high MOS and clean network', () {
       expect(callQualityLevel(mos: 4.4, rttMs: 40, jitterMs: 5, lossPct: 0), 4);

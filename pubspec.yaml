@@ -45,7 +45,7 @@ dependencies:
   flutter_contacts: ^1.1.9+2
   # Export SIP log / pcap
   share_plus: ^10.1.4
-  google_fonts: ^9.0.0
+  google_fonts: ^8.2.1
   just_audio: ^0.10.6
   audio_session: ^0.2.4
   proximity_screen_lock: ^2.3.0

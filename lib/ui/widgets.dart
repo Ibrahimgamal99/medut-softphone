@@ -249,7 +249,7 @@ Color qualityColor(Tokens t, int level) => switch (level) {
       _ => t.grey,
     };
 
-/// Echo's 3-bar Voice Quality Indicator for a finished or live call.
+/// 3-bar Voice Quality Indicator for a finished or live call.
 class QualityBars extends StatelessWidget {
   const QualityBars({super.key, this.mos, this.rttMs, this.jitterMs, this.lossPct, this.barWidth = 4});
   final double? mos, rttMs, jitterMs, lossPct;
@@ -283,7 +283,7 @@ class QualityBars extends StatelessWidget {
 }
 
 /// Call detail row: the bars, then MOS / RTT / jitter / loss, each green when
-/// it meets its target and red when it does not (as in Echo).
+/// it meets its target and red when it does not.
 class QualityMetricsRow extends StatelessWidget {
   const QualityMetricsRow({super.key, this.mos, this.rttMs, this.jitterMs, this.lossPct});
   final double? mos, rttMs, jitterMs, lossPct;

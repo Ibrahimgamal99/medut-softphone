@@ -221,7 +221,7 @@ class CallActivity : Activity() {
         status.text = s.status.ifBlank { s.number }
         updateTimer()
 
-        // Quality pill: Echo's 3 bars + word, MOS beside it, tap for details.
+        // Quality pill: 3 bars + word, MOS beside it, tap for details.
         if (s.qualityWord.isNotBlank()) {
             mosPill.visibility = View.VISIBLE
             val fg = when (s.qualityLevel) {

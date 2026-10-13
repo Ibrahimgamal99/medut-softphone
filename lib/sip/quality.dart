@@ -1,4 +1,4 @@
-/// Call quality grade 0–4, as in Echo: MOS and the network weighed together,
+/// Call quality grade 0–4: MOS and the network weighed together,
 /// so the bars, the word and their colour always agree.
 ///
 /// 4 excellent · 3 good · 2 fair · 1 poor · 0 checking (no sample yet).

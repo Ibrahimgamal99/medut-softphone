@@ -7,7 +7,7 @@ import android.graphics.RectF
 import android.view.View
 
 /**
- * Three rising signal bars for call quality, as in Echo. [setQuality] takes
+ * Three rising signal bars for call quality. [setQuality] takes
  * the 0–4 grade (4 shows as 3 bars) and the colour of the lit bars.
  */
 class QualityBars(context: Context) : View(context) {
