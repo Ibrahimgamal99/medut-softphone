@@ -11,11 +11,11 @@ import '../sip/sip_service.dart';
 import 'contacts_screen.dart' show StatusRulesScreen;
 import 'status_codes.dart';
 
-/// Your status: Ready, Silent, Do not disturb — a label, a
+/// Your status: Available, Ready, Do not disturb — a label, a
 /// colour and an icon.
 (String, Color, IconData) statusLook(Tokens t, MyStatus s) => switch (s) {
-      MyStatus.available => ('statusAvailable'.tr(), t.success, Icons.check_circle),
-      MyStatus.silent => ('statusSilent'.tr(), t.warn, Icons.notifications_off),
+      MyStatus.available => ('statusAvailable'.tr(), t.info, Icons.radio_button_checked),
+      MyStatus.ready => ('statusReady'.tr(), t.success, Icons.headset_mic),
       MyStatus.dnd => ('statusDnd'.tr(), t.danger, Icons.do_not_disturb_on),
     };
 
@@ -182,7 +182,7 @@ class _StatusSheet extends ConsumerWidget {
           ),
           Divider(height: 1, color: t.border),
           option(MyStatus.available, 'helpAvailable'.tr()),
-          option(MyStatus.silent, 'helpSilent'.tr()),
+          option(MyStatus.ready, 'helpReady'.tr()),
           option(MyStatus.dnd, 'helpDnd'.tr()),
           Divider(height: 1, color: t.border),
           ListTile(

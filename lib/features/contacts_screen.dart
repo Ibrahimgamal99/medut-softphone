@@ -567,8 +567,8 @@ class StatusButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final (label, color) = switch (status) {
-      MyStatus.available => ('statusAvailable'.tr(), t.success),
-      MyStatus.silent => ('statusSilent'.tr(), t.warn),
+      MyStatus.available => ('statusAvailable'.tr(), t.info),
+      MyStatus.ready => ('statusReady'.tr(), t.success),
       MyStatus.dnd => ('statusDnd'.tr(), t.danger),
     };
     return Material(

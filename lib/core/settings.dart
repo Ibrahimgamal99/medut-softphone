@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum MyStatus { available, silent, dnd }
+/// Your status. Available: registered, so calls to your extension ring,
+/// but out of the queues. Ready: in the queues as well. Do not disturb:
+/// DND on and out of the queues.
+enum MyStatus { available, ready, dnd }
 
 /// A colleague whose presence the Team tab watches (SUBSCRIBE).
 class Watched {
@@ -75,7 +78,11 @@ class AppSettings extends ChangeNotifier {
   set keepAlive(bool v) => _set('keepAlive', v);
 
   // Your status
-  MyStatus get status => MyStatus.values.byName(_s('status', 'available'));
+  MyStatus get status => switch (_s('status', 'available')) {
+        'ready' => MyStatus.ready,
+        'dnd' => MyStatus.dnd,
+        _ => MyStatus.available, // and 'silent', which is gone
+      };
   set status(MyStatus v) => _set('status', v.name);
 
   /// When the status was last picked (for the "Ready 12:03" timer).

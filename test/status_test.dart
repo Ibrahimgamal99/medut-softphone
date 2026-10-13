@@ -61,25 +61,35 @@ void main() {
     expect([back.pbx, back.code('dndOn')], ['freepbx', '*90']);
   });
 
-  test('Ready logs in to the queue, Do not disturb logs out, Silent sends nothing', () {
-    sip.setMyStatus(MyStatus.dnd);
-    expect(sip.dialed, ['*78'], reason: 'not in the queue yet: no toggle');
+  test('Ready logs in to the queue, Available logs out, Do not disturb sets DND and logs out', () {
+    sip.setMyStatus(MyStatus.ready);
+    expect(sip.dialed, ['*45'], reason: 'from Available: only the queue');
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.available);
+    expect(sip.dialed, ['*45'], reason: 'the toggle logs out again');
+    sip.dialed.clear();
+
+    sip.setMyStatus(MyStatus.dnd);
+    expect(sip.dialed, ['*78'], reason: 'already out of the queue');
+    sip.dialed.clear();
+
+    sip.setMyStatus(MyStatus.ready);
     expect(sip.dialed, ['*79', '*45']);
     sip.dialed.clear();
 
-    sip.setMyStatus(MyStatus.silent);
-    expect(sip.dialed, isEmpty);
-
     sip.setMyStatus(MyStatus.dnd);
-    expect(sip.dialed, ['*78', '*45'], reason: 'logged in, so the toggle logs out');
+    expect(sip.dialed, ['*78', '*45']);
     sip.dialed.clear();
 
-    sip.setMyStatus(MyStatus.silent);
-    expect(sip.dialed, ['*79'], reason: 'leaving DND for Silent lets calls in again');
+    sip.setMyStatus(MyStatus.available);
+    expect(sip.dialed, ['*79'], reason: 'leaving DND, and already out of the queue');
     expect(settings.statusSince.isAfter(DateTime(2020)), isTrue);
+  });
+
+  test('a saved Silent, which is gone, reads as Available', () async {
+    SharedPreferences.setMockInitialValues({'status': 'silent'});
+    expect((await AppSettings.load()).status, MyStatus.available);
   });
 
   Future<void> pump(WidgetTester tester, Widget home) async {

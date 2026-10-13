@@ -181,6 +181,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    // "Available" used to mean in the queue; whoever is logged in is Ready now.
+    if (settings.status == MyStatus.available && settings.queueIn.isNotEmpty) settings.status = MyStatus.ready;
     WidgetsBinding.instance.addObserver(this);
 
     _bridge.actions.listen(_onAction);
@@ -352,12 +354,13 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   final List<(String, String, String)> _codeQueue = [];
   ActiveCall? _codeCall;
 
-  /// Picks Ready, Silent or Do not disturb, and tells each registered
-  /// account's PBX with its feature codes: Ready = DND off + queue log-in,
-  /// Do not disturb = DND on + queue log-out, Silent = only the phone goes
-  /// quiet (DND off when it comes from Do not disturb). The codes are dialed
-  /// as ordinary calls, one after the other, so the PBX's announcement is
-  /// heard; a toggle such as FreePBX's *45 is only dialed to change state.
+  /// Picks Available, Ready or Do not disturb, and tells each registered
+  /// account's PBX with its feature codes: Available = out of the queues
+  /// (calls to your extension still ring), Ready = queue log-in, Do not
+  /// disturb = DND on + queue log-out; DND off is dialed when leaving Do not
+  /// disturb. The codes are dialed as ordinary calls, one after the other,
+  /// so the PBX's announcement is heard; a queue code is only dialed to
+  /// change state (FreePBX's *45 is a toggle).
   void setMyStatus(MyStatus next) {
     final prev = settings.status;
     if (prev == next) return;
@@ -367,10 +370,11 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       if (rt.status != RegStatus.registered || !store.accounts.any((a) => a.id == rt.cfg.id)) continue;
       final c = rt.cfg;
       final inQueue = settings.queueIn.contains(c.id);
+      final fromDnd = prev == MyStatus.dnd;
       final keys = switch (next) {
-        MyStatus.available => ['dndOff', if (!inQueue) 'queueLogin'],
+        MyStatus.available => [if (fromDnd) 'dndOff', if (inQueue) 'queueLogout'],
+        MyStatus.ready => [if (fromDnd) 'dndOff', if (!inQueue) 'queueLogin'],
         MyStatus.dnd => ['dndOn', if (inQueue) 'queueLogout'],
-        MyStatus.silent => [if (prev == MyStatus.dnd) 'dndOff'],
       };
       for (final k in keys) {
         final code = c.code(k);
@@ -1605,7 +1609,6 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'ringtone': _ringtoneSource,
       'vibrate': settings.vibrate,
       'recording': f.recording,
-      'silent': settings.effectiveStatus() == MyStatus.silent,
       'mos': s == null ? '' : fmt(mos, 1),
       // The quality sheet: each direction's MOS, then the figures behind it.
       'mosYou': s == null || s.mosLq <= 0 ? '' : fmt(s.mosLq, 1),

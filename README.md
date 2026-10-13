@@ -74,11 +74,13 @@ icon is its first hieroglyph, the staff 𓌃, with two sound waves.
   quality and SIP details.
 
 **Contacts and status**
-- Your status is Ready, Silent or Do not disturb, in a pill that shows how
-  long it has been set, and it is published with SIP PUBLISH. Each account
+- Your status is Available, Ready or Do not disturb, in a pill that shows how
+  long it has been set, and it is published with SIP PUBLISH. Available:
+  calls to your extension ring, but you are out of the queues. Ready: in the
+  queues too. Do not disturb: DND on and out of the queues. Each account
   picks its PBX (FreePBX / Issabel, FusionPBX / FreeSWITCH, 3CX or custom), and
-  changing status dials that PBX's feature codes: Ready means DND off plus
-  queue log-in, Do not disturb means DND on plus queue log-out.
+  changing status dials that PBX's feature codes (queue log-in / log-out,
+  DND on / off) only where the state changes.
 - Status rules: office hours, and who is let through on Do not disturb.
 - SIP has no directory, so extensions (2–6 digits) are learned from calls and
   from phone contacts saved with one, and can also be added by hand. Presence

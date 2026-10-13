@@ -14,8 +14,8 @@ import 'contacts_screen.dart';
 /// accounts, settings) and the account picker from the account pill.
 
 Color statusColor(Tokens t, MyStatus s) => switch (s) {
-      MyStatus.available => t.success,
-      MyStatus.silent => t.warn,
+      MyStatus.available => t.info,
+      MyStatus.ready => t.success,
       MyStatus.dnd => t.danger,
     };
 
@@ -46,7 +46,7 @@ class _MeSheet extends ConsumerWidget {
     final nav = Navigator.of(context);
     final help = switch (settings.effectiveStatus()) {
       MyStatus.available => 'helpAvailable'.tr(),
-      MyStatus.silent => 'helpSilent'.tr(),
+      MyStatus.ready => 'helpReady'.tr(),
       MyStatus.dnd => 'helpDnd'.tr(),
     };
 
