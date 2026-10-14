@@ -1,0 +1,36 @@
+name: iOS build
+
+# Compiles the iOS app (Swift PhoneEngine, MedutKit through the medut pod,
+# the call screen) without signing, so Swift errors show up on every push:
+# there is no Mac in the loop for day-to-day work. Medut-SDK comes from the
+# git sha pinned in pubspec.yaml.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-15
+    name: flutter build ios --no-codesign
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+
+      - name: Dart analysis and tests
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build iOS (no signing)
+        run: flutter build ios --release --no-codesign
