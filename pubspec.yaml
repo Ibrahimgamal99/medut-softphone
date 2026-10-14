@@ -19,7 +19,7 @@ dependencies:
     git:
       url: https://github.com/Ibrahimgamal99/Medut-SDK.git
       path: bindings/flutter
-      ref: d565d495af671a5cd4b4585bd108a96e540c403a
+      ref: a1b65f40befdd1b77d4d075b42040b4eacd24a13
 
   flutter_riverpod: ^2.6.1
 

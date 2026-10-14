@@ -796,6 +796,8 @@ object PhoneEngine {
             }
             dev.medut.CallState.HELD -> ac.phase = Phase.HELD
             dev.medut.CallState.ENDED, dev.medut.CallState.CANCELLED, dev.medut.CallState.FAILED -> {
+                // Ended from this phone, the app or not (Telecom, a headset, a watch).
+                if (e.endedLocally) ac.endedLocally = true
                 finish(ac, e.state == dev.medut.CallState.FAILED, e.reason, e.state)
                 return
             }
@@ -842,7 +844,9 @@ object PhoneEngine {
 
         val answered = ac.answeredAt > 0
         val result = if (ac.incoming) {
-            if (answered) "answered" else if (ac.userDeclined) "declined" else "missed"
+            // Unanswered and ended here (Decline in the app, on a headset or a
+            // watch) was declined; ended by the caller or the network, missed.
+            if (answered) "answered" else if (ac.userDeclined || ac.endedLocally) "declined" else "missed"
         } else {
             if (failed && !answered) "failed" else "answered"
         }

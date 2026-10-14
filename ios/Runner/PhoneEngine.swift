@@ -708,6 +708,8 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
     case .held:
       ac.phase = .held
     case .ended, .cancelled, .failed:
+      // Ended from this phone, the app or not (CallKit, AirPods, a watch).
+      if e.endedLocally { ac.endedLocally = true }
       finish(ac, failed: e.state == .failed, reason: e.reason, state: e.state)
       return
     default:
@@ -748,7 +750,8 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
     }
     let answered = ac.answeredAt != nil
     let result = ac.incoming
-      ? (answered ? "answered" : (ac.userDeclined ? "declined" : "missed"))
+      // Unanswered and ended here was declined; by the caller or the network, missed.
+      ? (answered ? "answered" : (ac.userDeclined || ac.endedLocally ? "declined" : "missed"))
       : (failed && !answered ? "failed" : "answered")
     let s = ac.stats
     let info = ac.info
