@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medut_phone/core/accounts.dart';
 import 'package:medut_phone/core/db.dart';
+import 'package:medut_phone/core/language.dart';
 import 'package:medut_phone/core/providers.dart';
 import 'package:medut_phone/core/settings.dart';
 import 'package:medut_phone/core/theme.dart';
@@ -207,7 +208,12 @@ void main() {
   testWidgets('the language is picked from a globe button, not a word', (tester) async {
     await pump(tester);
     expect(find.byIcon(Icons.language), findsOneWidget);
-    expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.language));
+    await tester.pumpAndSettle();
+    expect(find.text('languageAuto'), findsOneWidget);
+    for (final (_, name) in appLanguages) {
+      expect(find.text(name), findsOneWidget);
+    }
   });
 
   testWidgets('a server found over UDP gets no media encryption', (tester) async {

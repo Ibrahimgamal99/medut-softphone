@@ -200,6 +200,8 @@
   "themeLight": "فاتح",
   "themeDark": "داكن",
   "language": "اللغة",
+  "languageAuto": "تلقائي",
+  "languageAutoSub": "لغة النظام",
   "reachability": "إمكانية الوصول",
   "stayReachable": "البقاء متاحاً",
   "stayReachableSub": "يُبقي حساباتك مسجّلة أثناء إغلاق التطبيق",

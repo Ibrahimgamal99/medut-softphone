@@ -122,7 +122,7 @@ extension TokensX on BuildContext {
 TextStyle mono(BuildContext context, {double size = 11, Color? color, FontWeight? weight}) =>
     GoogleFonts.dmMono(fontSize: size, color: color ?? context.t.text2, fontWeight: weight);
 
-ThemeData buildTheme(Tokens tk, {required bool arabic}) {
+ThemeData buildTheme(Tokens tk, {required String language}) {
   final base = ThemeData(
     useMaterial3: true,
     brightness: tk.dark ? Brightness.dark : Brightness.light,
@@ -141,7 +141,12 @@ ThemeData buildTheme(Tokens tk, {required bool arabic}) {
     dividerColor: tk.border,
     extensions: [tk],
   );
-  final family = arabic ? GoogleFonts.cairo().fontFamily : GoogleFonts.figtree().fontFamily;
+  // Figtree has no Arabic letters, nor Persian's; Chinese uses the system font.
+  final family = switch (language) {
+    'ar' => GoogleFonts.cairo().fontFamily,
+    'fa' => GoogleFonts.vazirmatn().fontFamily,
+    _ => GoogleFonts.figtree().fontFamily,
+  };
   return base.copyWith(
     textTheme: base.textTheme.apply(fontFamily: family, bodyColor: tk.text, displayColor: tk.text),
     appBarTheme: AppBarTheme(

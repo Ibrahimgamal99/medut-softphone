@@ -12,6 +12,7 @@ import '../core/accounts.dart' show codecNames, kCodecs;
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../core/db.dart';
+import '../core/language.dart';
 import '../sip/native_bridge.dart';
 import '../sip/sip_service.dart';
 import '../sip/tones.dart';
@@ -127,19 +128,18 @@ class SettingsScreen extends ConsumerWidget {
               child: _ThemeSwatches(value: s.themeMode, onChanged: (v) => s.themeMode = v),
             ),
           ]),
-          SettingsTile(
-            icon: Icons.translate,
-            tint: t.info,
-            title: 'language'.tr(),
-            trailing: SizedBox(
-              width: 104,
-              child: PocketSegments(
-                options: const ['en', 'ar'],
-                labels: const ['EN', 'ع'],
-                value: Localizations.localeOf(context).languageCode,
-                onChanged: (v) => context.setLocale(Locale(v)),
-              ),
-            ),
+          ValueListenableBuilder(
+            valueListenable: followsPhoneLanguage,
+            builder: (context, auto, _) {
+              final name = languageName(Localizations.localeOf(context).languageCode);
+              return SettingsTile(
+                icon: Icons.translate,
+                tint: t.info,
+                title: 'language'.tr(),
+                subtitle: auto ? '${'languageAuto'.tr()} · $name' : name,
+                onTap: () => showLanguageSheet(context),
+              );
+            },
           ),
         ]),
         SettingsSection(title: 'statusSection'.tr(), children: [

@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/accounts.dart';
 import 'core/contacts.dart';
 import 'core/db.dart';
+import 'core/language.dart';
 import 'core/providers.dart';
 import 'core/settings.dart';
 import 'sip/sip_service.dart';
@@ -17,6 +18,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
   await initializeDateFormatting();
+  await loadLanguageChoice();
 
   final settings = await AppSettings.load();
   final store = await AccountStore.load();
@@ -41,7 +43,7 @@ Future<void> main() async {
 
   runApp(
     EasyLocalization(
-      supportedLocales: const [Locale('en'), Locale('ar')],
+      supportedLocales: appLocales,
       path: 'assets/translations',
       fallbackLocale: const Locale('en'),
       child: ProviderScope(

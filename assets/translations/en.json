@@ -200,6 +200,8 @@
   "themeLight": "Light",
   "themeDark": "Dark",
   "language": "Language",
+  "languageAuto": "Automatic",
+  "languageAutoSub": "System language",
   "reachability": "Reachability",
   "stayReachable": "Stay reachable",
   "stayReachableSub": "Keeps your accounts registered while the app is closed",

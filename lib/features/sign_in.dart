@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/accounts.dart';
+import '../core/language.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../sip/probe.dart';
@@ -587,14 +588,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         const Text('medut', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.2)),
       ],
       const Spacer(),
-      PopupMenuButton<String>(
+      IconButton(
         tooltip: 'language'.tr(),
         icon: Icon(Icons.language, color: t.text2),
-        onSelected: (code) => context.setLocale(Locale(code)),
-        itemBuilder: (_) => [
-          for (final (code, name) in const [('en', 'English'), ('ar', 'العربية')])
-            CheckedPopupMenuItem(value: code, checked: context.locale.languageCode == code, child: Text(name)),
-        ],
+        onPressed: () => showLanguageSheet(context),
       ),
     ]);
   }
