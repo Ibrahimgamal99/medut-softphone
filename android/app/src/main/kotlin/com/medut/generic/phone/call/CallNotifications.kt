@@ -51,7 +51,9 @@ object CallNotifications {
                 setShowBadge(false)
             },
             // High: a missed call or a message pops up as a heads-up.
-            NotificationChannel(CH_MISSED, "Missed calls", NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CH_MISSED, "Missed calls", NotificationManager.IMPORTANCE_HIGH).apply {
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            },
             NotificationChannel(CH_MESSAGES, "Messages", NotificationManager.IMPORTANCE_HIGH),
         ))
     }
@@ -208,15 +210,23 @@ object CallNotifications {
             )
             .build()
 
-    /** One notification for all unseen missed calls, replaced on every new miss. */
+    /**
+     * One notification for all unseen missed calls, replaced on every new
+     * miss. Public, like the phone's own: on a locked phone a private one
+     * shows only the app and a count, which reads like a call counter.
+     */
     fun showMissed(context: Context, count: Int, latest: String, title: String) {
         val n = NotificationCompat.Builder(context, CH_MISSED)
-            .setSmallIcon(R.drawable.ic_stat_medut)
+            .setSmallIcon(R.drawable.ic_call_missed)
             .setContentTitle(title)
             .setContentText(latest)
             .setNumber(count)
+            .setWhen(System.currentTimeMillis())
+            .setShowWhen(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(0xFFE5383B.toInt()) // the missed red, as in the Calls tab
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(
