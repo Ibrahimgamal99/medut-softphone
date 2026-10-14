@@ -68,7 +68,8 @@ private enum Ink {
 /// this takes over once the call is dialling or connected. A dark "ink"
 /// surface in both themes: the caller, the quality pill (tap it for every
 /// figure), four controls in a dock, then Transfer · End · More. It holds no
-/// call state: it renders [MedutBridge.latest] and sends every tap to Dart.
+/// call state: it renders [MedutBridge.latest] and sends every tap to
+/// [PhoneEngine]. Transfer and Add call pick their number here too.
 final class CallViewController: UIViewController {
 
   private var snap = CallSnapshot()
@@ -109,8 +110,30 @@ final class CallViewController: UIViewController {
   private let sheetRows = UIStackView()
 
   private let keypad = UIStackView()
+  private let keypadTitle = UILabel()
   private let keypadDigits = UILabel()
   private let keypadHide = UIButton(type: .system)
+  private var keypadEnd: UIButton!
+  private var keypadCall: UIButton!
+  private var keypadBack: UIButton!
+  /// The keypad sends DTMF, or dials a second call ("Add call").
+  private var addCallMode = false
+
+  // A warm transfer under way: who is being consulted, Back to caller / Join & drop.
+  private let xferBar = UIStackView()
+  private let xferStatus = UILabel()
+  private let xferHint = UILabel()
+  private let xferBack = UIButton(type: .system)
+  private let xferJoin = UIButton(type: .system)
+
+  // Transfer: who to send the caller to, then blind or warm.
+  private let transferSheet = UIView()
+  private let transferTitle = UILabel()
+  private let transferInput = UITextField()
+  private let transferList = UIStackView()
+  private var blindOption: UIButton!
+  private var warmOption: UIButton!
+  private var transferBottom: NSLayoutConstraint!
 
   override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
 
@@ -172,7 +195,21 @@ final class CallViewController: UIViewController {
     recLabel.text = "● " + s.label("recShort", "Rec")
     recLabel.isHidden = !s.recording
 
-    if let second = s.second {
+    if let xfer = s.transfer {
+      // The bar replaces the "on hold · Complete" pill while it is up.
+      xferBar.isHidden = false
+      xferStatus.text = xfer["status"] as? String ?? ""
+      xferHint.text = xfer["hint"] as? String ?? ""
+      xferBack.setTitle(xfer["back"] as? String ?? "Back to caller", for: .normal)
+      xferJoin.setTitle(xfer["join"] as? String ?? "Join & drop", for: .normal)
+      let talking = (xfer["phase"] as? String) == "talking"
+      xferJoin.isEnabled = talking
+      xferJoin.alpha = talking ? 1 : 0.45
+    } else {
+      xferBar.isHidden = true
+    }
+
+    if let second = s.second, s.transfer == nil {
       secondRow.isHidden = false
       secondText.text = second["text"] as? String
         ?? "\(second["name"] as? String ?? "") · \(s.label("onHold", "On hold"))"
@@ -199,13 +236,15 @@ final class CallViewController: UIViewController {
     transferLabel.text = s.label("transfer", "Transfer")
     moreLabel.text = s.label("more", "More")
     keypadHide.setTitle(s.label("hide", "Hide"), for: .normal)
+    renderKeypad(s)
     renderSheet(s)
-    // Screen-off at the ear is driven from Dart (proximity_screen_lock).
+    if !transferSheet.isHidden { renderTransfer(s) }
+    // Screen-off at the ear is the engine's (PhoneEngine.push).
   }
 
   private func renderSheet(_ s: CallSnapshot) {
     if sheetOpen && s.details.isEmpty { sheetOpen = false }
-    dim.isHidden = !sheetOpen
+    dim.isHidden = !sheetOpen && transferSheet.isHidden
     sheet.isHidden = !sheetOpen
     guard sheetOpen else { return }
     sheetTitle.text = s.label("callQuality", "Call quality")
@@ -258,21 +297,23 @@ final class CallViewController: UIViewController {
 
   @objc private func closeSheet() {
     sheetOpen = false
+    if !transferSheet.isHidden { closeTransfer() }
     render(snap)
   }
 
-  @objc private func tapSwap() { MedutBridge.shared.action(secondAction) }
-  @objc private func tapHangup() { MedutBridge.shared.action("hangup") }
-  @objc private func tapTransfer() { openApp("transfer") }
+  @objc private func tapSwap() { PhoneEngine.shared.action(secondAction) }
+  @objc private func tapHangup() { PhoneEngine.shared.action("hangup") }
+  @objc private func tapXferBack() { PhoneEngine.shared.action("cancelTransfer") }
+  @objc private func tapXferJoin() { PhoneEngine.shared.action("completeTransfer") }
 
   @objc private func tapDock(_ sender: UIButton) {
     guard let key = sender.accessibilityIdentifier else { return }
     let s = snap
     switch key {
-    case "mute": MedutBridge.shared.action(s.muted ? "unmute" : "mute")
+    case "mute": PhoneEngine.shared.action(s.muted ? "unmute" : "mute")
     case "speaker": chooseRoute(s, from: sender)
-    case "third": if s.canRecord { MedutBridge.shared.action("record") } else { showKeypad(true) }
-    case "hold": MedutBridge.shared.action(s.held ? "unhold" : "hold")
+    case "third": if s.canRecord { PhoneEngine.shared.action("record") } else { showKeypad(true) }
+    case "hold": PhoneEngine.shared.action(s.held ? "unhold" : "hold")
     default: break
     }
   }
@@ -283,7 +324,7 @@ final class CallViewController: UIViewController {
     let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
     menu.overrideUserInterfaceStyle = .dark
     menu.addAction(UIAlertAction(title: s.label("addCall", "Add call"), style: .default) { [weak self] _ in
-      self?.openApp("add")
+      self?.showKeypad(true, addCall: true)
     })
     if s.canRecord {
       menu.addAction(UIAlertAction(title: s.label("keypad", "Keypad"), style: .default) { [weak self] _ in
@@ -291,7 +332,9 @@ final class CallViewController: UIViewController {
       })
     }
     menu.addAction(UIAlertAction(title: s.label("message", "Message"), style: .default) { [weak self] _ in
-      self?.openApp("message")
+      // The conversation is in the app.
+      PhoneEngine.shared.action("message")
+      self?.tapMinimize()
     })
     menu.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))
     menu.popoverPresentationController?.sourceView = moreButton
@@ -299,17 +342,11 @@ final class CallViewController: UIViewController {
     present(menu, animated: true)
   }
 
-  /// These flows live in the Flutter UI: show it on the right screen.
-  private func openApp(_ route: String) {
-    MedutBridge.shared.action(route)
-    MedutBridge.shared.toDart("openRoute", ["route": route])
-    tapMinimize()
-  }
 
   private func chooseRoute(_ s: CallSnapshot, from button: UIButton) {
     // One tap toggles the speaker; with a headset connected, pick the output.
     guard s.bluetooth, !s.routes.isEmpty else {
-      MedutBridge.shared.action("toggleSpeaker")
+      PhoneEngine.shared.action("toggleSpeaker")
       return
     }
     let menu = UIAlertController(title: s.label("audioOutput", "Audio output"), message: nil, preferredStyle: .actionSheet)
@@ -319,7 +356,7 @@ final class CallViewController: UIViewController {
       let name = r["name"] as? String ?? id
       let active = (r["kind"] as? String) == s.route
       menu.addAction(UIAlertAction(title: (active ? "✓ " : "") + name, style: .default) { _ in
-        MedutBridge.shared.action("route", extra: ["routeId": id])
+        PhoneEngine.shared.action("route", ["routeId": id])
       })
     }
     menu.addAction(UIAlertAction(title: s.label("cancel", "Cancel"), style: .cancel))
@@ -328,23 +365,148 @@ final class CallViewController: UIViewController {
     present(menu, animated: true)
   }
 
-  private func showKeypad(_ show: Bool) {
+  private func showKeypad(_ show: Bool, addCall: Bool = false) {
     keypad.isHidden = !show
     stack.isHidden = show
+    addCallMode = show && addCall
     if show {
       dtmfTyped = ""
       keypadDigits.text = " "
     }
+    renderKeypad(snap)
+  }
+
+  private func renderKeypad(_ s: CallSnapshot) {
+    keypadTitle.text = "\(s.label("addCallTitle", "Add call")) · \(s.title) \(s.label("onHold", "On hold"))"
+    keypadTitle.isHidden = !addCallMode
+    keypadEnd.isHidden = addCallMode
+    keypadCall.isHidden = !addCallMode
+    keypadCall.alpha = dtmfTyped.isEmpty ? 0.45 : 1
+    keypadBack.alpha = addCallMode && !dtmfTyped.isEmpty ? 1 : 0
   }
 
   @objc private func tapKey(_ sender: UIButton) {
     guard let d = sender.title(for: .normal) else { return }
-    dtmfTyped = String((dtmfTyped + d).suffix(24))
+    dtmfTyped = String((dtmfTyped + d).suffix(addCallMode ? 40 : 24))
     keypadDigits.text = dtmfTyped
-    MedutBridge.shared.action("dtmf", extra: ["digit": d])
+    if !addCallMode { PhoneEngine.shared.action("dtmf", ["digit": d]) }
+    renderKeypad(snap)
+  }
+
+  @objc private func tapBackspace() {
+    dtmfTyped = String(dtmfTyped.dropLast())
+    keypadDigits.text = dtmfTyped.isEmpty ? " " : dtmfTyped
+    renderKeypad(snap)
+  }
+
+  @objc private func tapAddCall() {
+    let number = dtmfTyped.trimmingCharacters(in: .whitespaces)
+    guard !number.isEmpty else { return }
+    showKeypad(false)
+    PhoneEngine.shared.action("addCall", ["number": number])
   }
 
   @objc private func tapHideKeypad() { showKeypad(false) }
+
+  // MARK: Transfer
+
+  @objc private func tapTransfer() {
+    transferInput.text = ""
+    transferSheet.isHidden = false
+    dim.isHidden = false
+    renderTransfer(snap)
+    transferInput.becomeFirstResponder()
+  }
+
+  private func closeTransfer() {
+    transferInput.resignFirstResponder()
+    transferSheet.isHidden = true
+    dim.isHidden = !sheetOpen
+  }
+
+  private func transferTo(warm: Bool) {
+    let target = (transferInput.text ?? "").trimmingCharacters(in: .whitespaces)
+    guard !target.isEmpty else { return }
+    closeTransfer()
+    PhoneEngine.shared.action(warm ? "transferWarm" : "transferBlind", ["target": target])
+  }
+
+  @objc private func tapBlind() { transferTo(warm: false) }
+  @objc private func tapWarm() { transferTo(warm: true) }
+  @objc private func transferTyped() { renderTransfer(snap) }
+
+  @objc private func tapTarget(_ sender: UIButton) {
+    transferInput.text = sender.accessibilityIdentifier
+    renderTransfer(snap)
+  }
+
+  /// Title, the matching Team list with presence, and the two ways to transfer.
+  private func renderTransfer(_ s: CallSnapshot) {
+    transferTitle.text = s.label("transferWho", "Transfer {a}").replacingOccurrences(of: "{a}", with: s.title)
+    transferInput.attributedPlaceholder = NSAttributedString(
+      string: s.label("transferTo", "Transfer to (extension or number)"),
+      attributes: [.foregroundColor: Ink.text2])
+    let typed = (transferInput.text ?? "").trimmingCharacters(in: .whitespaces)
+    let q = typed.lowercased()
+    let matches = PhoneEngine.shared.config.watched
+      .filter { q.isEmpty || $0.0.lowercased().contains(q) || $0.1.contains(q) }
+      .prefix(5)
+    transferList.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    for (name, ext) in matches { transferList.addArrangedSubview(targetRow(s, name: name, ext: ext, selected: typed == ext)) }
+    for (b, title, hint) in [(blindOption!, s.label("blindTransfer", "Blind transfer"),
+                              s.label("blindTransferSub", "Sends the caller straight there. You leave the call now.")),
+                             (warmOption!, s.label("warmTransfer", "Warm transfer"),
+                              s.label("warmTransferSub", "The caller waits on hold while you talk to them, then you join them."))] {
+      let text = NSMutableAttributedString(string: title + "\n", attributes: [
+        .font: UIFont.systemFont(ofSize: 15, weight: .bold), .foregroundColor: Ink.text])
+      text.append(NSAttributedString(string: hint, attributes: [
+        .font: UIFont.systemFont(ofSize: 12.5), .foregroundColor: Ink.text2]))
+      b.setAttributedTitle(text, for: .normal)
+      b.isEnabled = !typed.isEmpty
+      b.alpha = typed.isEmpty ? 0.5 : 1
+    }
+  }
+
+  private func targetRow(_ s: CallSnapshot, name: String, ext: String, selected: Bool) -> UIView {
+    let presence = PhoneEngine.shared.presence[ext]
+    var word = s.label("presenceUnknown", "Unknown")
+    var dot = Ink.text2
+    switch presence {
+    case "open":
+      word = s.label("presenceOpen", "Available")
+      dot = Ink.good
+    case "busy":
+      word = s.label("presenceBusy", "On a call")
+      dot = Ink.poor
+    case "closed":
+      word = s.label("presenceClosed", "Offline / do not disturb")
+      dot = Ink.c(0xB7AEFF)
+    default:
+      break
+    }
+    let b = UIButton(type: .system)
+    b.accessibilityIdentifier = ext
+    b.contentHorizontalAlignment = .leading
+    b.contentEdgeInsets = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+    b.backgroundColor = selected ? Ink.good.withAlphaComponent(0.16) : .clear
+    b.layer.cornerRadius = 12
+    let text = NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: dot, .font: UIFont.systemFont(ofSize: 13)])
+    text.append(NSAttributedString(string: (name.isEmpty ? ext : name) + "\n", attributes: [
+      .font: UIFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: Ink.text]))
+    text.append(NSAttributedString(string: "    \(ext) · \(word)", attributes: [
+      .font: UIFont.systemFont(ofSize: 12), .foregroundColor: Ink.text2]))
+    b.setAttributedTitle(text, for: .normal)
+    b.titleLabel?.numberOfLines = 2
+    b.addTarget(self, action: #selector(tapTarget(_:)), for: .touchUpInside)
+    return b
+  }
+
+  @objc private func keyboardChanged(_ n: Notification) {
+    guard let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
+    let overlap = max(0, view.bounds.maxY - view.convert(end, from: nil).minY)
+    transferBottom.constant = -overlap
+    UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
+  }
 
   // MARK: Construction
 
@@ -494,12 +656,40 @@ final class CallViewController: UIViewController {
     bottom.distribution = .fillEqually
     bottom.alignment = .center
 
+    // Warm transfer: who is being consulted, Back to caller / Join & drop.
+    style(xferStatus, 14.5, .bold)
+    style(xferHint, 12, color: Ink.text2)
+    xferHint.numberOfLines = 2
+    for (b, bg, fg, sel) in [(xferBack, Ink.fill, Ink.text, #selector(tapXferBack)),
+                             (xferJoin, Ink.good, Ink.c(0x04271A), #selector(tapXferJoin))] {
+      b.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
+      b.setTitleColor(fg, for: .normal)
+      b.backgroundColor = bg
+      b.layer.cornerRadius = 22
+      b.heightAnchor.constraint(equalToConstant: 44).isActive = true
+      b.addTarget(self, action: sel, for: .touchUpInside)
+    }
+    let xferButtons = UIStackView(arrangedSubviews: [xferBack, xferJoin])
+    xferButtons.axis = .horizontal
+    xferButtons.distribution = .fillEqually
+    xferButtons.spacing = 8
+    [xferStatus, xferHint, xferButtons].forEach { xferBar.addArrangedSubview($0) }
+    xferBar.axis = .vertical
+    xferBar.spacing = 6
+    xferBar.isLayoutMarginsRelativeArrangement = true
+    xferBar.layoutMargins = UIEdgeInsets(top: 12, left: 14, bottom: 14, right: 14)
+    xferBar.backgroundColor = Ink.pill
+    xferBar.layer.cornerRadius = 22
+    xferBar.isHidden = true
+
     let spacerTop = UIView()
     let spacerMid = UIView()
     stack.addArrangedSubview(header)
     stack.addArrangedSubview(secondRow)
     stack.addArrangedSubview(spacerTop)
     stack.addArrangedSubview(caller)
+    stack.addArrangedSubview(xferBar)
+    stack.setCustomSpacing(12, after: caller)
     stack.addArrangedSubview(spacerMid)
     stack.addArrangedSubview(dockRow)
     stack.setCustomSpacing(18, after: dockRow)
@@ -516,6 +706,62 @@ final class CallViewController: UIViewController {
 
     buildKeypad()
     buildSheet()
+    buildTransferSheet()
+    NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)),
+                                           name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+  }
+
+  private func buildTransferSheet() {
+    transferSheet.backgroundColor = Ink.sheet
+    transferSheet.layer.cornerRadius = 26
+    transferSheet.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    transferSheet.isHidden = true
+    transferSheet.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(transferSheet)
+
+    style(transferTitle, 19, .heavy)
+    transferTitle.textAlignment = .natural
+    transferInput.keyboardType = .phonePad
+    transferInput.textColor = Ink.text
+    transferInput.font = .systemFont(ofSize: 18)
+    transferInput.backgroundColor = Ink.fill
+    transferInput.layer.cornerRadius = 16
+    transferInput.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 1))
+    transferInput.leftViewMode = .always
+    transferInput.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    transferInput.addTarget(self, action: #selector(transferTyped), for: .editingChanged)
+    transferList.axis = .vertical
+    transferList.spacing = 2
+    func option(_ symbol: String, _ sel: Selector) -> UIButton {
+      let b = UIButton(type: .system)
+      b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)), for: .normal)
+      b.tintColor = Ink.good
+      b.contentHorizontalAlignment = .leading
+      b.titleLabel?.numberOfLines = 0
+      b.contentEdgeInsets = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
+      b.titleEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: -14)
+      b.backgroundColor = UIColor(white: 1, alpha: 0.06)
+      b.layer.cornerRadius = 16
+      b.addTarget(self, action: sel, for: .touchUpInside)
+      return b
+    }
+    blindOption = option("arrow.turn.up.right", #selector(tapBlind))
+    warmOption = option("person.2.fill", #selector(tapWarm))
+    let content = UIStackView(arrangedSubviews: [transferTitle, transferInput, transferList, blindOption, warmOption])
+    content.axis = .vertical
+    content.spacing = 10
+    content.translatesAutoresizingMaskIntoConstraints = false
+    transferSheet.addSubview(content)
+    transferBottom = transferSheet.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+    NSLayoutConstraint.activate([
+      transferSheet.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      transferSheet.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      transferBottom,
+      content.topAnchor.constraint(equalTo: transferSheet.topAnchor, constant: 18),
+      content.leadingAnchor.constraint(equalTo: transferSheet.leadingAnchor, constant: 20),
+      content.trailingAnchor.constraint(equalTo: transferSheet.trailingAnchor, constant: -20),
+      content.bottomAnchor.constraint(equalTo: transferSheet.bottomAnchor, constant: -24),
+    ])
   }
 
   private func buildKeypad() {
@@ -525,8 +771,12 @@ final class CallViewController: UIViewController {
     keypad.isHidden = true
     keypad.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(keypad)
+    style(keypadTitle, 13, color: Ink.text2)
+    keypadTitle.isHidden = true
+    keypad.addArrangedSubview(keypadTitle)
     keypadDigits.font = .systemFont(ofSize: 34)
     keypadDigits.textColor = Ink.text
+    keypadDigits.lineBreakMode = .byTruncatingHead
     keypadDigits.text = " "
     keypad.addArrangedSubview(keypadDigits)
     for row in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["*", "0", "#"]] {
@@ -554,9 +804,19 @@ final class CallViewController: UIViewController {
     keypadHide.titleLabel?.font = .systemFont(ofSize: 15, weight: .bold)
     keypadHide.setTitleColor(Ink.text2, for: .normal)
     keypadHide.addTarget(self, action: #selector(tapHideKeypad), for: .touchUpInside)
-    let end = roundButton(74, symbol: "phone.down.fill", bg: Ink.end, tint: .white, action: #selector(tapHangup))
+    keypadEnd = roundButton(74, symbol: "phone.down.fill", bg: Ink.end, tint: .white, action: #selector(tapHangup))
+    keypadCall = roundButton(74, symbol: "phone.fill", bg: Ink.good, tint: Ink.c(0x04271A), action: #selector(tapAddCall))
+    keypadCall.isHidden = true
+    keypadBack = UIButton(type: .system)
+    keypadBack.setImage(UIImage(systemName: "delete.left", withConfiguration: UIImage.SymbolConfiguration(pointSize: 20)), for: .normal)
+    keypadBack.tintColor = Ink.text2
+    keypadBack.widthAnchor.constraint(equalToConstant: 56).isActive = true
+    keypadBack.addTarget(self, action: #selector(tapBackspace), for: .touchUpInside)
+    keypadBack.alpha = 0
     bottom.addArrangedSubview(keypadHide)
-    bottom.addArrangedSubview(end)
+    bottom.addArrangedSubview(keypadEnd)
+    bottom.addArrangedSubview(keypadCall)
+    bottom.addArrangedSubview(keypadBack)
     keypad.addArrangedSubview(bottom)
     let g = view.safeAreaLayoutGuide
     NSLayoutConstraint.activate([

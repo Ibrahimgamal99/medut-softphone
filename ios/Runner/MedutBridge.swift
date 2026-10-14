@@ -2,8 +2,8 @@ import Flutter
 import UIKit
 import UserNotifications
 
-/// One call snapshot, as pushed from Dart on every change. Dart owns the call;
-/// native only reports it to CallKit and draws the in-call screen.
+/// One call snapshot, as [PhoneEngine] builds it on every change. Every
+/// snapshot is complete, so the latest one is always enough to render.
 struct CallSnapshot {
   let raw: [String: Any]
 
@@ -39,22 +39,24 @@ struct CallSnapshot {
     (raw["details"] as? [[Any]])?.map { $0.map { "\($0)" } } ?? []
   }
   var second: [String: Any]? { raw["second"] as? [String: Any] }
+  /// A warm transfer under way: phase (calling | talking), status, hint, join, back.
+  var transfer: [String: Any]? { raw["transfer"] as? [String: Any] }
   /// Outputs offered during the call: [{id, kind, name}].
   var routes: [[String: Any]] { raw["routes"] as? [[String: Any]] ?? [] }
 
   var title: String { name.isEmpty ? number : name }
   var isLive: Bool { phase != "idle" && phase != "ended" }
 
-  /// Translated label from Dart, so native and Flutter share one string table.
+  /// Translated label from Flutter's string table, so native and Flutter share one.
   func label(_ key: String, _ fallback: String) -> String {
-    (raw["labels"] as? [String: Any])?[key] as? String ?? fallback
+    PhoneEngine.shared.config.label(key, fallback)
   }
 }
 
-/// The `medut/native` channel. Dart → native: call snapshots and a few
-/// commands. Native → Dart: CallKit actions and in-call screen taps
-/// (`callAction`), PushKit tokens and pushes, CallKit audio activation.
-/// Messages sent before Dart is listening are queued until it sends `ready`.
+/// The `medut/native` channel between Flutter and [PhoneEngine] (the same
+/// contract as NativeBridge.kt), and the fan-out of call snapshots to the
+/// native call screen. Messages to Dart before it is listening are dropped,
+/// except navigation, which waits for `ready`.
 final class MedutBridge {
   static let shared = MedutBridge()
 
@@ -75,50 +77,67 @@ final class MedutBridge {
 
   private func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     let args = call.arguments as? [String: Any] ?? [:]
+    let engine = PhoneEngine.shared
     switch call.method {
     case "ready":
       dartReady = true
+      result(engine.state())
       flush()
+    case "state":
+      result(engine.state())
+    case "getAccounts":
+      result(engine.repo.all().map { $0.json })
+    case "setAccounts":
+      engine.setAccounts((args["accounts"] as? [[String: Any]] ?? []).map(AccountCfg.init(json:)))
       result(nil)
-    case "callState":
-      update(CallSnapshot(args))
+    case "setConfig":
+      engine.setConfig(args)
       result(nil)
+    case "tryRegister":
+      let account = AccountCfg(json: args["account"] as? [String: Any] ?? [:])
+      engine.tryRegister(account, timeoutMs: (args["timeoutMs"] as? NSNumber)?.intValue ?? 8000) { result($0) }
+    case "cancelProbe":
+      engine.cancelProbe(args["id"] as? String ?? "")
+      result(nil)
+    case "retry":
+      engine.retryNow(args["id"] as? String ?? "")
+      result(nil)
+    case "dial":
+      engine.dial(args["number"] as? String ?? "", accountId: args["accountId"] as? String, name: args["name"] as? String)
+      result(nil)
+    case "sendMessage":
+      result(engine.sendMessage(args["peer"] as? String ?? "", args["body"] as? String ?? "",
+                                accountId: args["accountId"] as? String))
+    case "queueCodes":
+      engine.queueCodes(args["codes"] as? [[String: Any]] ?? [])
+      result(nil)
+    case "setPresenceTargets":
+      engine.setPresenceTargets(args["targets"] as? [String] ?? [])
+      result(nil)
+    case "getLog":
+      result(EngineLog.read(args["kind"] as? String ?? "conn", since: (args["since"] as? NSNumber)?.intValue ?? 0))
     case "openCallScreen":
       CallScreenPresenter.present()
       result(nil)
-    case "pushToken":
-      result(CallKitManager.shared.pushTokenInfo)
-    case "missedCalls":
-      notify(id: "medut.missed", title: args["title"] as? String ?? "Missed call",
-             body: args["latest"] as? String ?? "", badge: args["count"] as? Int)
+    case "missedSeen":
+      engine.missedSeen()
       result(nil)
-    case "clearMissed":
-      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["medut.missed"])
-      result(nil)
-    case "messageNotification":
-      let peer = args["peer"] as? String ?? ""
-      notify(id: "medut.msg.\(peer)", title: args["title"] as? String ?? peer, body: args["body"] as? String ?? "")
-      result(nil)
-    case "setRingtone":
-      CallKitManager.shared.setRingtone(path: args["path"] as? String)
-      result(nil)
-    case "keepAlive", "requestBatteryExemption", "openFullScreenIntentSettings":
-      result(nil)  // Android only
+    case "requestBatteryExemption", "openFullScreenIntentSettings":
+      result(nil) // Android only
     case "isBatteryExempt", "canUseFullScreenIntent":
       result(true)
-    case "setRoute":
-      result(false)  // the SDK's own iOS shim routes audio
     default:
       result(FlutterMethodNotImplemented)
     }
   }
 
-  // MARK: Dart → native state
+  // MARK: Engine → call screen
 
-  private func update(_ next: CallSnapshot) {
+  func update(_ next: CallSnapshot) {
     let prev = latest
     latest = next
-    CallKitManager.shared.sync(prev: prev, next: next)
+    // CallKit rings and answers; the app's own screen takes over once the
+    // call is dialling or connected, when the app is in front.
     if next.isLive && next.phase != "incoming" && UIApplication.shared.applicationState == .active
       && (prev.callId != next.callId || prev.phase == "incoming") {
       CallScreenPresenter.present()
@@ -141,17 +160,12 @@ final class MedutBridge {
   func toDart(_ method: String, _ args: Any? = nil) {
     DispatchQueue.main.async {
       guard let ch = self.channel, self.dartReady else {
-        self.pending.append((method, args))
+        // Only navigation is worth replaying: state is pulled on ready.
+        if method == "openRoute" { self.pending.append((method, args)) }
         return
       }
       ch.invokeMethod(method, arguments: args)
     }
-  }
-
-  func action(_ action: String, callId: String? = nil, extra: [String: Any] = [:]) {
-    var args: [String: Any] = ["action": action, "callId": callId ?? latest.callId]
-    extra.forEach { args[$0.key] = $0.value }
-    toDart("callAction", args)
   }
 
   private func flush() {
@@ -159,20 +173,5 @@ final class MedutBridge {
     let items = pending
     pending.removeAll()
     for (m, a) in items { ch.invokeMethod(m, arguments: a) }
-  }
-
-  /// A pop-up notification; the same [id] replaces the previous one
-  /// (one "N missed calls", one per conversation).
-  private func notify(id: String, title: String, body: String, badge: Int? = nil) {
-    let center = UNUserNotificationCenter.current()
-    center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-      guard granted else { return }
-      let content = UNMutableNotificationContent()
-      content.title = title
-      content.body = body
-      content.sound = .default
-      if let badge = badge { content.badge = NSNumber(value: badge) }
-      center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
-    }
   }
 }

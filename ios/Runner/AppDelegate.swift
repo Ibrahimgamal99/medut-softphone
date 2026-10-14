@@ -8,10 +8,10 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // PushKit first: on a VoIP-push launch the push is delivered right after
-    // this returns, and CallKit must be ready to report it.
-    _ = CallKitManager.shared
-    CallKitManager.shared.startPushKit()
+    // The phone first: on a VoIP-push launch the push is delivered right
+    // after this returns, and the SDK's CallKit must be ready to report it.
+    // The engine registers the accounts and rings calls with no Flutter UI.
+    PhoneEngine.shared.start()
     // Missed-call and message banners also pop up while the app is open.
     UNUserNotificationCenter.current().delegate = self
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

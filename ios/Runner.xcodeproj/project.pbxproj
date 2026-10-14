@@ -17,7 +17,9 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		2FA03605DD5D2D5B9D5F7834 /* MedutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E342B4127BFF115A0310DBC9 /* MedutBridge.swift */; };
-		43104A57BC66EB204BE1C9D1 /* CallKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8D7F2A044C3E33F6041646 /* CallKitManager.swift */; };
+		43104A57BC66EB204BE1C9D1 /* PhoneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8D7F2A044C3E33F6041646 /* PhoneEngine.swift */; };
+		A1E2C3D4E5F6A7B8C9D0E1F2 /* EngineSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* EngineSupport.swift */; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* ringback.wav in Resources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* ringback.wav */; };
 		51DFF629F4C68CC5047F350D /* CallViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E141D17AFE60F99E63FE21B6 /* CallViewController.swift */; };
 		5E15A699CF2B2C0A8F31B4A9 /* medut_classic.wav in Resources */ = {isa = PBXBuildFile; fileRef = 3AF1BCC7654802EA6EC464A9 /* medut_classic.wav */; };
 		311C4568BEF50122D9141E4E /* medut_soft.wav in Resources */ = {isa = PBXBuildFile; fileRef = ADB1F784FCE05682CEBCAEA9 /* medut_soft.wav */; };
@@ -65,7 +67,9 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E342B4127BFF115A0310DBC9 /* MedutBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedutBridge.swift; sourceTree = "<group>"; };
-		3D8D7F2A044C3E33F6041646 /* CallKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitManager.swift; sourceTree = "<group>"; };
+		3D8D7F2A044C3E33F6041646 /* PhoneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneEngine.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* EngineSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineSupport.swift; sourceTree = "<group>"; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* ringback.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ringback.wav; sourceTree = "<group>"; };
 		E141D17AFE60F99E63FE21B6 /* CallViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallViewController.swift; sourceTree = "<group>"; };
 		3AF1BCC7654802EA6EC464A9 /* medut_classic.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = medut_classic.wav; sourceTree = "<group>"; };
 		ADB1F784FCE05682CEBCAEA9 /* medut_soft.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = medut_soft.wav; sourceTree = "<group>"; };
@@ -136,7 +140,9 @@
 				ADB1F784FCE05682CEBCAEA9 /* medut_soft.wav */,
 				3AF1BCC7654802EA6EC464A9 /* medut_classic.wav */,
 				E141D17AFE60F99E63FE21B6 /* CallViewController.swift */,
-				3D8D7F2A044C3E33F6041646 /* CallKitManager.swift */,
+				3D8D7F2A044C3E33F6041646 /* PhoneEngine.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* EngineSupport.swift */,
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* ringback.wav */,
 				E342B4127BFF115A0310DBC9 /* MedutBridge.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -245,6 +251,7 @@
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				311C4568BEF50122D9141E4E /* medut_soft.wav in Resources */,
 				5E15A699CF2B2C0A8F31B4A9 /* medut_classic.wav in Resources */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* ringback.wav in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -302,7 +309,8 @@
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 				51DFF629F4C68CC5047F350D /* CallViewController.swift in Sources */,
-				43104A57BC66EB204BE1C9D1 /* CallKitManager.swift in Sources */,
+				43104A57BC66EB204BE1C9D1 /* PhoneEngine.swift in Sources */,
+				A1E2C3D4E5F6A7B8C9D0E1F2 /* EngineSupport.swift in Sources */,
 				2FA03605DD5D2D5B9D5F7834 /* MedutBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
