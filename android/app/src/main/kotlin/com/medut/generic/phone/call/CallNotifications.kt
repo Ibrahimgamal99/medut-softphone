@@ -27,6 +27,9 @@ object CallNotifications {
 
     private const val GREEN = 0xFF08805A.toInt() // the app's green, white text stays readable
 
+    /** Marks an incoming call where words would say so (the call log's arrow). */
+    const val INCOMING = "↙"
+
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -72,10 +75,15 @@ object CallNotifications {
     private fun person(s: CallSnapshot): Person =
         Person.Builder().setName(s.title.ifBlank { "Unknown" }).setImportant(true).build()
 
+    /**
+     * The incoming call: a pop-up while the phone is unlocked (in Medut or
+     * any other app), the full-screen ringing screen when it is locked.
+     * Tapping the pop-up opens the ringing screen; Answer answers there.
+     */
     fun showIncoming(context: Context, s: CallSnapshot) {
         if (s.phase != "incoming") return
-        val text = if (s.account.isNotBlank()) s.label("incomingOn", "Incoming call") + " · " + s.account
-        else s.label("incomingCall", "Incoming call")
+        // An arrow, not words: "↙ Office · 100".
+        val text = if (s.account.isNotBlank()) "$INCOMING ${s.account}" else INCOMING
         val n = NotificationCompat.Builder(context, CH_INCOMING)
             .setSmallIcon(R.drawable.ic_stat_medut)
             .setContentTitle(s.title)
@@ -85,6 +93,8 @@ object CallNotifications {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            // Re-posted as the call updates while it rings: pop up once.
+            .setOnlyAlertOnce(true)
             .setContentIntent(callScreenIntent(context, 10))
             .setFullScreenIntent(callScreenIntent(context, 11), true)
             .setStyle(
@@ -108,6 +118,7 @@ object CallNotifications {
      * "Calling…" with no timer until the call connects.
      */
     fun ongoing(context: Context, s: CallSnapshot): Notification {
+        if (Build.VERSION.SDK_INT >= 31) return ongoingCallStyle(context, s)
         val connecting = s.startedAt <= 0
         val b = NotificationCompat.Builder(context, CH_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_medut)
@@ -140,6 +151,42 @@ object CallNotifications {
         } else {
             b.setWhen(s.startedAt).setUsesChronometer(true).setShowWhen(true)
         }
+        return b.build()
+    }
+
+    /**
+     * The same card with the platform's CallStyle: AndroidX's keeps only one
+     * action next to Hang up, which dropped Speaker; the platform's keeps two.
+     */
+    @androidx.annotation.RequiresApi(31)
+    private fun ongoingCallStyle(context: Context, s: CallSnapshot): Notification {
+        val connecting = s.startedAt <= 0
+        val caller = android.app.Person.Builder().setName(s.title.ifBlank { "Unknown" }).setImportant(true).build()
+        fun action(icon: Int, label: String, intent: PendingIntent) =
+            Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(context, icon), label, intent).build()
+        val speakerOn = s.route == "speaker"
+        val b = Notification.Builder(context, CH_ONGOING)
+            .setSmallIcon(R.drawable.ic_stat_medut)
+            .setContentTitle(s.title)
+            .setContentText(if (connecting) s.label("calling", "Calling…") else s.status.ifBlank { s.account })
+            .setCategory(Notification.CATEGORY_CALL)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setColorized(true)
+            .setColor(GREEN)
+            .setContentIntent(callScreenIntent(context, 20))
+            .setStyle(Notification.CallStyle.forOngoingCall(caller, actionIntent(context, CallActionReceiver.HANGUP, 21)))
+            .addAction(action(
+                if (s.muted) R.drawable.ic_mic_off else R.drawable.ic_mic,
+                if (s.muted) s.label("unmute", "Unmute") else s.label("mute", "Mute"),
+                actionIntent(context, CallActionReceiver.TOGGLE_MUTE, 22),
+            ))
+            .addAction(action(
+                R.drawable.ic_speaker,
+                if (speakerOn) s.label("earpiece", "Phone") else s.label("speaker", "Speaker"),
+                actionIntent(context, CallActionReceiver.TOGGLE_SPEAKER, 23),
+            ))
+        if (connecting) b.setShowWhen(false) else b.setWhen(s.startedAt).setUsesChronometer(true).setShowWhen(true)
         return b.build()
     }
 

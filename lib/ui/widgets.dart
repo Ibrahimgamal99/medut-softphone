@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:medut/medut.dart' show PresenceStatus;
 
 import '../core/theme.dart';
 import '../sip/quality.dart';

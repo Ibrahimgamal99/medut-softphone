@@ -625,7 +625,7 @@ class DiagnosticsScreen extends ConsumerWidget {
             icon: Icons.info_outline,
             tint: t.text2,
             title: 'sdk'.tr(),
-            trailing: Text(sip.sdk?.version ?? '—', style: mono(context, size: 12)),
+            trailing: Text(sip.sdkVersion.isEmpty ? '—' : sip.sdkVersion, style: mono(context, size: 12)),
           ),
         ]),
       ]),

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../sip/native_bridge.dart';
+
 /// Filled in when ICE is turned on and no STUN server is set.
 const kDefaultStun = 'stun:stun.l.google.com:19302';
 
@@ -29,8 +31,8 @@ const kPbxPresets = <String, Map<String, String>>{
   'custom': {'dndOn': '', 'dndOff': '', 'queueLogin': '', 'queueLogout': ''},
 };
 
-/// One SIP account as the user configured it. Passwords live in the
-/// Keychain / Keystore; everything else in preferences.
+/// One SIP account as the user configured it. The native engine keeps it,
+/// passwords included, encrypted (see [AccountStore]).
 @immutable
 class SipAccountConfig {
   const SipAccountConfig({
@@ -318,16 +320,23 @@ class SipAccountConfig {
   }
 }
 
+/// The saved accounts. The native engine keeps them (encrypted, passwords
+/// included), so it can register them after a push or a reboot with no
+/// Flutter running; this reads and replaces the list over the channel. The
+/// first run after the move brings the accounts over from the old store
+/// (preferences + secure storage). With no native side (tests) it keeps
+/// using that old store.
 class AccountStore extends ChangeNotifier {
   AccountStore._(this._prefs);
 
-  static const _secure = FlutterSecureStorage(
+  static const _legacySecure = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
   final SharedPreferences _prefs;
   List<SipAccountConfig> _accounts = [];
+  bool _native = false;
 
   List<SipAccountConfig> get accounts => List.unmodifiable(_accounts);
 
@@ -337,7 +346,35 @@ class AccountStore extends ChangeNotifier {
     return s;
   }
 
+  /// What native keeps for [a]: [SipAccountConfig.toJson] plus the secrets.
+  static Map<String, dynamic> withSecrets(SipAccountConfig a) =>
+      {...a.toJson(), 'password': a.password, 'turnPass': a.turnPass};
+
+  static SipAccountConfig _fromNative(Map<String, dynamic> j) => SipAccountConfig.fromJson(
+        j,
+        password: j['password'] as String? ?? '',
+        turnPass: j['turnPass'] as String? ?? '',
+      );
+
   Future<void> _read() async {
+    final native = await NativeBridge.instance.getAccounts();
+    _native = native != null;
+    if (native == null) {
+      _accounts = await _readLegacy();
+      return;
+    }
+    if (native.isEmpty && _prefs.containsKey('accounts')) {
+      final legacy = await _readLegacy();
+      if (legacy.isEmpty || await NativeBridge.instance.setAccounts(legacy.map(withSecrets).toList())) {
+        await _clearLegacy(legacy);
+      }
+      _accounts = legacy;
+      return;
+    }
+    _accounts = native.map(_fromNative).toList();
+  }
+
+  Future<List<SipAccountConfig>> _readLegacy() async {
     final list = jsonDecode(_prefs.getString('accounts') ?? '[]') as List;
     final out = <SipAccountConfig>[];
     for (final e in list) {
@@ -345,16 +382,37 @@ class AccountStore extends ChangeNotifier {
       final id = j['id'] as String;
       out.add(SipAccountConfig.fromJson(
         j,
-        password: await _secure.read(key: 'pw_$id') ?? '',
-        turnPass: await _secure.read(key: 'turn_$id') ?? '',
+        password: await _legacySecure.read(key: 'pw_$id') ?? '',
+        turnPass: await _legacySecure.read(key: 'turn_$id') ?? '',
       ));
     }
-    _accounts = out;
+    return out;
+  }
+
+  Future<void> _clearLegacy(List<SipAccountConfig> moved) async {
+    for (final a in moved) {
+      await _legacySecure.delete(key: 'pw_${a.id}');
+      await _legacySecure.delete(key: 'turn_${a.id}');
+    }
+    await _prefs.remove('accounts');
   }
 
   Future<void> _write() async {
-    await _prefs.setString('accounts', jsonEncode(_accounts.map((a) => a.toJson()).toList()));
+    if (_native) {
+      await sync();
+    } else {
+      for (final a in _accounts) {
+        await _legacySecure.write(key: 'pw_${a.id}', value: a.password);
+        await _legacySecure.write(key: 'turn_${a.id}', value: a.turnPass);
+      }
+      await _prefs.setString('accounts', jsonEncode(_accounts.map((a) => a.toJson()).toList()));
+    }
     notifyListeners();
+  }
+
+  /// Hands native the saved list again; it re-registers what changed.
+  Future<void> sync() async {
+    if (_native) await NativeBridge.instance.setAccounts(_accounts.map(withSecrets).toList());
   }
 
   SipAccountConfig? byId(String id) {
@@ -371,8 +429,6 @@ class AccountStore extends ChangeNotifier {
   }
 
   Future<void> save(SipAccountConfig a) async {
-    await _secure.write(key: 'pw_${a.id}', value: a.password);
-    await _secure.write(key: 'turn_${a.id}', value: a.turnPass);
     var list = [..._accounts];
     final i = list.indexWhere((x) => x.id == a.id);
     if (a.isDefault) list = list.map((x) => x.isDefault ? x.copyWith(isDefault: false) : x).toList();
@@ -386,8 +442,10 @@ class AccountStore extends ChangeNotifier {
   }
 
   Future<void> remove(String id) async {
-    await _secure.delete(key: 'pw_$id');
-    await _secure.delete(key: 'turn_$id');
+    if (!_native) {
+      await _legacySecure.delete(key: 'pw_$id');
+      await _legacySecure.delete(key: 'turn_$id');
+    }
     _accounts = _accounts.where((a) => a.id != id).toList();
     if (_accounts.isNotEmpty && !_accounts.any((a) => a.isDefault)) {
       _accounts = [_accounts.first.copyWith(isDefault: true), ..._accounts.skip(1)];

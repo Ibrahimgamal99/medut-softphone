@@ -3,7 +3,7 @@ package com.medut.generic.phone.call
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.medut.generic.phone.NativeBridge
+import com.medut.generic.phone.engine.PhoneEngine
 
 /** Decline / Hang up from a notification, without bringing any screen up. */
 class CallActionReceiver : BroadcastReceiver() {
@@ -12,11 +12,11 @@ class CallActionReceiver : BroadcastReceiver() {
             DECLINE -> {
                 Ringer.stop()
                 CallNotifications.cancelIncoming(context)
-                NativeBridge.action("decline")
+                PhoneEngine.action("decline")
             }
-            HANGUP -> NativeBridge.action("hangup")
-            TOGGLE_MUTE -> NativeBridge.action("toggleMute")
-            TOGGLE_SPEAKER -> NativeBridge.action("toggleSpeaker")
+            HANGUP -> PhoneEngine.action("hangup")
+            TOGGLE_MUTE -> PhoneEngine.action("toggleMute")
+            TOGGLE_SPEAKER -> PhoneEngine.action("toggleSpeaker")
         }
     }
 

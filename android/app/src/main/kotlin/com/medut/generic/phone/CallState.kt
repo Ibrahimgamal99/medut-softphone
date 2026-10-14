@@ -6,13 +6,12 @@ import android.os.Looper
 import android.util.Log
 import com.medut.generic.phone.call.CallNotifications
 import com.medut.generic.phone.call.Ringer
+import com.medut.generic.phone.engine.PhoneEngine
 import com.medut.generic.phone.service.MedutService
-import com.medut.generic.phone.telecom.MedutTelecom
 
 /**
- * One call snapshot, as pushed from Dart on every change. Dart owns the call;
- * native only draws it. Every push is a full snapshot, so the latest one is
- * always enough to render.
+ * One call snapshot, as [PhoneEngine] builds it on every change. Every
+ * snapshot is complete, so the latest one is always enough to render.
  */
 class CallSnapshot(val raw: Map<String, Any?>) {
     val phase: String get() = raw["phase"] as? String ?: "idle"
@@ -20,6 +19,7 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val name: String get() = raw["name"] as? String ?: ""
     val number: String get() = raw["number"] as? String ?: ""
     val account: String get() = raw["account"] as? String ?: ""
+    val accountId: String get() = raw["accountId"] as? String ?: ""
     val status: String get() = raw["status"] as? String ?: ""
     val startedAt: Long get() = (raw["startedAt"] as? Number)?.toLong() ?: 0L
     val muted: Boolean get() = raw["muted"] == true
@@ -27,8 +27,9 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     val route: String get() = raw["route"] as? String ?: "earpiece"
     val bluetooth: Boolean get() = raw["bluetooth"] == true
     val recording: Boolean get() = raw["recording"] == true
-    val silent: Boolean get() = raw["silent"] == true
     val canRecord: Boolean get() = raw["canRecord"] != false
+    /** The ringing screen and ringtone are wanted (Telecom asked for them). */
+    val ring: Boolean get() = raw["ring"] == true
     /** File path of the chosen ringtone, or "system". */
     val ringtone: String get() = raw["ringtone"] as? String ?: "system"
     val vibrate: Boolean get() = raw["vibrate"] != false
@@ -61,11 +62,8 @@ class CallSnapshot(val raw: Map<String, Any?>) {
     @Suppress("UNCHECKED_CAST")
     val transfer: Map<String, Any?>? get() = raw["transfer"] as? Map<String, Any?>
 
-    @Suppress("UNCHECKED_CAST")
-    private val labels: Map<String, Any?> get() = raw["labels"] as? Map<String, Any?> ?: emptyMap()
-
-    /** Translated label from Dart, so native and Flutter share one string table. */
-    fun label(key: String, fallback: String): String = labels[key] as? String ?: fallback
+    /** Translated label from Flutter's string table, so native and Flutter share one. */
+    fun label(key: String, fallback: String): String = PhoneEngine.config.label(key, fallback)
 
     val title: String get() = name.ifBlank { number }
     val isLive: Boolean get() = phase != "idle" && phase != "ended"
@@ -95,23 +93,20 @@ object CallState {
         listeners.remove(l)
     }
 
-    /** Called on the main thread with each snapshot from Dart. */
+    /** Called on the main thread with each snapshot from the engine. */
     fun update(raw: Map<String, Any?>) {
         val prev = latest
         val next = CallSnapshot(raw)
         latest = next
         val newCall = next.callId != prev.callId
-        if (newCall || next.phase != prev.phase) {
-            Log.d(TAG, "phase ${prev.phase} -> ${next.phase} (${next.callId})")
+        if (newCall || next.phase != prev.phase || next.ring != prev.ring) {
+            Log.d(TAG, "phase ${prev.phase} -> ${next.phase} (${next.callId}) ring=${next.ring}")
             onTransition(prev, next, newCall)
         }
-        if (next.phase == "incoming") {
-            Ringer.setSilent(appContext, next.silent)
-            CallNotifications.showIncoming(appContext, next)
-        }
+        if (next.phase == "incoming" && next.ring) CallNotifications.showIncoming(appContext, next)
         // Stats arrive every few seconds; only touch the service notification
         // when something it shows has changed.
-        val serviceKey = "${next.callId}|${next.phase}|${next.title}|${next.startedAt}|${next.status}|${next.muted}"
+        val serviceKey = "${next.callId}|${next.phase}|${next.title}|${next.startedAt}|${next.status}|${next.muted}|${next.route}"
         if (serviceKey != lastServiceKey) {
             lastServiceKey = serviceKey
             MedutService.sync(appContext)
@@ -122,35 +117,11 @@ object CallState {
     private var lastServiceKey = ""
 
     private fun onTransition(prev: CallSnapshot, next: CallSnapshot, newCall: Boolean) {
-        when (next.phase) {
-            "incoming" -> {
-                if (newCall) {
-                    if (!MedutTelecom.startIncoming(appContext, next)) {
-                        // Telecom refused (no phone account on some OEMs): ring anyway.
-                        CallNotifications.showIncoming(appContext, next)
-                    }
-                    Ringer.start(appContext, next.ringtone, next.vibrate, next.silent)
-                }
-            }
-            "outgoing", "connecting" -> {
-                if (newCall) MedutTelecom.startOutgoing(appContext, next)
-                Ringer.stop()
-                CallNotifications.cancelIncoming(appContext)
-            }
-            "active" -> {
-                Ringer.stop()
-                CallNotifications.cancelIncoming(appContext)
-                MedutTelecom.setActive()
-            }
-            "held" -> MedutTelecom.setHeld(true)
-            "ended", "idle" -> {
-                Ringer.stop()
-                CallNotifications.cancelIncoming(appContext)
-                MedutTelecom.end()
-            }
+        if (next.phase == "incoming") {
+            if (next.ring && (newCall || !prev.ring)) Ringer.start(appContext, next.ringtone, next.vibrate)
+            return
         }
-        if (prev.phase == "held" && next.phase == "active") MedutTelecom.setHeld(false)
+        Ringer.stop()
+        CallNotifications.cancelIncoming(appContext)
     }
-
-    fun post(block: () -> Unit) = main.post(block)
 }

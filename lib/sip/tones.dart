@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:io';
 
-import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -76,69 +74,6 @@ class Tones {
     try {
       await p?.stop();
       await p?.dispose();
-    } catch (_) {}
-  }
-
-  // ── Ringback ──────────────────────────────────────────────────────────────
-
-  static AudioPlayer? _ringback;
-  static bool _ringingBack = false;
-
-  /// The "brrng… brrng…" while the far end rings (180 Ringing), stopped the
-  /// moment the call connects, fails or ends. Voice-call audio attributes, so
-  /// it plays where the user is already listening, like a native dialer.
-  static Future<void> startRingback() async {
-    if (_ringingBack) return;
-    _ringingBack = true;
-    try {
-      final session = await AudioSession.instance;
-      // iOS must keep the call's own category: a playback-only category would
-      // take the microphone away from the call that shares the session.
-      await session.configure(Platform.isIOS
-          ? const AudioSessionConfiguration(
-              avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-              avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth,
-              avAudioSessionMode: AVAudioSessionMode.voiceChat,
-            )
-          : const AudioSessionConfiguration(
-              androidAudioAttributes: AndroidAudioAttributes(
-                contentType: AndroidAudioContentType.sonification,
-                usage: AndroidAudioUsage.voiceCommunicationSignalling,
-              ),
-              androidAudioFocusGainType: AndroidAudioFocusGainType.gainTransient,
-            ));
-      final p = AudioPlayer(handleAudioSessionActivation: false);
-      _ringback = p;
-      await p.setLoopMode(LoopMode.one);
-      await p.setAsset('assets/sounds/ringback.wav');
-      // The call may have connected while the source was loading.
-      if (!_ringingBack || !identical(_ringback, p)) {
-        await _dispose(p);
-        return;
-      }
-      await p.play();
-    } catch (e) {
-      debugPrint('ringback failed: $e');
-    }
-  }
-
-  static void stopRingback() {
-    if (!_ringingBack) return;
-    _ringingBack = false;
-    final p = _ringback;
-    _ringback = null;
-    unawaited(_dispose(p));
-  }
-
-  // stop() before dispose(), errors swallowed: disposing while a load is in
-  // flight (answer the instant it rings) otherwise throws out of teardown.
-  static Future<void> _dispose(AudioPlayer? p) async {
-    if (p == null) return;
-    try {
-      await p.stop();
-    } catch (_) {}
-    try {
-      await p.dispose();
     } catch (_) {}
   }
 }

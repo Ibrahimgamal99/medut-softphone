@@ -20,10 +20,8 @@ class _FakeSip extends SipService {
   final dialed = <String>[];
 
   @override
-  ActiveCall? dial(String input, {String? accountId, String? name}) {
-    dialed.add(input);
-    return null;
-  }
+  Future<void> dialCodes(List<(String, String, String)> codes) async =>
+      dialed.addAll(codes.map((c) => c.$3));
 }
 
 const _pbx = SipAccountConfig(id: 'a1', name: 'Office', user: '201', domain: 'pbx.example.com');
@@ -37,6 +35,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'), (_) async => null);
+    // No native engine in tests: every call answers null.
+    messenger.setMockMethodCallHandler(const MethodChannel('medut/native'), (_) async => null);
     store = await AccountStore.load();
     await store.save(_pbx);
     settings = await AppSettings.load();
@@ -61,28 +61,35 @@ void main() {
     expect([back.pbx, back.code('dndOn')], ['freepbx', '*90']);
   });
 
-  test('Ready logs in to the queue, Available logs out, Do not disturb sets DND and logs out', () {
+  test('Ready logs in to the queue, Available logs out, Do not disturb sets DND and logs out', () async {
+    Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 50));
     sip.setMyStatus(MyStatus.ready);
+    await settle();
     expect(sip.dialed, ['*45'], reason: 'from Available: only the queue');
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.available);
+    await settle();
     expect(sip.dialed, ['*45'], reason: 'the toggle logs out again');
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.dnd);
+    await settle();
     expect(sip.dialed, ['*78'], reason: 'already out of the queue');
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.ready);
+    await settle();
     expect(sip.dialed, ['*79', '*45']);
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.dnd);
+    await settle();
     expect(sip.dialed, ['*78', '*45']);
     sip.dialed.clear();
 
     sip.setMyStatus(MyStatus.available);
+    await settle();
     expect(sip.dialed, ['*79'], reason: 'leaving DND, and already out of the queue');
     expect(settings.statusSince.isAfter(DateTime(2020)), isTrue);
   });

@@ -14,7 +14,7 @@ import com.medut.generic.phone.CallState
 import com.medut.generic.phone.call.CallNotifications
 
 /**
- * Keeps the process — and with it the Flutter engine that drives SIP — alive:
+ * Keeps the process — and with it the PhoneEngine that drives SIP — alive:
  *
  *  - while "Stay reachable" is on: a quiet notification, the SIP registration
  *    stays up and the PBX can ring this phone at any time;
@@ -22,7 +22,7 @@ import com.medut.generic.phone.call.CallNotifications
  *    closed and keeps the microphone in the background.
  *
  * START_STICKY: if Android kills us anyway, it restarts the service, which
- * restarts the process, the engine, and the registration.
+ * restarts the process, the engine (MedutApp), and the registration.
  */
 class MedutService : Service() {
 

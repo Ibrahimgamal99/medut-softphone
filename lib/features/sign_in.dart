@@ -160,7 +160,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   /// Your name on calls, and what to call the account, asked on the
   /// Connected step.
-  final _name = TextEditingController();
   final _accountName = TextEditingController();
 
   /// What a QR code or file carried beyond the form (TURN, TLS checks, …).
@@ -200,7 +199,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     for (final id in _tried) {
       _sip.cancelProbe(id);
     }
-    for (final c in [_address, _pass, _name, _accountName]) {
+    for (final c in [_address, _pass, _accountName]) {
       c.dispose();
     }
     _passFocus.dispose();
@@ -324,7 +323,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         setState(() {
           _steps['register'] = (CheckState.ok, cfg.transport, '');
           _connected = cfg;
-          _name.text = cfg.displayName;
           _accountName.text = cfg.name;
           _stage = _Stage.connected;
         });
@@ -377,7 +375,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final label = _accountName.text.trim();
     await ref
         .read(accountsProvider)
-        .save(c.copyWith(displayName: _name.text.trim(), name: label.isEmpty ? c.domain : label));
+        .save(c.copyWith(name: label.isEmpty ? c.domain : label));
     // Ask once, at the moment it makes sense: calls need the mic, and
     // ringing in the background needs notifications.
     await [Permission.microphone, Permission.notification].request();
@@ -864,16 +862,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           labelText: 'accountName'.tr(),
           hintText: 'accountNameHint'.tr(),
           helperText: 'accountNameHelp'.tr(),
-          floatingLabelBehavior: FloatingLabelBehavior.always,
-        ),
-      ),
-      const SizedBox(height: 12),
-      TextField(
-        controller: _name,
-        textCapitalization: TextCapitalization.words,
-        decoration: InputDecoration(
-          labelText: 'nameOnCallsOptional'.tr(),
-          hintText: 'nameOnCallsHint'.tr(),
           floatingLabelBehavior: FloatingLabelBehavior.always,
         ),
       ),

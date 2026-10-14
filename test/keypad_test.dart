@@ -29,6 +29,9 @@ void main() {
   setUp(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'), (_) async => null);
+    // No native engine in tests: every call answers null.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('medut/native'), (_) async => null);
     SharedPreferences.setMockInitialValues({
       'accounts': '[{"id":"a1","name":"Office PBX","user":"201","domain":"pbx.example.com","isDefault":true}]',
     });

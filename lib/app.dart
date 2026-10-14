@@ -16,6 +16,8 @@ class MedutPhoneApp extends ConsumerStatefulWidget {
 }
 
 class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindingObserver {
+  bool _sentToNative = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,8 +47,10 @@ class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindi
     final arabic = context.locale.languageCode == 'ar';
     final dark = _isDark(settings.themeMode);
 
-    // The native call screens follow the app's theme and language.
-    final changed = sip.isDark() != dark || sip.isRtl() != arabic;
+    // The native call screens follow the app's theme and language (and get
+    // the translations once they have loaded, on the first build).
+    final changed = !_sentToNative || sip.isDark() != dark || sip.isRtl() != arabic;
+    _sentToNative = true;
     sip.isDark = () => _isDark(ref.read(settingsProvider).themeMode);
     sip.isRtl = () => arabic;
     if (changed) WidgetsBinding.instance.addPostFrameCallback((_) => sip.refreshNative());

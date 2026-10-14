@@ -5,16 +5,25 @@ import android.content.Intent
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.embedding.engine.dart.DartExecutor
 
 /**
- * Shows the Flutter UI on the engine [MedutApp] already started. The engine is
- * not destroyed with the activity: closing the app must not drop the SIP
- * registration or a live call.
+ * The Flutter screens: history, accounts, contacts, settings. The engine is
+ * made on first open and kept, so coming back from the call screen is
+ * instant; calls themselves never need it.
  */
 class MainActivity : FlutterActivity() {
 
-    override fun provideFlutterEngine(context: Context): FlutterEngine =
-        (application as MedutApp).ensureEngine()
+    override fun provideFlutterEngine(context: Context): FlutterEngine {
+        FlutterEngineCache.getInstance().get(ENGINE_ID)?.let { return it }
+        val engine = FlutterEngine(context.applicationContext)
+        // The channel is up before Dart runs: main() asks for the accounts first thing.
+        NativeBridge.attach(context, engine.dartExecutor.binaryMessenger)
+        engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+        FlutterEngineCache.getInstance().put(ENGINE_ID, engine)
+        return engine
+    }
 
     override fun shouldDestroyEngineWithHost(): Boolean = false
 
@@ -28,7 +37,7 @@ class MainActivity : FlutterActivity() {
         handleRoute(intent)
     }
 
-    /** The native call screen opens the app on a Flutter flow (transfer, chat...). */
+    /** A notification or the call screen opens the app on a flow (chat, Calls tab). */
     private fun handleRoute(intent: Intent?) {
         val route = intent?.getStringExtra(EXTRA_ROUTE) ?: return
         intent.removeExtra(EXTRA_ROUTE)
@@ -37,6 +46,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val EXTRA_ROUTE = "medut_route"
+        private const val ENGINE_ID = "medut_ui"
 
         fun open(context: Context, route: String? = null) {
             val i = Intent(context, MainActivity::class.java)

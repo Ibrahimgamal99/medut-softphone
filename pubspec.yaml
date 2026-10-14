@@ -12,13 +12,14 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # SIP + media core (baresip over dart:ffi). Pinned to a full sha so the
-  # native binaries cannot move under a build.
+  # Medut-SDK: brings its Kotlin SDK (Android) and MedutKit (iOS) into the
+  # build. The app's native PhoneEngine drives them; Dart never imports it.
+  # Pinned to a full sha so the native binaries cannot move under a build.
   medut:
     git:
       url: https://github.com/Ibrahimgamal99/Medut-SDK.git
       path: bindings/flutter
-      ref: b1322f223547ca8e4e10ac24c460561fff365c89
+      ref: d565d495af671a5cd4b4585bd108a96e540c403a
 
   flutter_riverpod: ^2.6.1
 
@@ -34,9 +35,6 @@ dependencies:
   intl: ^0.20.2
 
   permission_handler: ^11.3.1
-  # FCM wake-up (Android). Optional: the app runs without google-services.json.
-  firebase_core: ^3.8.0
-  firebase_messaging: ^15.1.5
 
   # Add-account: scan a provisioning QR, or import an account JSON file
   mobile_scanner: ^6.0.2
@@ -48,7 +46,6 @@ dependencies:
   google_fonts: ^8.2.1
   just_audio: ^0.10.6
   audio_session: ^0.2.4
-  proximity_screen_lock: ^2.3.0
   qr_flutter: ^4.1.0
 
 dev_dependencies:
@@ -60,5 +57,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/translations/
-    - assets/sounds/
     - assets/sounds/ringtones/

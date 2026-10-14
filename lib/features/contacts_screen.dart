@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:medut/medut.dart' show PresenceStatus;
 
 import '../core/contacts.dart';
 import '../core/db.dart';
@@ -10,6 +9,7 @@ import '../core/people.dart';
 import '../core/providers.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../sip/sip_service.dart' show PresenceStatus;
 import '../ui/widgets.dart';
 import 'chat.dart';
 import 'dialer.dart';

@@ -220,7 +220,10 @@ const _v3Columns = {
   'end_reason': 'TEXT', 'sip_code': 'INTEGER', 'ended_by': 'TEXT',
 };
 
-/// Call history and SIP MESSAGE threads, on the device.
+/// Call history and SIP MESSAGE threads, on the device. The native engine
+/// writes the rows (HistoryWriter.kt / .swift) as calls end and messages
+/// arrive, with or without Flutter running; this owns the schema, reads, and
+/// the user's edits.
 class LocalDb extends ChangeNotifier {
   LocalDb._(this._db);
   final Database _db;
@@ -258,6 +261,9 @@ class LocalDb extends ChangeNotifier {
     );
     return LocalDb._(db);
   }
+
+  /// Native wrote a call or a message: whoever shows them reloads.
+  void changed() => notifyListeners();
 
   Future<void> addCall(CallRecord r) async {
     await _db.insert('calls', r.toRow());

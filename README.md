@@ -108,53 +108,62 @@ icon is its first hieroglyph, the staff 𓌃, with two sound waves.
 
 ```
 lib/
-  sip/sip_service.dart     drives Medut-SDK over dart:ffi: accounts, calls,
-                           presence, MWI, messages → call snapshots
+  sip/sip_service.dart     Flutter's side of the phone: mirrors the native
+                           engine's state, hands it accounts and settings
   sip/probe.dart           finds how a server can be reached before sign-in
   sip/native_bridge.dart   the medut/native channel
   core/                    accounts, settings, call history (sqflite), people
   features/                sign-in, dialer, calls, contacts, chat, accounts,
-                           status, settings, transfer
+                           status, settings
 android/app/src/main/kotlin/com/medut/generic/phone/
-  MedutApp                 process-wide Flutter engine
-  call/                    CallActivity (native call UI), ringer, notifications
+  engine/PhoneEngine.kt    the phone: Medut-SDK (Kotlin), accounts, calls,
+                           transfers, recording, history, presence, messages
+  engine/                  account store, settings, history writer, quality
+  call/                    CallActivity (ringing, in-call, Transfer, Add call),
+                           ringer, notifications
   service/                 MedutService (keep-alive FGS), boot receiver
-  telecom/                 Telecom ConnectionService
+  push/                    FCM wake-up
 ios/Runner/
-  CallKitManager.swift     CallKit + PushKit
-  CallViewController.swift native call UI
+  PhoneEngine.swift        the phone: MedutKit, its CallKit and PushKit wake-up
+  EngineSupport.swift      account store, settings, history writer, quality
+  CallViewController.swift in-call screen, Transfer, Add call
   MedutBridge.swift        the medut/native channel
 assets/translations/       en.json, ar.json (shared with the native screens)
 design/                    design canvases and icon sources
 ```
 
-Dart owns all call state. On every change it pushes a full snapshot over the
-`medut/native` channel. The native screens only draw the snapshot and send
-taps back as `callAction` messages. Labels travel with the snapshot, so the
-native and Flutter screens share one translation table.
+The native engine owns SIP and every call. It starts with the process
+(`MedutApp` on Android, `AppDelegate` on iOS), with or without the Flutter
+UI: a push or a reboot registers the accounts and rings a call without
+starting Flutter at all. It keeps the accounts (encrypted, passwords
+included) and the settings Flutter last pushed, writes each finished call and
+each SIP message into the same `medut.db` the Calls tab reads, and draws the
+call screens from its own snapshots. Flutter shows the history, edits
+accounts and settings, and forwards dial, message and status taps over the
+`medut/native` channel. The labels Flutter pushes are kept natively, so the
+two still share one translation table.
 
 ### Staying reachable
 
-**Android.** The Flutter engine is created in `MedutApp.onCreate`, not in the
-activity, so SIP starts with the process and survives the app being closed or
-swiped away. With *Stay reachable* on, `MedutService` runs as a foreground
-service (`specialUse` on Android 14+, `dataSync` before) that keeps the
-process and the registration alive. It restarts after a reboot. During a call
-the ongoing-call notification holds the process. Settings asks the user to
-allow ignoring battery optimisation, because Doze would otherwise cut the
-network.
+**Android.** The engine starts in `MedutApp.onCreate`, so SIP starts with the
+process and survives the app being closed or swiped away. With *Stay
+reachable* on, `MedutService` runs as a foreground service (`specialUse` on
+Android 14+, `dataSync` before) that keeps the process and the registration
+alive. It restarts after a reboot. During a call the ongoing-call notification
+holds the process. Settings asks the user to allow ignoring battery
+optimisation, because Doze would otherwise cut the network.
 
-FCM is optional. If `android/app/google-services.json` is present, the app
-puts its FCM token in the REGISTER Contact (RFC 8599 `pn-provider=fcm`). A push
-from the server starts the process, which then registers and receives the
-INVITE.
+FCM is optional. If `android/app/google-services.json` is present, the engine
+puts its FCM token in the REGISTER Contact (RFC 8599 `pn-provider=fcm`). A
+push from the server starts the process; the accounts refresh their
+registration and the INVITE rings like any other call.
 
 **iOS.** iOS does not keep a backgrounded app's socket alive, so a closed app
-is woken by a VoIP push. The app registers with PushKit and puts the token in
-the REGISTER Contact (RFC 8599 `pn-provider=apns`, `pn-prid=<token>`). Every
-push is reported to CallKit at once, as Apple requires. The call is bound to
-the SIP INVITE when it arrives, and an answer or decline given before then is
-remembered.
+is woken by a VoIP push. The engine registers with PushKit and puts the token
+in the REGISTER Contact (RFC 8599 `pn-provider=apns`, `pn-prid=<token>`).
+Every push is reported to CallKit at once, as Apple requires, by the SDK's
+`MedutPush.wake`. The call is bound to the SIP INVITE when it arrives, and an
+answer or decline given before then is carried out.
 
 Something on the server side has to send that push:
 - **Kamailio / OpenSIPS:** a push module or script that reads the `pn-*`
@@ -162,8 +171,8 @@ Something on the server side has to send that push:
 - **Asterisk / FreeSWITCH:** such a proxy in front, or a small push gateway.
 
 Without one, iOS rings only while the app is open. The push payload can carry
-`caller` / `caller_name` (or `from` / `display_name`) to show the caller on
-the CallKit screen before the INVITE arrives.
+`caller_uri` / `caller_name` (the Medut-SDK push contract, docs/guides/push.md
+in the SDK) to show the caller on the CallKit screen before the INVITE arrives.
 
 ## Build
 

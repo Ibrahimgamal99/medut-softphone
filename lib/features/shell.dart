@@ -13,7 +13,6 @@ import 'activity.dart';
 import 'chat.dart';
 import 'dialer.dart';
 import 'contacts_screen.dart';
-import 'transfer_sheet.dart';
 import 'settings_screen.dart';
 
 /// Bottom tabs (Calls · Contacts · Settings), the dial button that opens the
@@ -52,22 +51,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.dispose();
   }
 
-  /// The native call screen hands over to Flutter for these flows.
+  /// A notification or the native call screen hands over to Flutter for
+  /// these flows (Transfer and Add call stay on the call screen).
   void _openRoute(String route) {
     if (!mounted) return;
     final sip = ref.read(sipProvider);
-    final call = sip.focused;
     switch (route) {
-      case 'transfer':
-        if (call != null) showTransferSheet(context);
-      case 'add':
-        _openKeypad(addCall: true);
-      case 'message':
-      case 'reply':
-        if (call != null) {
-          if (route == 'reply') sip.decline(call, code: 486);
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(peer: call.number, title: call.title)));
-        }
       case final r when r.startsWith('chat:'):
         final peer = r.substring(5);
         final name = sip.nameFor(peer);
@@ -79,10 +68,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
-  /// The keypad, full screen over the tabs; [addCall] when the call screen
-  /// asked for a second call.
-  void _openKeypad({bool addCall = false}) {
-    _addCallMode.value = addCall;
+  /// The keypad, full screen over the tabs.
+  void _openKeypad() {
+    _addCallMode.value = false;
     Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => KeypadPage(addCallMode: _addCallMode),
@@ -159,7 +147,7 @@ class _ReturnToCallBarState extends State<_ReturnToCallBar> {
     return Material(
       color: t.success,
       child: InkWell(
-        onTap: NativeBridge.instance.openCallScreen,
+        onTap: widget.sip.openCallScreen,
         child: Container(
           constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 16),

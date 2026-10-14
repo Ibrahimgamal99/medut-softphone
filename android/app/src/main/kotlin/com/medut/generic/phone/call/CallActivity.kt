@@ -14,12 +14,16 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.util.TypedValue
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -28,8 +32,8 @@ import android.widget.TextView
 import com.medut.generic.phone.CallSnapshot
 import com.medut.generic.phone.CallState
 import com.medut.generic.phone.MainActivity
-import com.medut.generic.phone.NativeBridge
 import com.medut.generic.phone.R
+import com.medut.generic.phone.engine.PhoneEngine
 
 // The ink surface: the same in both themes except the ground.
 private const val INK = 0xFF0F1418.toInt()
@@ -62,18 +66,20 @@ private val AVATARS = listOf(
  * surface in both themes, the way most phones show a call: the caller, the
  * quality pill (tap it for every figure), four controls in a dock, then
  * Transfer · End · More. It holds no call state of its own: it renders
- * [CallState.latest] and sends every tap to Dart through [NativeBridge].
+ * [CallState.latest] and sends every tap to [PhoneEngine]. Transfer and Add
+ * call pick their number here too, so a call never needs the Flutter app.
  */
 class CallActivity : Activity() {
 
     private val ui = Handler(Looper.getMainLooper())
     private var snap = CallSnapshot(emptyMap())
     private var ground = 0
-    /** The open sheet: "quality", "more" or null. */
+    /** The open sheet: "quality", "more", "transfer" or null. */
     private var sheet: String? = null
     private var keypadOpen = false
+    /** The keypad sends DTMF, or dials a second call ("Add call"). */
+    private var addCallMode = false
     private var dtmfTyped = ""
-    private var proximity: PowerManager.WakeLock? = null
     private var secondAction = "swap"
 
     private lateinit var root: FrameLayout
@@ -136,8 +142,20 @@ class CallActivity : Activity() {
 
     // Keypad
     private lateinit var keypad: LinearLayout
+    private lateinit var keypadTitle: TextView
     private lateinit var keypadDigits: TextView
     private lateinit var keypadHide: TextView
+    private lateinit var keypadBack: ImageView
+    private lateinit var keypadEnd: ImageView
+    private lateinit var keypadCall: ImageView
+
+    // Transfer: who to send the caller to, then blind or warm.
+    private lateinit var transferSheet: LinearLayout
+    private lateinit var transferTitle: TextView
+    private lateinit var transferInput: EditText
+    private lateinit var transferList: LinearLayout
+    private lateinit var blindOption: LinearLayout
+    private lateinit var warmOption: LinearLayout
 
     private val listener: (CallSnapshot) -> Unit = { s -> ui.post { render(s) } }
 
@@ -151,6 +169,7 @@ class CallActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOverLockScreen(true)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         buildViews()
         setContentView(root)
         isShowing = true
@@ -175,7 +194,6 @@ class CallActivity : Activity() {
 
     override fun onDestroy() {
         CallState.removeListener(listener)
-        setProximity(false)
         isShowing = false
         super.onDestroy()
     }
@@ -185,14 +203,8 @@ class CallActivity : Activity() {
         // Back closes a sheet or the keypad first, then leaves the call running
         // and shows the app, like the system dialer.
         when {
-            sheet != null -> {
-                sheet = null
-                render(snap)
-            }
-            keypadOpen -> {
-                keypadOpen = false
-                render(snap)
-            }
+            sheet != null -> openSheet(null)
+            keypadOpen -> closeKeypad()
             else -> MainActivity.open(this)
         }
     }
@@ -202,7 +214,7 @@ class CallActivity : Activity() {
             intent.removeExtra(EXTRA_ANSWER)
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
-            NativeBridge.action("answer")
+            PhoneEngine.action("answer")
         }
     }
 
@@ -224,7 +236,6 @@ class CallActivity : Activity() {
     private fun render(s: CallSnapshot) {
         snap = s
         if (!s.isLive) {
-            setProximity(false)
             showOverLockScreen(false)
             finish()
             return
@@ -249,7 +260,10 @@ class CallActivity : Activity() {
 
         val (avBg, avFg) = avatarColors(s.title)
         if (isIncoming) {
-            inAccount.text = if (s.account.isNotBlank()) s.label("incomingOn", "Incoming on") + " " + s.account
+            // An arrow, not words; screen readers still hear them.
+            inAccount.text = if (s.account.isNotBlank()) "${CallNotifications.INCOMING}  ${s.account}"
+            else CallNotifications.INCOMING
+            inAccount.contentDescription = if (s.account.isNotBlank()) s.label("incomingOn", "Incoming on") + " " + s.account
             else s.label("incomingCall", "Incoming call")
             inAvatar.text = initials(s.title)
             inAvatar.background = rings(avBg)
@@ -261,7 +275,6 @@ class CallActivity : Activity() {
             inDecline.text = s.label("decline", "Decline")
             inAnswer.text = s.label("answer", "Answer")
             renderSheets(s)
-            setProximity(false)
             return
         }
 
@@ -347,9 +360,10 @@ class CallActivity : Activity() {
         transfer.text = s.label("transfer", "Transfer")
         more.text = s.label("more", "More")
         keypadHide.text = s.label("hide", "Hide")
+        renderKeypad(s)
         renderSheets(s)
-        // Screen-off at the ear is driven from Dart (proximity_screen_lock), so it
-        // also works while the Flutter app is in front during a call.
+        // Screen-off at the ear is the engine's (PhoneEngine.setProximity), so
+        // it also works while the Flutter app is in front during a call.
     }
 
     private fun renderSheets(s: CallSnapshot) {
@@ -357,6 +371,8 @@ class CallActivity : Activity() {
         dim.visibility = vis(sheet != null)
         qualitySheet.visibility = vis(sheet == "quality")
         moreSheet.visibility = vis(sheet == "more")
+        transferSheet.visibility = vis(sheet == "transfer")
+        if (sheet == "transfer") renderTransfer(s)
         if (sheet == "quality") {
             val fg = gradeColor(s.qualityLevel)
             sheetTitle.text = s.label("callQuality", "Call quality")
@@ -399,33 +415,20 @@ class CallActivity : Activity() {
         else String.format("%02d:%02d", sec / 60, sec % 60)
     }
 
-    private fun setProximity(on: Boolean) {
-        if (on) {
-            if (proximity?.isHeld == true) return
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) return
-            proximity = pm.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "medut:proximity").apply {
-                acquire(4 * 60 * 60 * 1000L)
-            }
-        } else {
-            proximity?.let { if (it.isHeld) it.release() }
-            proximity = null
-        }
-    }
-
     // ── Actions ──────────────────────────────────────────────────────────────
 
     private fun onDock(key: String) {
         val s = snap
         when (key) {
-            "mute" -> NativeBridge.action(if (s.muted) "unmute" else "mute")
+            "mute" -> PhoneEngine.action(if (s.muted) "unmute" else "mute")
             "speaker" -> chooseRoute(s)
-            "third" -> if (s.canRecord) NativeBridge.action("record") else openKeypad()
-            "hold" -> NativeBridge.action(if (s.held) "unhold" else "hold")
+            "third" -> if (s.canRecord) PhoneEngine.action("record") else openKeypad()
+            "hold" -> PhoneEngine.action(if (s.held) "unhold" else "hold")
         }
     }
 
     private fun openSheet(which: String?) {
+        if (sheet == "transfer" && which != "transfer") hideKeyboard()
         sheet = which
         render(snap)
     }
@@ -434,7 +437,7 @@ class CallActivity : Activity() {
     private fun chooseRoute(s: CallSnapshot) {
         val routes = s.routes
         if (!s.bluetooth || routes.isEmpty()) {
-            NativeBridge.action("toggleSpeaker")
+            PhoneEngine.action("toggleSpeaker")
             return
         }
         val names = routes.map { it["name"] as? String ?: "" }.toTypedArray()
@@ -442,16 +445,33 @@ class CallActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle(s.label("audioOutput", "Audio output"))
             .setSingleChoiceItems(names, current) { d, which ->
-                NativeBridge.action("route", mapOf("routeId" to routes[which]["id"]))
+                PhoneEngine.action("route", mapOf("routeId" to routes[which]["id"]))
                 d.dismiss()
             }
             .show()
     }
 
-    private fun openApp(route: String) {
+    private fun openTransfer() {
+        sheet = "transfer"
+        transferInput.setText("")
+        render(snap)
+        transferInput.requestFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showSoftInput(transferInput, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideKeyboard() {
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(root.windowToken, 0)
+    }
+
+    private fun transferTo(warm: Boolean) {
+        val target = transferInput.text.toString().trim()
+        if (target.isEmpty()) return
+        hideKeyboard()
         sheet = null
-        NativeBridge.action(route)
-        MainActivity.open(this, route)
+        PhoneEngine.action(if (warm) "transferWarm" else "transferBlind", mapOf("target" to target))
+        render(snap)
     }
 
     // ── View construction ────────────────────────────────────────────────────
@@ -606,13 +626,16 @@ class CallActivity : Activity() {
             layoutParams = lp(0, dp(48), 1f).apply { marginEnd = dp(8) }
             setOnClickListener {
                 Ringer.stop()
-                NativeBridge.action("busy")
+                PhoneEngine.action("busy")
             }
         }
         inMessage = text(15f, 600).apply {
             background = pill(PILL, 24f)
             layoutParams = lp(0, dp(48), 1f)
-            setOnClickListener { openApp("reply") }
+            setOnClickListener {
+                Ringer.stop()
+                PhoneEngine.action("reply")
+            }
         }
         quick.addView(inBusy)
         quick.addView(inMessage)
@@ -624,12 +647,12 @@ class CallActivity : Activity() {
         val decline = cell(icon(R.drawable.ic_call_end, 72, oval(END), Color.WHITE, "Decline") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
-            NativeBridge.action("decline")
+            PhoneEngine.action("decline")
         }, 13f, 600)
         val answer = cell(icon(R.drawable.ic_call, 72, oval(GOOD), ON_GOOD, "Answer") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
-            NativeBridge.action("answer")
+            PhoneEngine.action("answer")
         }, 13f, 600)
         inDecline = decline.second
         inAnswer = answer.second
@@ -669,7 +692,7 @@ class CallActivity : Activity() {
             setPadding(dp(12), dp(5), dp(12), dp(5))
             background = pill(0x29FFFFFF, 16f)
             layoutParams = wrap().apply { marginStart = dp(8) }
-            setOnClickListener { NativeBridge.action(secondAction) }
+            setOnClickListener { PhoneEngine.action(secondAction) }
         }
         secondPill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -687,13 +710,13 @@ class CallActivity : Activity() {
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = pill(FILL, 24f)
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
-            setOnClickListener { NativeBridge.action("cancelTransfer") }
+            setOnClickListener { PhoneEngine.action("cancelTransfer") }
         }
         xferJoin = text(14f, 700, ON_GOOD).apply {
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = pill(GOOD, 24f)
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener { NativeBridge.action("completeTransfer") }
+            setOnClickListener { PhoneEngine.action("completeTransfer") }
         }
         xferBar = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -768,9 +791,9 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) }
         }
-        val t = cell(icon(R.drawable.ic_transfer, 46, oval(FILL), TEXT, "Transfer") { openApp("transfer") }, 11.5f)
+        val t = cell(icon(R.drawable.ic_transfer, 46, oval(FILL), TEXT, "Transfer") { openTransfer() }, 11.5f)
         transfer = t.second
-        val hang = icon(R.drawable.ic_call_end, 0, pill(END, 29f), Color.WHITE, "Hang up") { NativeBridge.action("hangup") }.apply {
+        val hang = icon(R.drawable.ic_call_end, 0, pill(END, 29f), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }.apply {
             layoutParams = lp(dp(88), dp(60))
         }
         val m = cell(icon(R.drawable.ic_more, 46, oval(FILL), TEXT, "More") { openSheet("more") }, 11.5f)
@@ -801,7 +824,16 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(32), dp(24), dp(32), dp(24))
         }
-        keypadDigits = text(34f).apply { layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)) }
+        keypadTitle = text(13f, color = TEXT2).apply {
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            background = pill(PILL, 16f)
+            layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL }
+        }
+        keypadDigits = text(34f).apply {
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(64))
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.START
+        }
         val keys = GridLayout(this).apply { columnCount = 3 }
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#").forEach { d ->
             keys.addView(text(28f, 500).apply {
@@ -811,11 +843,7 @@ class CallActivity : Activity() {
                     width = dp(74); height = dp(74)
                     setMargins(dp(10), dp(7), dp(10), dp(7))
                 }
-                setOnClickListener {
-                    dtmfTyped = (dtmfTyped + d).takeLast(24)
-                    keypadDigits.text = dtmfTyped
-                    NativeBridge.action("dtmf", mapOf("digit" to d))
-                }
+                setOnClickListener { onKey(d) }
             })
         }
         val bottom = LinearLayout(this).apply {
@@ -825,14 +853,29 @@ class CallActivity : Activity() {
         }
         keypadHide = text(15f, 600, TEXT2).apply {
             layoutParams = lp(0, dp(56), 1f)
-            setOnClickListener {
-                keypadOpen = false
-                render(snap)
+            setOnClickListener { closeKeypad() }
+        }
+        keypadEnd = icon(R.drawable.ic_call_end, 74, oval(END), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }
+        keypadCall = icon(R.drawable.ic_call, 74, oval(GOOD), ON_GOOD, "Call") {
+            val number = dtmfTyped.trim()
+            if (number.isNotEmpty()) {
+                closeKeypad()
+                PhoneEngine.action("addCall", mapOf("number" to number))
             }
         }
+        keypadBack = icon(R.drawable.ic_backspace, 56, null, TEXT2, "Delete") {
+            dtmfTyped = dtmfTyped.dropLast(1)
+            keypadDigits.text = dtmfTyped
+            renderKeypad(snap)
+        }
         bottom.addView(keypadHide)
-        bottom.addView(icon(R.drawable.ic_call_end, 74, oval(END), Color.WHITE, "Hang up") { NativeBridge.action("hangup") })
-        bottom.addView(View(this).apply { layoutParams = lp(0, 1, 1f) })
+        bottom.addView(keypadEnd)
+        bottom.addView(keypadCall)
+        bottom.addView(FrameLayout(this).apply {
+            layoutParams = lp(0, dp(56), 1f)
+            addView(keypadBack, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
+        })
+        keypad.addView(keypadTitle)
         keypad.addView(spacer())
         keypad.addView(keypadDigits)
         keypad.addView(keys)
@@ -903,13 +946,146 @@ class CallActivity : Activity() {
             setOnClickListener { onClick() }
             moreSheet.addView(this)
         }
-        moreAdd = row(R.drawable.ic_add) { openApp("add") }
+        moreAdd = row(R.drawable.ic_add) {
+            openSheet(null)
+            openKeypad(addCall = true)
+        }
         moreKeypad = row(R.drawable.ic_dialpad) {
             openSheet(null)
             openKeypad()
         }
-        moreMessage = row(R.drawable.ic_message) { openApp("message") }
+        moreMessage = row(R.drawable.ic_message) {
+            openSheet(null)
+            PhoneEngine.action("message")
+        }
         root.addView(moreSheet, bottom())
+
+        buildTransferSheet()
+        root.addView(transferSheet, bottom())
+    }
+
+    private fun buildTransferSheet() {
+        transferSheet = sheetPanel()
+        transferTitle = text(19f, 800).apply {
+            gravity = Gravity.START
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
+        }
+        transferInput = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_PHONE
+            setTextColor(TEXT)
+            setHintTextColor(TEXT2)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            isSingleLine = true
+            background = pill(FILL, 16f)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(e: Editable?) {
+                    if (sheet == "transfer") renderTransfer(snap)
+                }
+            })
+        }
+        transferList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val listScroll = android.widget.ScrollView(this).apply {
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) }
+            addView(transferList)
+        }
+        fun option(res: Int, onClick: () -> Unit): LinearLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = pill(0x0FFFFFFF, 16f)
+            layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+            addView(ImageView(this@CallActivity).apply {
+                setImageResource(res)
+                scaleType = ImageView.ScaleType.CENTER
+                background = oval(withAlpha(GOOD, 0x29))
+                imageTintList = ColorStateList.valueOf(GOOD)
+                layoutParams = lp(dp(40), dp(40))
+            })
+            addView(LinearLayout(this@CallActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), 0, dp(4), 0)
+                layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                addView(text(15f, 700).apply { gravity = Gravity.START })
+                addView(text(12.5f, color = TEXT2).apply { gravity = Gravity.START; setPadding(0, dp(2), 0, 0) })
+            })
+            setOnClickListener { onClick() }
+        }
+        blindOption = option(R.drawable.ic_transfer) { transferTo(warm = false) }
+        warmOption = option(R.drawable.ic_add) { transferTo(warm = true) }
+        transferSheet.addView(transferTitle)
+        transferSheet.addView(transferInput)
+        transferSheet.addView(listScroll)
+        transferSheet.addView(blindOption)
+        transferSheet.addView(warmOption)
+    }
+
+    /** Title, the matching Team list with presence, and the two ways to transfer. */
+    private fun renderTransfer(s: CallSnapshot) {
+        transferTitle.text = s.label("transferWho", "Transfer {a}").replace("{a}", s.title)
+        transferInput.hint = s.label("transferTo", "Transfer to (extension or number)")
+        val typed = transferInput.text.toString().trim()
+        val q = typed.lowercase()
+        val matches = PhoneEngine.config.watched.filter { (n, ext) -> q.isEmpty() || n.lowercase().contains(q) || ext.contains(q) }.take(6)
+        transferList.removeAllViews()
+        for ((n, ext) in matches) transferList.addView(targetRow(s, n, ext, selected = typed == ext))
+        fun fill(option: LinearLayout, title: String, hint: String) {
+            val texts = option.getChildAt(1) as LinearLayout
+            (texts.getChildAt(0) as TextView).text = title
+            (texts.getChildAt(1) as TextView).text = hint
+            option.isEnabled = typed.isNotEmpty()
+            option.alpha = if (typed.isNotEmpty()) 1f else 0.5f
+        }
+        fill(blindOption, s.label("blindTransfer", "Blind transfer"),
+            s.label("blindTransferSub", "Sends the caller straight there. You leave the call now."))
+        fill(warmOption, s.label("warmTransfer", "Warm transfer"),
+            s.label("warmTransferSub", "The caller waits on hold while you talk to them, then you join them."))
+    }
+
+    private fun targetRow(s: CallSnapshot, name: String, ext: String, selected: Boolean): View {
+        val presence = PhoneEngine.presence[ext]
+        val dotColor = when (presence) {
+            "open" -> GOOD
+            "busy" -> POOR
+            "closed" -> 0xFFB7AEFF.toInt()
+            else -> TEXT2
+        }
+        val word = when (presence) {
+            "open" -> s.label("presenceOpen", "Available")
+            "busy" -> s.label("presenceBusy", "On a call")
+            "closed" -> s.label("presenceClosed", "Offline / do not disturb")
+            else -> s.label("presenceUnknown", "Unknown")
+        }
+        val (avBg, avFg) = avatarColors(name.ifBlank { ext })
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = if (selected) pill(withAlpha(GOOD, 0x29), 12f) else null
+            addView(FrameLayout(this@CallActivity).apply {
+                layoutParams = lp(dp(40), dp(40))
+                addView(text(15f, 700, avFg).apply {
+                    text = initials(name.ifBlank { ext })
+                    background = oval(avBg)
+                }, FrameLayout.LayoutParams(dp(40), dp(40)))
+                addView(View(this@CallActivity).apply { background = oval(dotColor) },
+                    FrameLayout.LayoutParams(dp(11), dp(11), Gravity.BOTTOM or Gravity.END))
+            })
+            addView(LinearLayout(this@CallActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, 0, 0)
+                layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                addView(text(15f, 600).apply { gravity = Gravity.START; text = name.ifBlank { ext } })
+                addView(text(12f, color = TEXT2).apply { gravity = Gravity.START; text = "$ext · $word" })
+            })
+            setOnClickListener {
+                transferInput.setText(ext)
+                transferInput.setSelection(ext.length)
+            }
+        }
     }
 
     private fun detailRow(k: String, v: String): View = LinearLayout(this).apply {
@@ -936,11 +1112,34 @@ class CallActivity : Activity() {
         t.text = label
     }
 
-    private fun openKeypad() {
+    private fun openKeypad(addCall: Boolean = false) {
         keypadOpen = true
+        addCallMode = addCall
         dtmfTyped = ""
         keypadDigits.text = ""
         render(snap)
+    }
+
+    private fun closeKeypad() {
+        keypadOpen = false
+        addCallMode = false
+        render(snap)
+    }
+
+    private fun renderKeypad(s: CallSnapshot) {
+        keypadTitle.text = if (addCallMode) "${s.label("addCallTitle", "Add call")} · ${s.title} ${s.label("onHold", "On hold")}" else ""
+        keypadTitle.visibility = vis(addCallMode)
+        keypadBack.visibility = if (addCallMode && dtmfTyped.isNotEmpty()) View.VISIBLE else View.INVISIBLE
+        keypadEnd.visibility = vis(!addCallMode)
+        keypadCall.visibility = vis(addCallMode)
+        keypadCall.alpha = if (dtmfTyped.isEmpty()) 0.45f else 1f
+    }
+
+    private fun onKey(d: String) {
+        dtmfTyped = (dtmfTyped + d).takeLast(if (addCallMode) 40 else 24)
+        keypadDigits.text = dtmfTyped
+        if (!addCallMode) PhoneEngine.action("dtmf", mapOf("digit" to d))
+        renderKeypad(snap)
     }
 
     private fun initials(s: String): String {

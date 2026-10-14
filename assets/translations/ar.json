@@ -421,8 +421,6 @@
   "enc_none": "غير مشفّرة",
   "enc_sdes": "مشفّرة (SRTP)",
   "enc_dtls": "مشفّرة (DTLS)",
-  "nameOnCallsOptional": "اسمك في المكالمات (اختياري)",
-  "nameOnCallsHint": "يظهر لمن تتصل بهم",
   "nextPermissions": "بعد ذلك، إذنان",
   "permMic": "الميكروفون، ليسمعك الآخرون",
   "permNotify": "الإشعارات، لترنّ المكالمات والتطبيق مغلق",

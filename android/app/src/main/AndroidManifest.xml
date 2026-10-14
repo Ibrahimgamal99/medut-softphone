@@ -34,8 +34,8 @@
         android:label="@string/app_name"
         android:name=".MedutApp"
         android:icon="@mipmap/ic_launcher">
-        <!-- Uses the process-wide engine MedutApp starts, so the SIP stack keeps
-             running when this activity is closed. -->
+        <!-- The Flutter screens. Calls never need them: PhoneEngine (started by
+             MedutApp) owns SIP, and CallActivity draws every call. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -55,9 +55,9 @@
             </intent-filter>
         </activity>
 
-        <!-- Native ringing + in-call screen. Draws with plain Views in one frame,
-             no Flutter cold start. showWhenLocked/turnScreenOn are set at runtime
-             only while a call is presented. -->
+        <!-- Native ringing + in-call screen, Transfer and Add call. Draws with
+             plain Views in one frame, no Flutter at all. showWhenLocked/turnScreenOn
+             are set at runtime only while a call is presented. -->
         <activity
             android:name=".call.CallActivity"
             android:exported="false"
@@ -65,6 +65,7 @@
             android:taskAffinity=""
             android:excludeFromRecents="true"
             android:theme="@style/CallTheme"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true" />
 
@@ -82,12 +83,13 @@
                 android:value="Keeps the user's SIP registration alive so their PBX can ring this phone for incoming VoIP calls." />
         </service>
 
+        <!-- FCM wake-up (works once android/app/google-services.json is added).
+             The SDK's own ConnectionService comes from its manifest. -->
         <service
-            android:name=".telecom.MedutConnectionService"
-            android:exported="true"
-            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
+            android:name=".push.MedutFcmService"
+            android:exported="false">
             <intent-filter>
-                <action android:name="android.telecom.ConnectionService" />
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
 

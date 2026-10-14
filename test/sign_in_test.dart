@@ -52,6 +52,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'), (_) async => null);
+    // No native engine in tests: every call answers null.
+    messenger.setMockMethodCallHandler(const MethodChannel('medut/native'), (_) async => null);
     messenger.setMockMethodCallHandler(const MethodChannel('flutter.baseflow.com/permissions/methods'), (call) async {
       if (call.method == 'requestPermissions') return {for (final p in call.arguments as List) p: 1};
       return 1;
@@ -122,13 +124,13 @@ void main() {
     expect(store.accounts, isEmpty, reason: 'nothing is saved before Continue');
 
     await tester.enterText(find.widgetWithText(TextField, 'accountName'), 'Office');
-    await tester.enterText(find.widgetWithText(TextField, 'nameOnCallsOptional'), 'Sara');
+    expect(find.widgetWithText(TextField, 'nameOnCallsOptional'), findsNothing, reason: 'only the account name is asked');
     await tester.ensureVisible(find.text('continue'));
     await tester.tap(find.text('continue'));
     await tester.pumpAndSettle();
     final a = store.accounts.single;
     expect([a.user, a.domain, a.port, a.transport, a.password, a.displayName, a.name],
-        ['201', 'pbx.example.com', 5080, 'tcp', 'secret', 'Sara', 'Office']);
+        ['201', 'pbx.example.com', 5080, 'tcp', 'secret', '', 'Office']);
     expect(a.id, sip.tried.single.id, reason: 'the running registration is adopted');
     expect(a.isDefault, isTrue);
   });

@@ -53,6 +53,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'), (_) async => null);
+    // No native engine in tests: every call answers null.
+    messenger.setMockMethodCallHandler(const MethodChannel('medut/native'), (_) async => null);
     messenger.setMockMethodCallHandler(const MethodChannel('flutter.baseflow.com/permissions/methods'), (call) async {
       if (call.method == 'requestPermissions') return {for (final p in call.arguments as List) p: 1};
       return 1;

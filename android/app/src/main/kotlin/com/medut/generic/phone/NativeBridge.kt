@@ -12,21 +12,25 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import com.medut.generic.phone.call.CallActivity
-import com.medut.generic.phone.call.CallNotifications
-import com.medut.generic.phone.service.MedutService
-import com.medut.generic.phone.telecom.MedutTelecom
+import com.medut.generic.phone.engine.AccountCfg
+import com.medut.generic.phone.engine.EngineConfig
+import com.medut.generic.phone.engine.EngineLog
+import com.medut.generic.phone.engine.PhoneEngine
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONObject
 
 /**
- * The `medut/native` channel between Dart and the native shell.
+ * The `medut/native` channel between Flutter and [PhoneEngine].
  *
- * Dart → native: call snapshots, keep-alive on/off, OS settings shortcuts.
- * Native → Dart: button taps on the native call screen and notifications
- * (`callAction`), and navigation requests (`openRoute`).
+ * Flutter → native: accounts, settings, dialing, messages, your status,
+ * presence targets, the logs, OS settings shortcuts.
+ * Native → Flutter: `state` (registrations, calls, presence), `historyChanged`,
+ * `notice`, and navigation requests (`openRoute`).
  *
  * Messages to Dart that arrive before Dart has installed its handler (a tap on
- * a cold-start ring screen) are queued and flushed when Dart sends `ready`.
+ * a notification that opened the app) are queued and flushed when Dart sends
+ * `ready`.
  */
 object NativeBridge {
     private const val TAG = "MedutBridge"
@@ -34,66 +38,89 @@ object NativeBridge {
 
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
+    private var messenger: BinaryMessenger? = null
     private var dartReady = false
     private val pending = ArrayDeque<Pair<String, Any?>>()
 
     @SuppressLint("StaticFieldLeak")
     private lateinit var appContext: Context
 
+    /** Once per Flutter engine (MainActivity keeps one for the process). */
     fun attach(context: Context, messenger: BinaryMessenger) {
         appContext = context.applicationContext
+        if (messenger === this.messenger) return
+        this.messenger = messenger
+        dartReady = false
         val ch = MethodChannel(messenger, CHANNEL)
         channel = ch
         ch.setMethodCallHandler { call, result ->
             try {
+                val engine = PhoneEngine
                 when (call.method) {
                     "ready" -> {
                         dartReady = true
+                        result.success(engine.state())
                         flush()
+                    }
+                    "state" -> result.success(engine.state())
+                    "getAccounts" -> result.success(engine.repo.all().map { jsonToMap(it.json) })
+                    "setAccounts" -> {
+                        val list = (call.argument<List<Map<String, Any?>>>("accounts") ?: emptyList())
+                            .map { AccountCfg(EngineConfig.fromMap(it)) }
+                        engine.setAccounts(list)
                         result.success(null)
                     }
-                    "callState" -> {
-                        @Suppress("UNCHECKED_CAST")
-                        CallState.update(call.arguments as? Map<String, Any?> ?: emptyMap())
+                    "setConfig" -> {
+                        engine.setConfig(EngineConfig.fromMap(call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()))
                         result.success(null)
                     }
-                    "openCallScreen" -> {
-                        CallActivity.open(appContext)
+                    "tryRegister" -> {
+                        val acct = AccountCfg(EngineConfig.fromMap(call.argument<Map<String, Any?>>("account") ?: emptyMap<String, Any?>()))
+                        val timeout = (call.argument<Number>("timeoutMs") ?: 8000).toLong()
+                        engine.tryRegister(acct, timeout) { result.success(it) }
+                    }
+                    "cancelProbe" -> {
+                        engine.cancelProbe(call.argument<String>("id") ?: "")
                         result.success(null)
                     }
-                    "keepAlive" -> {
-                        val enabled = call.argument<Boolean>("enabled") == true
-                        MedutService.setKeepAlive(
-                            appContext,
-                            enabled,
-                            call.argument<String>("title") ?: "Medut",
-                            call.argument<String>("text") ?: "",
+                    "retry" -> {
+                        engine.retryNow(call.argument<String>("id") ?: "")
+                        result.success(null)
+                    }
+                    "dial" -> {
+                        engine.dial(
+                            call.argument<String>("number") ?: "",
+                            call.argument<String>("accountId"),
+                            call.argument<String>("name"),
                         )
                         result.success(null)
                     }
-                    "missedCalls" -> {
-                        CallNotifications.showMissed(
-                            appContext,
-                            call.argument<Int>("count") ?: 1,
-                            call.argument<String>("latest") ?: "",
-                            call.argument<String>("title") ?: "Missed call",
-                        )
-                        result.success(null)
-                    }
-                    "clearMissed" -> {
-                        CallNotifications.cancelMissed(appContext)
-                        result.success(null)
-                    }
-                    "messageNotification" -> {
-                        CallNotifications.showMessage(
-                            appContext,
+                    "sendMessage" -> result.success(
+                        engine.sendMessage(
                             call.argument<String>("peer") ?: "",
-                            call.argument<String>("title") ?: "",
                             call.argument<String>("body") ?: "",
-                        )
+                            call.argument<String>("accountId"),
+                        ),
+                    )
+                    "queueCodes" -> {
+                        engine.queueCodes(call.argument<List<Map<String, Any?>>>("codes") ?: emptyList())
                         result.success(null)
                     }
-                    "setRingtone" -> result.success(null) // Android: sent in each call snapshot
+                    "setPresenceTargets" -> {
+                        engine.setPresenceTargets(call.argument<List<String>>("targets") ?: emptyList())
+                        result.success(null)
+                    }
+                    "getLog" -> result.success(
+                        EngineLog.read(call.argument<String>("kind") ?: "conn", (call.argument<Number>("since") ?: 0).toLong()),
+                    )
+                    "openCallScreen" -> {
+                        if (engine.calls.isNotEmpty()) CallActivity.open(appContext)
+                        result.success(null)
+                    }
+                    "missedSeen" -> {
+                        engine.missedSeen()
+                        result.success(null)
+                    }
                     "isBatteryExempt" -> result.success(isBatteryExempt())
                     "requestBatteryExemption" -> {
                         requestBatteryExemption()
@@ -104,18 +131,6 @@ object NativeBridge {
                         openFullScreenIntentSettings()
                         result.success(null)
                     }
-                    // With a Telecom call up, audio routes go through Telecom;
-                    // false tells Dart to route through the SDK instead.
-                    "setRoute" -> {
-                        val route = call.argument<String>("route") ?: "earpiece"
-                        if (MedutTelecom.connection != null) {
-                            MedutTelecom.setRoute(route)
-                            result.success(true)
-                        } else {
-                            result.success(false)
-                        }
-                    }
-                    "pushToken" -> result.success(null) // iOS only (PushKit)
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {
@@ -130,15 +145,12 @@ object NativeBridge {
         main.post {
             val ch = channel
             if (ch == null || !dartReady) {
-                pending.addLast(method to args)
+                // Only navigation is worth replaying: state is pulled on ready.
+                if (method == "openRoute") pending.addLast(method to args)
                 return@post
             }
             ch.invokeMethod(method, args)
         }
-    }
-
-    fun action(action: String, extra: Map<String, Any?> = emptyMap()) {
-        toDart("callAction", mapOf("action" to action, "callId" to CallState.latest.callId) + extra)
     }
 
     private fun flush() {
@@ -148,6 +160,15 @@ object NativeBridge {
             ch.invokeMethod(m, a)
         }
     }
+
+    private fun jsonToMap(o: JSONObject): Map<String, Any?> =
+        o.keys().asSequence().associateWith { k ->
+            when (val v = o.opt(k)) {
+                is JSONObject -> jsonToMap(v)
+                JSONObject.NULL -> null
+                else -> v
+            }
+        }
 
     private fun isBatteryExempt(): Boolean {
         val pm = appContext.getSystemService(Context.POWER_SERVICE) as PowerManager

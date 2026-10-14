@@ -77,4 +77,11 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.core:core-ktx:1.15.0")
+    // FCM wake-up for the native engine (push/MedutFcmService.kt).
+    implementation("com.google.firebase:firebase-messaging:24.1.2")
+
+    // JVM tests of the engine's pure parts (src/test). Real org.json: the
+    // android.jar one is a stub.
+    testImplementation("junit:junit:4.12")
+    testImplementation("org.json:json:20180813")
 }

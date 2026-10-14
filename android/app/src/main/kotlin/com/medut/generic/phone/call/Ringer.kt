@@ -16,24 +16,21 @@ import android.util.Log
 /**
  * Ringtone + vibration for an incoming call. A self-managed call rings itself:
  * the ring notification channel is silent so the two never double up. Follows
- * the phone's ringer mode, and the app's own "Silent" status.
+ * the phone's ringer mode.
  */
 object Ringer {
     private const val TAG = "MedutRinger"
     private var ringtone: Ringtone? = null
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
-    private var silent = false
 
     /**
      * [source] is the ringtone the user picked in Medut: a file path (a bundled
      * tone copied out of the app, or their own file) or "system" for the
      * phone's ringtone. [vibrate] is Medut's own vibrate switch.
      */
-    fun start(context: Context, source: String, vibrate: Boolean, appSilent: Boolean) {
+    fun start(context: Context, source: String, vibrate: Boolean) {
         stop()
-        silent = appSilent
-        if (appSilent) return
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         when (am.ringerMode) {
             AudioManager.RINGER_MODE_SILENT -> return
@@ -62,12 +59,6 @@ object Ringer {
     } catch (e: Exception) {
         Log.e(TAG, "ringtone file failed, using the system one", e)
         false
-    }
-
-    /** The user switched to Silent while it is ringing. */
-    fun setSilent(context: Context, appSilent: Boolean) {
-        if (appSilent && !silent) stop()
-        silent = appSilent
     }
 
     fun stop() {

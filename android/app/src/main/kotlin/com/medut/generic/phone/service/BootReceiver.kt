@@ -6,8 +6,8 @@ import android.content.Intent
 
 /**
  * After a reboot or an app update, bring the keep-alive service back. The
- * process start has already booted the engine (MedutApp), which registers the
- * accounts; this only keeps the process from being reclaimed afterwards.
+ * process start has already started the engine (MedutApp), which registers
+ * the accounts; this only keeps the process from being reclaimed afterwards.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

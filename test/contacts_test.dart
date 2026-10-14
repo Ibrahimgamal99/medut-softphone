@@ -35,6 +35,9 @@ void main() {
   Future<AppSettings> pump(WidgetTester tester, {Set<String> favourites = const {}}) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'), (_) async => null);
+    // No native engine in tests: every call answers null.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('medut/native'), (_) async => null);
     SharedPreferences.setMockInitialValues({});
     final store = await AccountStore.load();
     final settings = await AppSettings.load();

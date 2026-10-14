@@ -421,8 +421,6 @@
   "enc_none": "Not encrypted",
   "enc_sdes": "Encrypted (SRTP)",
   "enc_dtls": "Encrypted (DTLS)",
-  "nameOnCallsOptional": "Your name on calls (optional)",
-  "nameOnCallsHint": "Shown to the people you call",
   "nextPermissions": "Next, two permissions",
   "permMic": "Microphone, so people can hear you",
   "permNotify": "Notifications, so calls ring when the app is closed",
