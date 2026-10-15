@@ -88,7 +88,8 @@ working.
 
 ## Keeping and deleting data
 
-Everything the app stores is on your phone. *Delete account* removes that
+Everything the app stores is on your phone, and none of it goes into a phone
+backup or a transfer to a new phone. *Delete account* removes that
 account's password and settings. Uninstalling the app deletes all of its data, except
 recordings or exports you saved to a shared folder. Data on your SIP server is
 controlled by whoever runs that server: ask them about it.

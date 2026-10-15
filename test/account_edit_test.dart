@@ -32,12 +32,12 @@ class _FakeSip extends SipService {
 
 const _echo = SipAccountConfig(
   id: 'a1',
-  name: 'echo.example.com',
+  name: 'pbx.example.com',
   user: '100',
-  domain: 'echo.example.com',
+  domain: 'pbx.example.com',
   password: 'pw',
   transport: 'wss',
-  serverUrl: 'wss://echo.example.com/sip-ws',
+  serverUrl: 'wss://pbx.example.com/sip-ws',
   mediaEnc: 'dtls',
   ice: true,
   stun: kDefaultStun,
@@ -92,7 +92,7 @@ void main() {
 
   testWidgets('sections show the account at a glance', (tester) async {
     await open(tester, const RegProbe(RegStatus.registered));
-    expect(find.text('WSS · wss://echo.example.com/sip-ws'), findsOneWidget);
+    expect(find.text('WSS · wss://pbx.example.com/sip-ws'), findsOneWidget);
     expect(find.text('DTLS-SRTP · sumCertChecked'), findsOneWidget);
     expect(find.text('ICE · STUN stun.l.google.com · sumNoTurn'), findsOneWidget);
     expect(find.text('Opus · PCMA · PCMU'), findsOneWidget);
@@ -105,7 +105,7 @@ void main() {
     await tester.tap(find.text('saveConnect'));
     await tester.pumpAndSettle();
     expect(sip.tried.single.id, 'a1');
-    expect(store.accounts.single.serverUrl, 'wss://echo.example.com/sip-ws');
+    expect(store.accounts.single.serverUrl, 'wss://pbx.example.com/sip-ws');
     expect(popped, isTrue);
   });
 

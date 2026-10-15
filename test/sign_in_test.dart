@@ -186,10 +186,10 @@ void main() {
 
   testWidgets('pasted account JSON fills the form and signs in over its web link', (tester) async {
     final json = jsonEncode({
-      'uri': '100@echo.example.com',
+      'uri': '100@pbx.example.com',
       'password': 'pw',
       'transport': 'wss',
-      'server_url': 'wss://echo.example.com/sip-ws',
+      'server_url': 'wss://pbx.example.com/sip-ws',
       'media_enc': 'dtls_srtp',
       'ice_enabled': true,
     });
@@ -201,7 +201,7 @@ void main() {
     expect(sip.probed, isEmpty, reason: 'the JSON named its transport');
     final c = sip.tried.single;
     expect([c.user, c.domain, c.transport, c.serverUrl, c.mediaEnc, c.ice],
-        ['100', 'echo.example.com', 'wss', 'wss://echo.example.com/sip-ws', 'dtls', true]);
+        ['100', 'pbx.example.com', 'wss', 'wss://pbx.example.com/sip-ws', 'dtls', true]);
     expect(find.text('signedInTitle'), findsOneWidget);
   });
 
