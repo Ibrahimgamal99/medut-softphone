@@ -768,7 +768,9 @@ object PhoneEngine {
 
         // The INVITE a push rang for: the same call goes on ringing (or, answered
         // already, the SDK has answered it), now with the caller the INVITE names.
-        ringFor(call)?.let { ring ->
+        val ring = boundRing(call)
+        if (ring == null && pushRings().isNotEmpty()) logUnmatched(call)
+        if (ring != null) {
             ring.bind(call)
             ring.runtime = rt
             ring.number = number
@@ -846,24 +848,51 @@ object PhoneEngine {
         return live.firstOrNull { it.cfg.isDefault } ?: live.firstOrNull()
     }
 
+    private fun pushRings() = calls.filter { it.sipCall == null && it.pushKey != null }
+
     /**
-     * The push ring [call] belongs to: the one the SDK bound it to (its
-     * Telecom bridge sees the INVITE first), else the one whose push names it.
+     * The push ring the SDK bound [call] to. Its Telecom bridge sees the
+     * INVITE first: one it did not bind is not this ring's, whatever the push
+     * said (Telecom turns it away with 486 while the ring is up).
      */
-    private fun ringFor(call: Call): ActiveCall? {
-        val rings = calls.filter { it.sipCall == null && it.pushKey != null }
-        if (rings.isEmpty()) return null
-        rings.firstOrNull {
-            MedutTelecom.callFor(Intent().putExtra(MedutTelecom.EXTRA_CALL_ID, it.pushKey)) === call
-        }?.let { return it }
-        return rings.firstOrNull { pushNames(it.pushPayload, call) }
+    private fun boundRing(call: Call): ActiveCall? = pushRings().firstOrNull {
+        MedutTelecom.callFor(Intent().putExtra(MedutTelecom.EXTRA_CALL_ID, it.pushKey)) === call
     }
 
-    /** Matches the SDK: a push with no Call-ID is for whichever INVITE comes. */
+    /**
+     * The push ring [call] is for, before the SDK has had its say (the
+     * incoming-call filter runs first): bound already, or named by its push.
+     */
+    private fun ringFor(call: Call): ActiveCall? =
+        boundRing(call) ?: pushRings().firstOrNull { pushNames(it.pushPayload, call) }
+
+    /**
+     * MedutPush.matches: the push's AOR is the INVITE's account, and its
+     * Call-ID the INVITE's. A field the push leaves out matches anything.
+     */
     private fun pushNames(p: PushPayload?, call: Call): Boolean {
-        val want = p?.callId ?: return true
+        p ?: return true
+        val aor = p.aor
+        val account = call.account?.aor
+        if (aor != null && account != null && sipAor(aor) != sipAor(account)) return false
+        val want = p.callId ?: return true
         val got = runCatching { call.info().callId }.getOrDefault("")
         return got.isEmpty() || got == want
+    }
+
+    private fun sipAor(s: String) = s.trim().lowercase(Locale.ROOT).removePrefix("sips:").removePrefix("sip:")
+        .substringBefore(';').substringBefore('>')
+
+    /** A push rang, and an INVITE came that it did not name: say why, for the Connection log. */
+    private fun logUnmatched(call: Call) {
+        val got = runCatching { call.info().callId }.getOrDefault("")
+        for (ring in pushRings()) {
+            val p = ring.pushPayload ?: continue
+            val msg = "push ring not matched: push call_id=${p.callId ?: "-"} aor=${p.aor ?: "-"}; " +
+                "INVITE Call-ID=${got.ifEmpty { "-" }} account=${call.account?.aor ?: "-"}"
+            Log.w(TAG, msg)
+            EngineLog.conn(msg)
+        }
     }
 
     /** Push rings declined before their INVITE, which the SDK rejects when it comes. */
@@ -889,7 +918,13 @@ object PhoneEngine {
         for (ac in calls.toList()) {
             val p = ac.pushPayload ?: continue
             if (ac.sipCall != null) continue
-            if (payload.callId != null && p.callId != null && payload.callId != p.callId) continue
+            if (cancel) {
+                if (payload.callId != null && p.callId != null && payload.callId != p.callId) continue
+            } else if (p !== payload) {
+                // A call push's wait ends only its own ring (the SDK hands the
+                // same payload through), not one a later push started.
+                continue
+            }
             endRing(ac, if (cancel) "cancelled" else "no INVITE")
         }
     }

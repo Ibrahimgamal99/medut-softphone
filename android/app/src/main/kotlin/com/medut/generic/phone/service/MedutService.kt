@@ -31,6 +31,11 @@ class MedutService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         running = true
         if (!update()) {
+            // Started with startForegroundService, so it must go foreground
+            // even when the call it was started for has already ended (a ring
+            // turned away in a second): stopping first kills the app.
+            start(CallNotifications.service(this, "Medut", ""), keepAliveTypes())
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
