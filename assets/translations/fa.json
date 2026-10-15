@@ -38,6 +38,7 @@
   "complete": "تکمیل",
   "ringing": "در حال زنگ خوردن",
   "calling": "در حال تماس…",
+  "connecting": "در حال اتصال…",
   "keepAliveConnecting": "در حال اتصال حساب‌های شما…",
   "keepAliveOn": "آماده برای تماس · {n} متصل",
   "newMessage": "پیام جدید",

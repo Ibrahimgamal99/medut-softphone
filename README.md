@@ -155,8 +155,11 @@ optimisation, because Doze would otherwise cut the network.
 
 FCM is optional. If `android/app/google-services.json` is present, the engine
 puts its FCM token in the REGISTER Contact (RFC 8599 `pn-provider=fcm`). A
-push from the server starts the process; the accounts refresh their
-registration and the INVITE rings like any other call.
+call push from the server starts the process and rings at once, with the
+caller the push names (`caller_name` / `caller_uri`), while the accounts
+refresh their registration. The INVITE then takes the ring over; an answer
+given before it arrives is carried out, and a decline rejects it. No INVITE
+within 20 s, or a `cancel` push, ends the ring as a missed call.
 
 **iOS.** iOS does not keep a backgrounded app's socket alive, so a closed app
 is woken by a VoIP push. The engine registers with PushKit and puts the token

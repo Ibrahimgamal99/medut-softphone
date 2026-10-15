@@ -38,6 +38,7 @@
   "complete": "Completar",
   "ringing": "Sonando",
   "calling": "Llamando…",
+  "connecting": "Conectando…",
   "keepAliveConnecting": "Conectando tus cuentas…",
   "keepAliveOn": "Listo para llamadas · {n} conectadas",
   "newMessage": "Mensaje nuevo",

@@ -38,6 +38,7 @@
   "complete": "Abschließen",
   "ringing": "Klingelt",
   "calling": "Wird angerufen…",
+  "connecting": "Verbindung wird hergestellt…",
   "keepAliveConnecting": "Ihre Konten werden verbunden…",
   "keepAliveOn": "Bereit für Anrufe · {n} verbunden",
   "newMessage": "Neue Nachricht",

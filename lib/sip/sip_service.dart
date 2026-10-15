@@ -158,7 +158,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     'stopRecord', 'hide', 'onHold', 'swap', 'callDetails', 'audioOutput', 'cancel', 'complete',
     'more', 'callQuality', 'youHear', 'theyHear', 'encrypted', 'recShort', 'call',
     // Status lines and the warm-transfer bar
-    'transferring', 'ringing', 'calling', 'reconnecting', 'poorConnection', 'recordingNow',
+    'transferring', 'ringing', 'calling', 'connecting', 'reconnecting', 'poorConnection', 'recordingNow',
     'xferConnectedTo', 'xferCalling', 'xferHintTalking', 'xferHintCalling', 'xferJoin', 'xferBack',
     // The quality pill and sheet
     'signalExcellent', 'signalGood', 'signalFair', 'signalPoor', 'signalChecking',

@@ -38,6 +38,7 @@
   "complete": "完成",
   "ringing": "正在响铃",
   "calling": "正在呼叫…",
+  "connecting": "正在连接…",
   "keepAliveConnecting": "正在连接您的账号…",
   "keepAliveOn": "可接打电话 · 已连接 {n} 个",
   "newMessage": "新消息",

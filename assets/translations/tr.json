@@ -38,6 +38,7 @@
   "complete": "Tamamla",
   "ringing": "Çalıyor",
   "calling": "Aranıyor…",
+  "connecting": "Bağlanıyor…",
   "keepAliveConnecting": "Hesaplarınız bağlanıyor…",
   "keepAliveOn": "Aramalara hazır · {n} bağlı",
   "newMessage": "Yeni mesaj",

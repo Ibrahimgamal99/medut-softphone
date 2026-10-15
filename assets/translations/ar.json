@@ -38,6 +38,7 @@
   "complete": "إتمام",
   "ringing": "الرنين",
   "calling": "جارٍ الاتصال…",
+  "connecting": "جارٍ التوصيل…",
   "keepAliveConnecting": "جارٍ توصيل حساباتك…",
   "keepAliveOn": "جاهز للمكالمات · {n} متصل",
   "newMessage": "رسالة جديدة",

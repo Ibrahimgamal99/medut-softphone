@@ -38,6 +38,7 @@
   "complete": "Terminer",
   "ringing": "Sonnerie",
   "calling": "Appel en cours…",
+  "connecting": "Connexion…",
   "keepAliveConnecting": "Connexion de vos comptes…",
   "keepAliveOn": "Prêt pour les appels · {n} connectés",
   "newMessage": "Nouveau message",

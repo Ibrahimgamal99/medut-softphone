@@ -38,6 +38,7 @@
   "complete": "Complete",
   "ringing": "Ringing",
   "calling": "Calling…",
+  "connecting": "Connecting…",
   "keepAliveConnecting": "Connecting your accounts…",
   "keepAliveOn": "Ready for calls · {n} connected",
   "newMessage": "New message",

@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -43,7 +44,7 @@ import dev.medut.RegistrationState
 import dev.medut.android.AndroidOptions
 import dev.medut.android.AudioRoute
 import dev.medut.android.MedutAndroid
-import dev.medut.android.MedutPush
+import dev.medut.android.PushPayload
 import dev.medut.android.telecom.MedutTelecom
 import dev.medut.android.telecom.TelecomOptions
 import org.json.JSONObject
@@ -70,13 +71,31 @@ class AccountRuntime(var cfg: AccountCfg, val signature: String) {
 
 class ActiveCall(
     val id: String,
-    val call: Call,
-    val runtime: AccountRuntime,
+    call: Call?,
+    var runtime: AccountRuntime,
     val incoming: Boolean,
     var number: String,
     var name: String,
     var phase: Phase,
 ) {
+    /** The SIP call; null on a push ring until its INVITE arrives. */
+    var sipCall: Call? = call
+        private set
+
+    /** Only touched once the INVITE is in: a push ring is answered, declined and ended through Telecom. */
+    val call: Call get() = sipCall ?: error("push ring $id has no INVITE yet")
+
+    /** A push ring's key, for MedutTelecom.answerPushRing / declinePushRing. */
+    var pushKey: String? = null
+    var pushPayload: PushPayload? = null
+
+    /** Answered while ringing for a push: the SDK answers the INVITE when it comes. */
+    var answerPending = false
+
+    fun bind(c: Call) {
+        sipCall = c
+    }
+
     val createdAt = System.currentTimeMillis()
     var answeredAt = 0L
     var muted = false
@@ -140,6 +159,9 @@ object PhoneEngine {
     private const val TAG = "MedutEngine"
     private const val PREFS = "medut_engine"
 
+    /** How long a push waits for its INVITE (MedutFcmService), and a declined ring stays declined. */
+    const val PUSH_WAIT_MS = 20_000L
+
     lateinit var app: Context
         private set
     private val main = Handler(Looper.getMainLooper())
@@ -200,8 +222,11 @@ object PhoneEngine {
         forgetLegacyPhoneAccount()
 
         // The app draws its own incoming-call screen and ringtone; Telecom
-        // only tells us when to show it. The ring waits for the INVITE.
+        // only tells us when to show it.
         MedutTelecom.onShowIncomingCallUi = { call -> find(call)?.let(::showRing) }
+        // A call push rings at once, with the caller the push names, while
+        // the accounts register; the INVITE then takes the ring over.
+        MedutTelecom.onShowPushIncomingCallUi = ::onPushRing
         // Blocked, busy and Do not disturb are turned away before Telecom
         // hears of the call, so it never starts to ring.
         MedutTelecom.incomingCallFilter = { call -> refusal(call, call.remoteUri, call.remoteDisplayName) }
@@ -211,7 +236,6 @@ object PhoneEngine {
             refreshRoutes()
         }
         MedutTelecom.onOutgoingCallRefused = { notice(config.label("callFailed", "Couldn't place the call")) }
-        MedutPush.ringOnPush = false
         loadPushToken()
 
         try {
@@ -666,7 +690,7 @@ object PhoneEngine {
 
     // ── Calls ──────────────────────────────────────────────────────────────
 
-    private fun find(c: Call): ActiveCall? = calls.firstOrNull { it.call === c }
+    private fun find(c: Call): ActiveCall? = calls.firstOrNull { it.sipCall === c }
 
     private fun byId(id: String?): ActiveCall? = if (id.isNullOrEmpty()) null else calls.firstOrNull { it.id == id }
 
@@ -696,11 +720,11 @@ object PhoneEngine {
             EngineLog.conn("blocked call from $number")
             return 603
         }
-        if (calls.size >= 2) return 486
+        // The push ring this INVITE takes over is the same call, not a second one.
+        val ring = ringFor(call)
+        if (calls.count { it !== ring } >= 2) return 486
         if (config.effectiveStatus() == "dnd") {
-            val fav = config.letFavourites && config.favourites.any { sameNumber(it, number) }
-            val repeat = config.letRepeat && history.calledRecently(number)
-            if (!fav && !repeat) {
+            if (!dndLetsThrough(number)) {
                 val shown = (displayName ?: "").trim()
                 val name = nameFor(number).ifEmpty { if (shown == number) "" else shown }
                 history.addCall(missedRow(rt, number, name))
@@ -713,10 +737,22 @@ object PhoneEngine {
         return null
     }
 
+    /** Under Do not disturb: a favourite or a repeat caller still rings. */
+    private fun dndLetsThrough(number: String): Boolean =
+        (config.letFavourites && config.favourites.any { sameNumber(it, number) }) ||
+            (config.letRepeat && history.calledRecently(number))
+
     private fun onIncoming(e: MedutEvent.IncomingCall) {
         val call = e.call
-        // Already turned away by the filter, before Telecom was told.
-        if (refused.remove(call)) return
+        // Already turned away by the filter, before Telecom was told. The SDK
+        // has ended the push ring it would have taken over.
+        if (refused.remove(call)) {
+            forgetDeclined(call)
+            ringFor(call)?.let { calls.remove(it); afterRingGone(it) }
+            return
+        }
+        // Its push ring was declined: the SDK has rejected it.
+        if (forgetDeclined(call)) return
         // No Telecom (below API 26): the same rules, applied here.
         if (!MedutAndroid.isTelecomEnabled) {
             refusal(call, e.fromUri, e.displayName)?.let { code ->
@@ -730,6 +766,19 @@ object PhoneEngine {
         val shown = (e.displayName ?: "").trim()
         val name = nameFor(number).ifEmpty { if (shown == number) "" else shown }
 
+        // The INVITE a push rang for: the same call goes on ringing (or, answered
+        // already, the SDK has answered it), now with the caller the INVITE names.
+        ringFor(call)?.let { ring ->
+            ring.bind(call)
+            ring.runtime = rt
+            ring.number = number
+            ring.name = name.ifEmpty { ring.name }
+            push()
+            pushState()
+            if (!ring.answerPending) armAutoAnswer(ring)
+            return
+        }
+
         val ac = ActiveCall(callIdOf(call), call, rt, true, number, name, Phase.INCOMING)
         calls.add(ac)
         // A second call while talking is "call waiting": the live one stays in front.
@@ -742,12 +791,124 @@ object PhoneEngine {
         }
         push()
         pushState()
-        // Auto-answer (not over another call). It still rings, so it can be declined.
-        if (config.autoAnswer && focused === ac) {
-            val r = Runnable { if (ac.phase == Phase.INCOMING && calls.contains(ac)) answer(ac) }
-            ac.autoAnswer = r
-            main.postDelayed(r, config.autoAnswerDelay * 1000L)
+        armAutoAnswer(ac)
+    }
+
+    /** Auto-answer (not over another call). It still rings, so it can be declined. */
+    private fun armAutoAnswer(ac: ActiveCall) {
+        if (!config.autoAnswer || focused !== ac) return
+        val r = Runnable { if (ac.phase == Phase.INCOMING && calls.contains(ac)) answer(ac) }
+        ac.autoAnswer = r
+        main.postDelayed(r, config.autoAnswerDelay * 1000L)
+    }
+
+    // ── Push rings: ringing before the INVITE ───────────────────────────────
+
+    /**
+     * Telecom shows a call a push announced (MedutPush.wake): ring now, with
+     * the caller the push names. The same rules as for an INVITE apply; one
+     * turned away is declined, and the SDK rejects its INVITE when it comes.
+     */
+    private fun onPushRing(key: String, payload: PushPayload) {
+        if (calls.any { it.pushKey == key }) return
+        val number = userPart(payload.callerUri ?: "")
+        val rt = runtimeForPush(payload)
+        val refuse = rt == null || calls.size >= 2 ||
+            (number.isNotEmpty() && config.blocked.contains(number)) ||
+            (config.effectiveStatus() == "dnd" && !dndLetsThrough(number))
+        if (refuse) {
+            // The INVITE meets the incoming-call filter, which records it as for any call.
+            MedutTelecom.declinePushRing(key)
+            rememberDeclined(payload)
+            return
         }
+        val shown = (payload.callerName ?: "").trim()
+        val name = nameFor(number).ifEmpty { if (shown == number) "" else shown }
+            .ifEmpty { if (number.isEmpty()) config.label("incomingCall", "Incoming call") else "" }
+        val ac = ActiveCall(payload.callId ?: key, null, rt!!, true, number, name, Phase.INCOMING)
+        ac.pushKey = key
+        ac.pushPayload = payload
+        calls.add(ac)
+        if (focused == null) focused = ac
+        showRing(ac)
+        pushState()
+    }
+
+    /** The account a push is for: the one it names, else the default one. */
+    private fun runtimeForPush(p: PushPayload): AccountRuntime? {
+        val live = runtimes.values.filter { it.account != null && !it.probe }
+        p.aor?.let { aor ->
+            val user = userPart(aor)
+            val domain = aor.substringAfter('@', "").substringBefore(';').substringBefore('>').lowercase(Locale.ROOT)
+            live.firstOrNull { it.cfg.user == user && (domain.isEmpty() || it.cfg.domain.lowercase(Locale.ROOT) == domain) }
+                ?.let { return it }
+        }
+        return live.firstOrNull { it.cfg.isDefault } ?: live.firstOrNull()
+    }
+
+    /**
+     * The push ring [call] belongs to: the one the SDK bound it to (its
+     * Telecom bridge sees the INVITE first), else the one whose push names it.
+     */
+    private fun ringFor(call: Call): ActiveCall? {
+        val rings = calls.filter { it.sipCall == null && it.pushKey != null }
+        if (rings.isEmpty()) return null
+        rings.firstOrNull {
+            MedutTelecom.callFor(Intent().putExtra(MedutTelecom.EXTRA_CALL_ID, it.pushKey)) === call
+        }?.let { return it }
+        return rings.firstOrNull { pushNames(it.pushPayload, call) }
+    }
+
+    /** Matches the SDK: a push with no Call-ID is for whichever INVITE comes. */
+    private fun pushNames(p: PushPayload?, call: Call): Boolean {
+        val want = p?.callId ?: return true
+        val got = runCatching { call.info().callId }.getOrDefault("")
+        return got.isEmpty() || got == want
+    }
+
+    /** Push rings declined before their INVITE, which the SDK rejects when it comes. */
+    private val declinedRings = mutableListOf<PushPayload>()
+
+    private fun rememberDeclined(p: PushPayload) {
+        declinedRings.add(p)
+        main.postDelayed({ declinedRings.remove(p) }, PUSH_WAIT_MS)
+    }
+
+    private fun forgetDeclined(call: Call): Boolean {
+        val p = declinedRings.firstOrNull { pushNames(it, call) } ?: return false
+        declinedRings.remove(p)
+        return true
+    }
+
+    /**
+     * MedutFcmService: a cancel push, or a call push whose INVITE never
+     * came. The SDK has ended the ring; it goes in the history as missed.
+     */
+    fun pushRingOver(payload: PushPayload) {
+        val cancel = payload.type == PushPayload.Type.CANCEL
+        for (ac in calls.toList()) {
+            val p = ac.pushPayload ?: continue
+            if (ac.sipCall != null) continue
+            if (payload.callId != null && p.callId != null && payload.callId != p.callId) continue
+            endRing(ac, if (cancel) "cancelled" else "no INVITE")
+        }
+    }
+
+    /** A push ring ends before its INVITE: declined here ([ActiveCall.userDeclined]), cancelled or timed out. */
+    private fun endRing(ac: ActiveCall, reason: String?) {
+        if (!calls.contains(ac) || ac.sipCall != null) return
+        if (ac.userDeclined) {
+            ac.pushKey?.let(MedutTelecom::declinePushRing)
+            ac.pushPayload?.let(::rememberDeclined)
+        }
+        finish(ac, false, reason, dev.medut.CallState.CANCELLED)
+    }
+
+    /** A push ring dropped without a history row: the call it announced was turned away. */
+    private fun afterRingGone(ac: ActiveCall) {
+        if (focused === ac) focused = calls.firstOrNull()
+        push()
+        pushState()
     }
 
     private fun missedRow(rt: AccountRuntime, number: String, name: String) = ContentValues().apply {
@@ -956,13 +1117,22 @@ object PhoneEngine {
         if (ac.phase != Phase.INCOMING) return
         for (other in calls.toList()) if (other !== ac && other.phase == Phase.ACTIVE) hold(other)
         focused = ac
-        runCatching { ac.call.answer() }.onFailure { Log.w(TAG, "answer: $it") }
+        val key = ac.pushKey
+        if (ac.sipCall == null && key != null) {
+            // No INVITE yet: the SDK answers it the moment it arrives.
+            if (!MedutTelecom.answerPushRing(key)) return endRing(ac, "no INVITE")
+            ac.answerPending = true
+            ac.phase = Phase.OUTGOING
+        } else {
+            runCatching { ac.call.answer() }.onFailure { Log.w(TAG, "answer: $it") }
+        }
         push()
         pushState()
     }
 
     fun decline(ac: ActiveCall, code: Int = 603) {
         ac.userDeclined = true
+        if (ac.sipCall == null) return endRing(ac, null)
         runCatching { ac.call.reject(code, if (code == 486) "Busy Here" else "Decline") }
     }
 
@@ -974,7 +1144,7 @@ object PhoneEngine {
             runCatching { ac.call.stopRecording() }
             ac.recording = false
         }
-        if (ac.phase == Phase.INCOMING) decline(ac) else runCatching { ac.call.hangup() }
+        if (ac.phase == Phase.INCOMING || ac.sipCall == null) decline(ac) else runCatching { ac.call.hangup() }
     }
 
     private fun setMute(ac: ActiveCall, on: Boolean) {
@@ -1352,7 +1522,11 @@ object PhoneEngine {
             )
         }
         val status = if (f.transferring) l.label("transferring", "Transferring…") else when (f.phase) {
-            Phase.OUTGOING -> if (f.remoteRinging) l.label("ringing", "Ringing") else l.label("calling", "Calling…")
+            Phase.OUTGOING -> when {
+                f.answerPending -> l.label("connecting", "Connecting…")
+                f.remoteRinging -> l.label("ringing", "Ringing")
+                else -> l.label("calling", "Calling…")
+            }
             Phase.HELD -> l.label("onHold", "On hold")
             else -> when (f.link) {
                 "reconnecting" -> l.label("reconnecting", "Reconnecting…")
