@@ -2,6 +2,7 @@ import AVFoundation
 import Foundation
 import Security
 import SQLite3
+import UIKit
 import medut
 
 // The engine's settings, accounts, history and helpers: the Swift twins of
@@ -576,5 +577,59 @@ enum Ringback {
   static func stop() {
     player?.stop()
     player = nil
+  }
+}
+
+/// What the app keeps, on Android's terms (allowBackup off,
+/// res/xml/data_extraction_rules.xml): nothing goes into an iCloud or
+/// computer backup, and a new install starts empty.
+enum AppData {
+  private static let installedKey = "medut.installed"
+
+  /// didFinishLaunching, before the engine reads the accounts.
+  static func prepare() {
+    // Before the first unlock after a restart (a VoIP push can launch the app
+    // then) neither the defaults nor the Keychain can be read: leave both be.
+    guard UIApplication.shared.isProtectedDataAvailable else { return }
+    let defaults = UserDefaults.standard
+    if !defaults.bool(forKey: installedKey) {
+      // The Keychain outlives an uninstall on iOS, so an earlier install's
+      // accounts and passwords would come back. The defaults and Documents go
+      // with the app: both empty is a new install, not an update from a build
+      // without this mark.
+      if !hasLocalData() { wipeKeychain() }
+      defaults.set(true, forKey: installedKey)
+    }
+    excludeFromBackup()
+  }
+
+  private static func hasLocalData() -> Bool {
+    if let id = Bundle.main.bundleIdentifier,
+       let d = UserDefaults.standard.persistentDomain(forName: id), !d.isEmpty { return true }
+    let fm = FileManager.default
+    guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first,
+          let items = try? fm.contentsOfDirectory(atPath: docs.path) else { return false }
+    return !items.isEmpty
+  }
+
+  private static func wipeKeychain() {
+    for cls in [kSecClassGenericPassword, kSecClassInternetPassword, kSecClassKey,
+                kSecClassCertificate, kSecClassIdentity] {
+      SecItemDelete([kSecClass as String: cls] as CFDictionary)
+    }
+  }
+
+  /// Documents (history, messages, recordings) and Library (settings) stay
+  /// out of backups; the Keychain items are ThisDeviceOnly already.
+  private static func excludeFromBackup() {
+    let fm = FileManager.default
+    let dirs = fm.urls(for: .documentDirectory, in: .userDomainMask)
+      + fm.urls(for: .libraryDirectory, in: .userDomainMask)
+    for dir in dirs {
+      var url = dir
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try? url.setResourceValues(values)
+    }
   }
 }

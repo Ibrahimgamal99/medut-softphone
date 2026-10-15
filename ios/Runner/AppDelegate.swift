@@ -8,6 +8,8 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // A new install starts empty, and nothing goes into a backup.
+    AppData.prepare()
     // The phone first: on a VoIP-push launch the push is delivered right
     // after this returns, and the SDK's CallKit must be ready to report it.
     // The engine registers the accounts and rings calls with no Flutter UI.

@@ -105,6 +105,10 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
   private weak var codeCall: ActiveCall?
   private var probeWaiters: [String: () -> Void] = [:]
   private var subscription: MedutSubscription?
+  /// Pushes whose CallKit call waits for its INVITE, oldest first: the SDK
+  /// gives each INVITE to the oldest, and one that times out is a missed call
+  /// with the caller its push named.
+  private var pendingPushes: [(at: Date, uri: String?, name: String?, aor: String?)] = []
   private var registry: PKPushRegistry?
   private var statusTimer: Timer?
   private var names: [String: String] = [:]
@@ -161,6 +165,7 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
           self.pushState()
         }
       }
+      MedutCallKit.shared.onPushCallTimedOut = { [weak self] in self?.pushCallTimedOut() }
       MedutCallKit.shared.onOutgoingCallRefused = { [weak self] _, _ in
         self?.notice(self?.config.label("callFailed", "Couldn't place the call") ?? "")
       }
@@ -259,8 +264,52 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
 
   func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload,
                     for type: PKPushType, completion: @escaping () -> Void) {
+    let data = payload.dictionaryPayload
+    func field(_ key: String) -> String? {
+      if let s = data[key] as? String, !s.isEmpty { return s }
+      if let nested = data["medut"] as? [AnyHashable: Any], let s = nested[key] as? String, !s.isEmpty { return s }
+      return nil
+    }
+    let uri = field("caller_uri"), aor = field("aor")
+    EngineLog.conn("push call: call_id=\(field("call_id") ?? "-") aor=\(aor ?? "-") caller=\(uri ?? "-")")
+    prunePushes()
+    pendingPushes.append((at: Date(), uri: uri, name: field("caller_name"), aor: aor))
     // Reports a CallKit call at once (iOS requires it), then the INVITE binds to it.
-    MedutPush.wake(payload: payload.dictionaryPayload, completion: completion)
+    MedutPush.wake(payload: data, completion: completion)
+  }
+
+  /// A push rang and no INVITE came (MedutCallKit ended its call as
+  /// unanswered): a missed call, as on Android.
+  private func pushCallTimedOut() {
+    prunePushes()
+    guard !pendingPushes.isEmpty else { return }
+    let p = pendingPushes.removeFirst()
+    guard let rt = runtimeForPush(p.aor) else { return }
+    let number = Numbers.userPart(p.uri ?? "")
+    let contact = nameFor(number)
+    let shown = (p.name ?? "").trimmingCharacters(in: .whitespaces)
+    let name = !contact.isEmpty ? contact : (shown == number ? "" : shown)
+    history.insert("calls", [
+      "account_id": rt.cfg.id, "account_name": rt.cfg.label, "number": number, "name": name,
+      "direction": "incoming", "result": "missed", "started_at": Int(p.at.timeIntervalSince1970 * 1000),
+      "duration": 0, "end_reason": "no INVITE",
+    ])
+    MedutBridge.shared.toDart("historyChanged")
+    notifyMissed(!name.isEmpty ? name : !number.isEmpty ? number : config.label("incomingCall", "Incoming call"))
+  }
+
+  private func prunePushes() {
+    let now = Date()
+    pendingPushes.removeAll { now.timeIntervalSince($0.at) > 30 }
+  }
+
+  /// The account a push is for: the one whose user its AOR names (servers
+  /// often write their own address for the domain), else the default one.
+  private func runtimeForPush(_ aor: String?) -> AccountRuntime? {
+    let live = runtimes.values.filter { $0.account != nil && !$0.probe }
+    if let aor = aor, let rt = live.first(where: { $0.cfg.user == Numbers.userPart(aor) }) { return rt }
+    let def = repo.defaultAccount()
+    return live.first { $0.cfg.id == def?.id } ?? live.first
   }
 
   private func setPushToken(_ token: String?) {
@@ -656,6 +705,10 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
     policyLock.lock()
     let wasRefused = refused.remove(ObjectIdentifier(call)) != nil
     policyLock.unlock()
+    // The SDK gave this INVITE the oldest push's CallKit call (or turned it
+    // away in that call's place): that push is answered for.
+    prunePushes()
+    if !pendingPushes.isEmpty { pendingPushes.removeFirst() }
     // Already turned away by the filter, before CallKit was told.
     if wasRefused { return }
     // No CallKit: the same rules, applied here.
