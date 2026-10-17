@@ -86,14 +86,19 @@ class _AccountCard extends ConsumerWidget {
         Row(children: [
           Dot(color, size: 10),
           const SizedBox(width: 10),
-          Flexible(child: Text(cfg.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-          IconButton(
-            tooltip: 'rename'.tr(),
-            visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.edit_outlined, size: 18, color: t.text2),
-            onPressed: () => renameAccount(context, ref, cfg),
+          // Name and pencil share one Expanded, so a short name leaves its
+          // spare room here and the switch stays flush with the card's edge.
+          Expanded(
+            child: Row(children: [
+              Flexible(child: Text(cfg.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+              IconButton(
+                tooltip: 'rename'.tr(),
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.edit_outlined, size: 18, color: t.text2),
+                onPressed: () => renameAccount(context, ref, cfg),
+              ),
+            ]),
           ),
-          const Spacer(),
           if (cfg.isDefault)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

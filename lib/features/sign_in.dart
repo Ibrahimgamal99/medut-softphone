@@ -1005,7 +1005,9 @@ class _CheckRow extends StatelessWidget {
                 fontSize: 14, fontWeight: dim ? FontWeight.w500 : FontWeight.w600, color: dim ? t.text2 : t.text),
           ),
         ),
-        Flexible(
+        // Expanded, not Flexible: a loose child beside an Expanded one keeps
+        // its unused half as dead space, and a short result drifted left.
+        Expanded(
           child: Text(result,
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
@@ -1312,7 +1314,7 @@ class _FoldFieldState extends State<FoldField> {
           child: Row(children: [
             Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
             const SizedBox(width: 12),
-            Flexible(
+            Expanded(
               child: Text(v.isEmpty ? widget.empty : v,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.end,
