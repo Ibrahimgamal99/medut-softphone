@@ -194,6 +194,13 @@ flutter build apk --release  # Android
 upload key from `android/key.properties`, and keeps the Dart debug info in
 `symbols/<version>/`.
 
+**GitHub Release:** bump `version:` in `pubspec.yaml`, commit, then push a
+matching tag (`git tag v0.2.0 && git push origin v0.2.0`). The
+`android-release` workflow builds the signed APK, checks it is not
+debug-signed, and attaches it with its checksum and debug symbols to the
+release for that tag. Signing comes from the repository secrets listed at the
+top of `.github/workflows/android-release.yml`.
+
 **iOS** (on a Mac):
 1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK
    repo does not ship it yet, and `pod install` reports it missing otherwise.
