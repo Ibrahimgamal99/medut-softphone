@@ -1,7 +1,7 @@
 name: medut_phone
 description: "Medut — a softphone for any SIP PBX, built on Medut-SDK."
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ^3.10.0
