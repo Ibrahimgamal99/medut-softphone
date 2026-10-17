@@ -450,7 +450,7 @@ class _ThemeSwatches extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: value == mode ? FontWeight.w700 : FontWeight.w500,
-                          color: value == mode ? t.accent : t.text2)),
+                          color: value == mode ? t.accentText : t.text2)),
                 ]),
               ),
             ),

@@ -481,7 +481,7 @@ class _PersonRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(_hm(g.latest), style: TextStyle(fontSize: 12, color: unread ? t.accent : t.grey)),
+                  Text(_hm(g.latest), style: TextStyle(fontSize: 12, color: unread ? t.accentText : t.grey)),
                   const SizedBox(height: 6),
                   if (owed > 0)
                     _Badge('$owed', t.missed)

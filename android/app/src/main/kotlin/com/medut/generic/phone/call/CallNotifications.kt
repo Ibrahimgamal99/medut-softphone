@@ -25,7 +25,7 @@ object CallNotifications {
     const val ID_SERVICE = 1002
     const val ID_MISSED = 1003
 
-    private const val GREEN = 0xFF08805A.toInt() // the app's green, white text stays readable
+    private const val BRAND = 0xFF0F8EB8.toInt() // the brand cyan, white text stays readable
 
     /** Marks an incoming call where words would say so (the call log's arrow). */
     const val INCOMING = "↙"
@@ -130,7 +130,7 @@ object CallNotifications {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setColorized(true)
-            .setColor(GREEN)
+            .setColor(BRAND)
             .setContentIntent(callScreenIntent(context, 20))
             .setStyle(
                 NotificationCompat.CallStyle.forOngoingCall(
@@ -175,7 +175,7 @@ object CallNotifications {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setColorized(true)
-            .setColor(GREEN)
+            .setColor(BRAND)
             .setContentIntent(callScreenIntent(context, 20))
             .setStyle(Notification.CallStyle.forOngoingCall(caller, actionIntent(context, CallActionReceiver.HANGUP, 21)))
             .addAction(action(
@@ -226,7 +226,7 @@ object CallNotifications {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setColor(0xFFE5383B.toInt()) // the missed red, as in the Calls tab
+            .setColor(0xFFDC2626.toInt()) // the missed red, as in the Calls tab
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(

@@ -12,6 +12,7 @@ class Tokens extends ThemeExtension<Tokens> {
     required this.text,
     required this.text2,
     required this.accent,
+    required this.accentText,
     required this.accentSoft,
     required this.onAccent,
     required this.success,
@@ -32,7 +33,9 @@ class Tokens extends ThemeExtension<Tokens> {
   });
 
   final Color bg, surface, surface2, border, text, text2;
-  final Color accent, accentSoft, onAccent;
+  /// [accent] fills buttons and focus rings; [accentText] is the same cyan as
+  /// text or an icon, darkened on light so small text stays readable.
+  final Color accent, accentText, accentSoft, onAccent;
   final Color success, successSoft, onSuccess;
   final Color danger, dangerSoft, missed, warn, warnSoft, info;
   final Color purple, purpleSoft, grey, nav;
@@ -41,65 +44,67 @@ class Tokens extends ThemeExtension<Tokens> {
   final List<(Color, Color)> avatars;
   final bool dark;
 
-  /// Pocket: cool neutrals, one green that is both the brand and "call".
+  /// Medut brand: cool neutrals, one cyan for the brand, green only for "call".
   static const light = Tokens(
-    bg: Color(0xFFF3F4F6),
+    bg: Color(0xFFF6F7F8),
     surface: Color(0xFFFFFFFF),
-    surface2: Color(0xFFE9ECEF),
-    border: Color(0xFFE0E3E8),
-    text: Color(0xFF0E1116),
-    text2: Color(0xFF5D6470),
-    accent: Color(0xFF08805A),
-    accentSoft: Color(0xFFDCF2E8),
+    surface2: Color(0xFFECEEF1),
+    border: Color(0xFFDFE2E6),
+    text: Color(0xFF111418),
+    text2: Color(0xFF454D56),
+    accent: Color(0xFF0F8EB8),
+    accentText: Color(0xFF0B6886),
+    accentSoft: Color(0xFFDCEEF5),
     onAccent: Color(0xFFFFFFFF),
-    success: Color(0xFF08805A),
-    successSoft: Color(0xFFDCF2E8),
+    success: Color(0xFF16A34A),
+    successSoft: Color(0xFFDCF5E4),
     onSuccess: Color(0xFFFFFFFF),
-    danger: Color(0xFFE5383B),
-    dangerSoft: Color(0xFFFDE6E6),
-    missed: Color(0xFFE5383B),
-    warn: Color(0xFF9A6700),
-    warnSoft: Color(0xFFFDF1DC),
-    info: Color(0xFF1D5C99),
-    purple: Color(0xFF4B3BB0),
-    purpleSoft: Color(0xFFE7E3FB),
+    danger: Color(0xFFDC2626),
+    dangerSoft: Color(0xFFFCE4E4),
+    missed: Color(0xFFDC2626),
+    warn: Color(0xFFD97706),
+    warnSoft: Color(0xFFFDEFD8),
+    info: Color(0xFF2563EB),
+    purple: Color(0xFF9333EA),
+    purpleSoft: Color(0xFFEFE4FB),
     grey: Color(0xFF9097A1),
-    nav: Color(0xFFF3F4F6),
+    nav: Color(0xFFF6F7F8),
     avatars: [
-      (Color(0xFFDCF2E8), Color(0xFF0B6B4A)),
-      (Color(0xFFE7E3FB), Color(0xFF4B3BB0)),
+      (Color(0xFFD6ECF4), Color(0xFF0B6886)),
+      (Color(0xFFEFE4FB), Color(0xFF7E22CE)),
       (Color(0xFFFBE8D7), Color(0xFF9A4A12)),
-      (Color(0xFFDFEBF8), Color(0xFF1D5C99)),
+      (Color(0xFFDBEAFE), Color(0xFF1D4ED8)),
     ],
     dark: false,
   );
 
   static const darkTokens = Tokens(
     bg: Color(0xFF0C0E10),
-    surface: Color(0xFF16191C),
-    surface2: Color(0xFF1F2327),
-    border: Color(0xFF2A2F34),
-    text: Color(0xFFF2F4F6),
-    text2: Color(0xFFA0A8B2),
-    accent: Color(0xFF3DD49A),
-    accentSoft: Color(0x243DD49A),
-    onAccent: Color(0xFF04271A),
-    success: Color(0xFF3DD49A),
-    successSoft: Color(0x243DD49A),
-    onSuccess: Color(0xFF04271A),
-    danger: Color(0xFFFF5A5F),
-    dangerSoft: Color(0x26FF5A5F),
-    missed: Color(0xFFFF5A5F),
-    warn: Color(0xFFE9B04A),
-    warnSoft: Color(0x24E9B04A),
-    info: Color(0xFF8EC0F2),
-    purple: Color(0xFFB7AEFF),
-    purpleSoft: Color(0x29B7AEFF),
+    surface: Color(0xFF131619),
+    surface2: Color(0xFF1B1F24),
+    border: Color(0xFF262B31),
+    text: Color(0xFFECEFF2),
+    text2: Color(0xFFA6AEB7),
+    accent: Color(0xFF0F8EB8),
+    accentText: Color(0xFF11A4D4),
+    accentSoft: Color(0x2611A4D4),
+    onAccent: Color(0xFFFFFFFF),
+    success: Color(0xFF22C55E),
+    successSoft: Color(0x2422C55E),
+    onSuccess: Color(0xFF052E16),
+    danger: Color(0xFFEF4444),
+    dangerSoft: Color(0x26EF4444),
+    missed: Color(0xFFEF4444),
+    warn: Color(0xFFF59E0B),
+    warnSoft: Color(0x24F59E0B),
+    info: Color(0xFF3B82F6),
+    purple: Color(0xFFA855F7),
+    purpleSoft: Color(0x29A855F7),
     grey: Color(0xFF6F7781),
     nav: Color(0xFF0C0E10),
     avatars: [
-      (Color(0xFF163428), Color(0xFF7DE3B8)),
-      (Color(0xFF25214A), Color(0xFFB7AEFF)),
+      (Color(0xFF084E65), Color(0xFF9BDCF2)),
+      (Color(0xFF2E1A4A), Color(0xFFC4A2FA)),
       (Color(0xFF38261A), Color(0xFFF4B27A)),
       (Color(0xFF162A3D), Color(0xFF8EC0F2)),
     ],
@@ -118,9 +123,9 @@ extension TokensX on BuildContext {
   Tokens get t => Theme.of(this).extension<Tokens>()!;
 }
 
-/// Monospace for SIP / RTP details (URIs, codecs, MOS).
+/// IBM Plex Mono: numbers, and SIP / RTP details (URIs, codecs, MOS).
 TextStyle mono(BuildContext context, {double size = 11, Color? color, FontWeight? weight}) =>
-    GoogleFonts.dmMono(fontSize: size, color: color ?? context.t.text2, fontWeight: weight);
+    GoogleFonts.ibmPlexMono(fontSize: size, color: color ?? context.t.text2, fontWeight: weight);
 
 ThemeData buildTheme(Tokens tk, {required String language}) {
   final base = ThemeData(
@@ -141,11 +146,11 @@ ThemeData buildTheme(Tokens tk, {required String language}) {
     dividerColor: tk.border,
     extensions: [tk],
   );
-  // Figtree has no Arabic letters, nor Persian's; Chinese uses the system font.
+  // IBM Plex Sans has no Arabic letters; Plex Sans Arabic covers Arabic and
+  // Persian. Chinese uses the system font.
   final family = switch (language) {
-    'ar' => GoogleFonts.cairo().fontFamily,
-    'fa' => GoogleFonts.vazirmatn().fontFamily,
-    _ => GoogleFonts.figtree().fontFamily,
+    'ar' || 'fa' => GoogleFonts.ibmPlexSansArabic().fontFamily,
+    _ => GoogleFonts.ibmPlexSans().fontFamily,
   };
   return base.copyWith(
     textTheme: base.textTheme.apply(fontFamily: family, bodyColor: tk.text, displayColor: tk.text),
@@ -187,7 +192,7 @@ ThemeData buildTheme(Tokens tk, {required String language}) {
       style: OutlinedButton.styleFrom(foregroundColor: tk.text, side: BorderSide(color: tk.border), shape: const StadiumBorder()),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: tk.accent, textStyle: const TextStyle(fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(foregroundColor: tk.accentText, textStyle: const TextStyle(fontWeight: FontWeight.w600)),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: tk.surface,

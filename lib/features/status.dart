@@ -113,11 +113,7 @@ class _StatusPillState extends ConsumerState<StatusPill> {
               if (time.isNotEmpty) ...[
                 const SizedBox(width: 7),
                 Text(time,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        color: t.text.withValues(alpha: 0.75))),
+                    style: mono(context, size: 12, weight: FontWeight.w600, color: t.text.withValues(alpha: 0.75))),
               ],
               Icon(Icons.keyboard_arrow_down, size: 18, color: color),
             ]),

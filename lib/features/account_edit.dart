@@ -519,13 +519,13 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
         OutlinedButton(
           onPressed: _testing || _inCall ? null : _test,
           style: OutlinedButton.styleFrom(
-            foregroundColor: t.accent,
-            side: BorderSide(color: t.accent, width: 1.5),
+            foregroundColor: t.accentText,
+            side: BorderSide(color: t.accentText, width: 1.5),
             shape: const StadiumBorder(),
             minimumSize: const Size(0, 38),
           ),
           child: _testing
-              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: t.accent))
+              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentText))
               : Text('test'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
@@ -905,7 +905,7 @@ class _Chip extends StatelessWidget {
         child: SizedBox(
           height: 64,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 20, color: t.accent),
+            Icon(icon, size: 20, color: t.accentText),
             const SizedBox(height: 5),
             Text(label,
                 maxLines: 1,

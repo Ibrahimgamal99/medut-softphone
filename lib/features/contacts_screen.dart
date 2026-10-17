@@ -147,7 +147,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     if (first)
                       Padding(
                         padding: const EdgeInsetsDirectional.fromSTEB(20, 10, 20, 0),
-                        child: Text(letter, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.accent)),
+                        child: Text(letter, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.accentText)),
                       ),
                     _PersonRow(
                       name: c.name,
@@ -395,7 +395,7 @@ class _PersonRow extends ConsumerWidget {
             ),
           IconButton(
             tooltip: 'call'.tr(),
-            icon: Icon(Icons.call_outlined, size: 21, color: t.accent),
+            icon: Icon(Icons.call_outlined, size: 21, color: t.accentText),
             onPressed: onCall ?? () => placeCall(context, ref, number, name: name),
           ),
         ]),
@@ -420,7 +420,7 @@ class _AllowContacts extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
-            child: Icon(Icons.contacts_outlined, color: t.accent),
+            child: Icon(Icons.contacts_outlined, color: t.accentText),
           ),
           const SizedBox(height: 10),
           Text('phoneContactsTitle'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -638,7 +638,7 @@ class StatusRulesScreen extends ConsumerWidget {
                   selected: days.contains(d),
                   onSelected: (on) => s.officeDays = on ? [...days, d] : days.where((x) => x != d).toList(),
                   selectedColor: t.accentSoft,
-                  checkmarkColor: t.accent,
+                  checkmarkColor: t.accentText,
                 ),
             ]),
             const SizedBox(height: 8),

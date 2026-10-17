@@ -98,7 +98,7 @@ class _AccountCard extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: t.accentSoft, borderRadius: BorderRadius.circular(6)),
-              child: Text('default'.tr(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: t.accent)),
+              child: Text('default'.tr(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: t.accentText)),
             ),
           Switch(value: cfg.enabled, onChanged: (v) => ref.read(accountsProvider).setEnabled(cfg.id, v)),
         ]),

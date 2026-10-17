@@ -781,7 +781,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             if (i > 0) Divider(height: 1, color: t.border),
             ListTile(
               onTap: fixes[i].onTap,
-              leading: Icon(fixes[i].icon, color: t.accent),
+              leading: Icon(fixes[i].icon, color: t.accentText),
               title: Text(fixes[i].title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               subtitle: Text(fixes[i].sub, style: TextStyle(fontSize: 12, color: t.text2)),
               trailing: fixes[i].onTap == null ? null : Icon(Icons.chevron_right, color: t.text2),
@@ -829,7 +829,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           width: 64,
           height: 64,
           decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
-          child: Icon(Icons.check_rounded, size: 34, color: t.accent),
+          child: Icon(Icons.check_rounded, size: 34, color: t.accentText),
         ),
       ),
       const SizedBox(height: 16),
@@ -946,7 +946,7 @@ class _Tile extends StatelessWidget {
         child: SizedBox(
           height: 84,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 22, color: t.accent),
+            Icon(icon, size: 22, color: t.accentText),
             const SizedBox(height: 7),
             Text(label,
                 textAlign: TextAlign.center,
@@ -972,12 +972,12 @@ class _CheckRow extends StatelessWidget {
     final dim = state == CheckState.failed || state == CheckState.skipped;
     final dot = switch (state) {
       CheckState.running => SizedBox(
-          width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: t.accent)),
+          width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: t.accentText)),
       CheckState.ok => Container(
           width: 22,
           height: 22,
           decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
-          child: Icon(Icons.check_rounded, size: 14, color: t.accent)),
+          child: Icon(Icons.check_rounded, size: 14, color: t.accentText)),
       CheckState.failed => Container(
           width: 22,
           height: 22,
@@ -1034,7 +1034,7 @@ class _Fact extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 11),
       child: Row(children: [
-        Icon(icon, size: 18, color: t.accent),
+        Icon(icon, size: 18, color: t.accentText),
         const SizedBox(width: 12),
         Text(label, style: TextStyle(fontSize: 13, color: t.text2)),
         const SizedBox(width: 12),

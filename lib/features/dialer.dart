@@ -277,8 +277,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                 fit: BoxFit.scaleDown,
                 child: Text(_number.isEmpty ? ' ' : _number,
                     textDirection: ui.TextDirection.ltr,
-                    style: const TextStyle(
-                        fontSize: 36, fontWeight: FontWeight.w600, letterSpacing: 0.5, fontFeatures: [FontFeature.tabularFigures()])),
+                    style: mono(context, size: 36, weight: FontWeight.w500, color: t.text)),
               ),
             ),
             const SizedBox(height: 6),
@@ -295,7 +294,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> {
                             child: Text(match.$1,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.accent)),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.accentText)),
                           ),
                         ]),
                       ),
@@ -357,7 +356,7 @@ class _AccountPill extends StatelessWidget {
               child: Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: dot == null ? t.accent : t.text)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: dot == null ? t.accentText : t.text)),
             ),
             const SizedBox(width: 2),
             Icon(Icons.expand_more, size: 18, color: t.text2),
@@ -550,7 +549,7 @@ class _MatchList extends ConsumerWidget {
               ),
               IconButton(
                 tooltip: 'call'.tr(),
-                icon: Icon(Icons.call, size: 20, color: t.accent),
+                icon: Icon(Icons.call, size: 20, color: t.accentText),
                 onPressed: () => onCall(m),
               ),
             ]),
@@ -573,7 +572,7 @@ class _MatchList extends ConsumerWidget {
     for (final ch in number.characters) {
       final isDigit = RegExp(r'\d').hasMatch(ch);
       final on = isDigit && d >= start && d < start + query.length;
-      spans.add(TextSpan(text: ch, style: on ? base.copyWith(color: t.accent, fontWeight: FontWeight.w700) : base));
+      spans.add(TextSpan(text: ch, style: on ? base.copyWith(color: t.accentText, fontWeight: FontWeight.w700) : base));
       if (isDigit) d++;
     }
     return Text.rich(TextSpan(children: spans), textDirection: ui.TextDirection.ltr);

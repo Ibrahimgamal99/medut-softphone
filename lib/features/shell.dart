@@ -210,7 +210,7 @@ class _BottomNav extends ConsumerWidget {
                               color: i == index ? t.accentSoft : Colors.transparent,
                               borderRadius: BorderRadius.circular(15),
                             ),
-                            child: Icon(items[i].$1, size: 21, color: i == index ? t.accent : t.text2),
+                            child: Icon(items[i].$1, size: 21, color: i == index ? t.accentText : t.text2),
                           ),
                           if (i == 0)
                             FutureBuilder<int>(
@@ -234,7 +234,7 @@ class _BottomNav extends ConsumerWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: i == index ? FontWeight.w700 : FontWeight.w500,
-                                color: i == index ? t.accent : t.text2)),
+                                color: i == index ? t.accentText : t.text2)),
                       ]),
                     ),
                   ),

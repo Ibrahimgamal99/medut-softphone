@@ -136,7 +136,7 @@ class _AccountSheet extends ConsumerWidget {
                 if (status == RegStatus.failed)
                   TextButton(onPressed: () => sip.retryNow(a.id), child: Text('retryNow'.tr()))
                 else if (selected)
-                  Icon(Icons.check_circle, color: t.accent),
+                  Icon(Icons.check_circle, color: t.accentText),
               ]),
             ),
           );

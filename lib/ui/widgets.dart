@@ -356,12 +356,7 @@ class QualityMetricsRow extends StatelessWidget {
             Text(value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: ok ? t.success : t.danger,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                )),
+                style: mono(context, size: 14, weight: FontWeight.w600, color: ok ? t.success : t.danger)),
             const SizedBox(height: 2),
             Text(label, style: TextStyle(color: t.text2, fontSize: 11)),
           ]),
@@ -416,7 +411,7 @@ class PocketSegments extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: value == options[i] ? t.accent : t.text2)),
+                              color: value == options[i] ? t.accentText : t.text2)),
                     ),
                   ),
                 ),
