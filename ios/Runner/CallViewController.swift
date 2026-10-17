@@ -25,33 +25,46 @@ enum CallScreenPresenter {
   }
 }
 
-/// The ink surface: the same in both themes except the ground.
+/// The call screen's colours. The dark theme keeps a black ground, the way
+/// most phones show a call; the light theme uses the app's light page. Set
+/// [dark] before building views; a change under a live call rebuilds them.
 private enum Ink {
+  static var dark = true
+
   static func c(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {
     UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
             blue: CGFloat(hex & 0xFF) / 255, alpha: a)
   }
+  private static func pick(_ d: UIColor, _ l: UIColor) -> UIColor { dark ? d : l }
+  /// White on the dark ink, black on the light page, at [a] (or [light] there).
+  static func tint(_ a: CGFloat, light: CGFloat? = nil) -> UIColor {
+    UIColor(white: dark ? 1 : 0, alpha: dark ? a : (light ?? a))
+  }
 
-  static let text = c(0xF4F6F8)
-  static let text2 = UIColor(white: 1, alpha: 0.68)
-  static let fill = UIColor(white: 1, alpha: 0.12)
-  static let dock = UIColor(white: 1, alpha: 0.07)
-  static let pill = UIColor(white: 1, alpha: 0.10)
-  static let sheet = c(0x182027)
-  static let line = UIColor(white: 1, alpha: 0.08)
-  static let good = c(0x3DD49A)
-  static let fair = c(0xE9B04A)
-  static let poor = c(0xFF5A5F)
-  static let rec = c(0xFF8A8D)
-  static let end = c(0xE5383B)
+  static var ground: UIColor { pick(.black, c(0xF6F7F8)) }
+  static var text: UIColor { pick(c(0xECEFF2), c(0x111418)) }
+  static var text2: UIColor { pick(UIColor(white: 1, alpha: 0.68), c(0x454D56)) }
+  static var fill: UIColor { tint(0.12, light: 0.08) }
+  static var dock: UIColor { tint(0.07, light: 0.04) }
+  static var pill: UIColor { tint(0.10, light: 0.06) }
+  static var sheet: UIColor { pick(c(0x131619), .white) }
+  static var line: UIColor { tint(0.08) }
+  static var good: UIColor { pick(c(0x22C55E), c(0x16A34A)) }
+  static var onGood: UIColor { pick(c(0x052E16), .white) }
+  static var fair: UIColor { pick(c(0xF59E0B), c(0xD97706)) }
+  static var poor: UIColor { pick(c(0xEF4444), c(0xDC2626)) }
+  static var rec: UIColor { pick(c(0xF87171), c(0xDC2626)) }
+  static var end: UIColor { pick(c(0xEF4444), c(0xDC2626)) }
+  static var purple: UIColor { pick(c(0xA855F7), c(0x9333EA)) } // on hold
+  static var teal: UIColor { pick(c(0x14B8A6), c(0x0F766E)) } // transfer
 
-  /// (background, initials) per person: the app's dark avatar colours, picked the same way.
-  static let avatars: [(UIColor, UIColor)] = [
-    (c(0x163428), c(0x7DE3B8)), (c(0x25214A), c(0xB7AEFF)),
-    (c(0x38261A), c(0xF4B27A)), (c(0x162A3D), c(0x8EC0F2)),
-  ]
-
-  static func ground(dark: Bool) -> UIColor { dark ? .black : c(0x0F1418) }
+  /// (background, initials) per person: the app's avatar colours, picked the same way.
+  static var avatars: [(UIColor, UIColor)] {
+    dark ? [(c(0x084E65), c(0x9BDCF2)), (c(0x2E1A4A), c(0xC4A2FA)),
+            (c(0x38261A), c(0xF4B27A)), (c(0x162A3D), c(0x8EC0F2))]
+         : [(c(0xD6ECF4), c(0x0B6886)), (c(0xEFE4FB), c(0x7E22CE)),
+            (c(0xFBE8D7), c(0x9A4A12)), (c(0xDBEAFE), c(0x1D4ED8))]
+  }
 
   static func grade(_ level: Int) -> UIColor {
     level >= 3 ? good : level == 2 ? fair : level == 1 ? poor : text2
@@ -65,17 +78,17 @@ private enum Ink {
 }
 
 /// Native in-call screen (Pocket). Ringing on iOS is CallKit's own screen;
-/// this takes over once the call is dialling or connected. A dark "ink"
-/// surface in both themes: the caller, the quality pill (tap it for every
-/// figure), four controls in a dock, then Transfer · End · More. It holds no
-/// call state: it renders [MedutBridge.latest] and sends every tap to
-/// [PhoneEngine]. Transfer and Add call pick their number here too.
+/// this takes over once the call is dialling or connected. Black ink in the
+/// dark theme, the app's light page in the light one: the caller, the quality
+/// pill (tap it for every figure), four controls in a dock, then Transfer ·
+/// End · More. It holds no call state: it renders [MedutBridge.latest] and
+/// sends every tap to [PhoneEngine]. Transfer and Add call pick their number
+/// here too.
 final class CallViewController: UIViewController {
 
   private var snap = CallSnapshot()
   private var listener: UUID?
   private var timer: Timer?
-  private var dark: Bool?
   private var sheetOpen = false
   private var dtmfTyped = ""
   private var secondAction = "swap"
@@ -135,10 +148,11 @@ final class CallViewController: UIViewController {
   private var warmOption: UIButton!
   private var transferBottom: NSLayoutConstraint!
 
-  override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+  override var preferredStatusBarStyle: UIStatusBarStyle { Ink.dark ? .lightContent : .darkContent }
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    Ink.dark = MedutBridge.shared.latest.dark
     build()
     listener = MedutBridge.shared.addListener { [weak self] s in
       DispatchQueue.main.async { self?.render(s) }
@@ -159,9 +173,12 @@ final class CallViewController: UIViewController {
       close()
       return
     }
-    if dark != s.dark {
-      dark = s.dark
-      view.backgroundColor = Ink.ground(dark: s.dark)
+    if s.dark != Ink.dark {
+      // The theme changed under a live call: build again in the other ink.
+      Ink.dark = s.dark
+      view.subviews.forEach { $0.removeFromSuperview() }
+      build()
+      setNeedsStatusBarAppearanceUpdate()
     }
     let direction: UISemanticContentAttribute = s.rtl ? .forceRightToLeft : .forceLeftToRight
     view.semanticContentAttribute = direction
@@ -182,6 +199,7 @@ final class CallViewController: UIViewController {
       line = ""
     }
     statusLabel.text = line
+    statusLabel.textColor = s.phase == "held" ? Ink.purple : s.link != "ok" ? Ink.fair : Ink.text2
     statusLabel.isHidden = line.isEmpty
 
     // Quality pill: 3 bars, the grade word and the MOS, in the grade's colour.
@@ -322,7 +340,7 @@ final class CallViewController: UIViewController {
   @objc private func tapMore() {
     let s = snap
     let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-    menu.overrideUserInterfaceStyle = .dark
+    menu.overrideUserInterfaceStyle = Ink.dark ? .dark : .light
     menu.addAction(UIAlertAction(title: s.label("addCall", "Add call"), style: .default) { [weak self] _ in
       self?.showKeypad(true, addCall: true)
     })
@@ -350,7 +368,7 @@ final class CallViewController: UIViewController {
       return
     }
     let menu = UIAlertController(title: s.label("audioOutput", "Audio output"), message: nil, preferredStyle: .actionSheet)
-    menu.overrideUserInterfaceStyle = .dark
+    menu.overrideUserInterfaceStyle = Ink.dark ? .dark : .light
     for r in s.routes {
       let id = r["id"] as? String ?? ""
       let name = r["name"] as? String ?? id
@@ -480,7 +498,7 @@ final class CallViewController: UIViewController {
       dot = Ink.poor
     case "closed":
       word = s.label("presenceClosed", "Offline / do not disturb")
-      dot = Ink.c(0xB7AEFF)
+      dot = Ink.purple
     default:
       break
     }
@@ -555,7 +573,7 @@ final class CallViewController: UIViewController {
   }
 
   private func build() {
-    view.backgroundColor = Ink.ground(dark: false)
+    view.backgroundColor = Ink.ground
     stack.axis = .vertical
     stack.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(stack)
@@ -578,7 +596,7 @@ final class CallViewController: UIViewController {
     style(secondText, 13, .semibold)
     secondSwap.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
     secondSwap.setTitleColor(Ink.text, for: .normal)
-    secondSwap.backgroundColor = UIColor(white: 1, alpha: 0.16)
+    secondSwap.backgroundColor = Ink.tint(0.16)
     secondSwap.contentEdgeInsets = UIEdgeInsets(top: 5, left: 12, bottom: 5, right: 12)
     secondSwap.layer.cornerRadius = 14
     secondSwap.addTarget(self, action: #selector(tapSwap), for: .touchUpInside)
@@ -661,7 +679,7 @@ final class CallViewController: UIViewController {
     style(xferHint, 12, color: Ink.text2)
     xferHint.numberOfLines = 2
     for (b, bg, fg, sel) in [(xferBack, Ink.fill, Ink.text, #selector(tapXferBack)),
-                             (xferJoin, Ink.good, Ink.c(0x04271A), #selector(tapXferJoin))] {
+                             (xferJoin, Ink.teal, Ink.onGood, #selector(tapXferJoin))] {
       b.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
       b.setTitleColor(fg, for: .normal)
       b.backgroundColor = bg
@@ -723,6 +741,7 @@ final class CallViewController: UIViewController {
     transferTitle.textAlignment = .natural
     transferInput.keyboardType = .phonePad
     transferInput.textColor = Ink.text
+    transferInput.keyboardAppearance = Ink.dark ? .dark : .light
     transferInput.font = .systemFont(ofSize: 18)
     transferInput.backgroundColor = Ink.fill
     transferInput.layer.cornerRadius = 16
@@ -740,7 +759,7 @@ final class CallViewController: UIViewController {
       b.titleLabel?.numberOfLines = 0
       b.contentEdgeInsets = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
       b.titleEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: -14)
-      b.backgroundColor = UIColor(white: 1, alpha: 0.06)
+      b.backgroundColor = Ink.tint(0.06)
       b.layer.cornerRadius = 16
       b.addTarget(self, action: sel, for: .touchUpInside)
       return b
@@ -805,7 +824,7 @@ final class CallViewController: UIViewController {
     keypadHide.setTitleColor(Ink.text2, for: .normal)
     keypadHide.addTarget(self, action: #selector(tapHideKeypad), for: .touchUpInside)
     keypadEnd = roundButton(74, symbol: "phone.down.fill", bg: Ink.end, tint: .white, action: #selector(tapHangup))
-    keypadCall = roundButton(74, symbol: "phone.fill", bg: Ink.good, tint: Ink.c(0x04271A), action: #selector(tapAddCall))
+    keypadCall = roundButton(74, symbol: "phone.fill", bg: Ink.good, tint: Ink.onGood, action: #selector(tapAddCall))
     keypadCall.isHidden = true
     keypadBack = UIButton(type: .system)
     keypadBack.setImage(UIImage(systemName: "delete.left", withConfiguration: UIImage.SymbolConfiguration(pointSize: 20)), for: .normal)
@@ -841,7 +860,7 @@ final class CallViewController: UIViewController {
     view.addSubview(sheet)
 
     let handle = UIView()
-    handle.backgroundColor = UIColor(white: 1, alpha: 0.2)
+    handle.backgroundColor = Ink.tint(0.2)
     handle.layer.cornerRadius = 2.5
     handle.widthAnchor.constraint(equalToConstant: 38).isActive = true
     handle.heightAnchor.constraint(equalToConstant: 5).isActive = true
@@ -863,7 +882,7 @@ final class CallViewController: UIViewController {
       box.axis = .vertical
       box.isLayoutMarginsRelativeArrangement = true
       box.layoutMargins = UIEdgeInsets(top: 9, left: 12, bottom: 9, right: 12)
-      box.backgroundColor = UIColor(white: 1, alpha: 0.06)
+      box.backgroundColor = Ink.tint(0.06)
       box.layer.cornerRadius = 16
       return box
     }
@@ -919,7 +938,7 @@ final class CallViewController: UIViewController {
     b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)), for: .normal)
     b.accessibilityLabel = title
     b.backgroundColor = on ? (onBg ?? Ink.text) : Ink.fill
-    b.tintColor = on ? (onTint ?? Ink.ground(dark: false)) : Ink.text
+    b.tintColor = on ? (onTint ?? Ink.ground) : Ink.text
     l.text = title
   }
 
@@ -940,9 +959,9 @@ final class RingAvatar: UIView {
   init(size: CGFloat, fontSize: CGFloat) {
     super.init(frame: .zero)
     translatesAutoresizingMaskIntoConstraints = false
-    backgroundColor = UIColor(white: 1, alpha: 0.03)
+    backgroundColor = Ink.tint(0.03)
     layer.cornerRadius = size / 2
-    middle.backgroundColor = UIColor(white: 1, alpha: 0.05)
+    middle.backgroundColor = Ink.tint(0.05)
     middle.layer.cornerRadius = size / 2 - 10
     middle.translatesAutoresizingMaskIntoConstraints = false
     disc.textAlignment = .center
@@ -1014,7 +1033,7 @@ final class QualityPill: UIControl {
   func set(level: Int, word w: String, mos m: String) {
     let fg = Ink.grade(level)
     backgroundColor = fg.withAlphaComponent(0.15)
-    bars.setQuality(level: level, litColor: fg, offColor: UIColor(white: 1, alpha: 0.25))
+    bars.setQuality(level: level, litColor: fg, offColor: Ink.tint(0.25))
     word.text = w
     word.textColor = fg
     mos.text = m

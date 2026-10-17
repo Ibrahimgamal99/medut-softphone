@@ -21,5 +21,7 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@color/call_bg</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Dark status-bar icons on the light page; the night theme keeps light ones. -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The call screen's ink, so its first frame is already the right colour. -->
-    <color name="call_bg">#0F1418</color>
-    <color name="brand">#08805A</color>
+    <!-- The call screen's ground, so its first frame is already the right colour. -->
+    <color name="call_bg">#F6F7F8</color>
+    <color name="brand">#0F8EB8</color>
 </resources>

@@ -35,35 +35,50 @@ import com.medut.generic.phone.MainActivity
 import com.medut.generic.phone.R
 import com.medut.generic.phone.engine.PhoneEngine
 
-// The ink surface: the same in both themes except the ground.
-private const val INK = 0xFF0F1418.toInt()
-private const val BLACK = 0xFF000000.toInt()
-private const val TEXT = 0xFFF4F6F8.toInt()
-private const val TEXT2 = 0xADFFFFFF.toInt() // 68 %
-private const val FILL = 0x1FFFFFFF // 12 %: round buttons
-private const val DOCK = 0x12FFFFFF // 7 %: the dock
-private const val PILL = 0x1AFFFFFF // 10 %
-private const val SHEET = 0xFF182027.toInt()
-private const val LINE = 0x14FFFFFF // 8 %
-private const val GOOD = 0xFF3DD49A.toInt()
-private const val FAIR = 0xFFE9B04A.toInt()
-private const val POOR = 0xFFFF5A5F.toInt()
-private const val REC = 0xFFFF8A8D.toInt()
-private const val END = 0xFFE5383B.toInt()
-private const val ON_GOOD = 0xFF04271A.toInt()
+/**
+ * The call screen's colours. The dark theme keeps a black ground, the way most
+ * phones show a call; the light theme uses the app's light page. Built once in
+ * [CallActivity.onCreate]; a theme change under a live call recreates it.
+ */
+private class Ink(val dark: Boolean) {
+    val ground = if (dark) 0xFF000000.toInt() else 0xFFF6F7F8.toInt()
+    val text = if (dark) 0xFFECEFF2.toInt() else 0xFF111418.toInt()
+    val text2 = if (dark) 0xADFFFFFF.toInt() else 0xFF454D56.toInt() // 68 % white, or the light secondary
+    val fill = tint(if (dark) 0x1F else 0x14) // round buttons
+    val dock = tint(if (dark) 0x12 else 0x0A) // the dock
+    val pill = tint(if (dark) 0x1A else 0x0F)
+    val sheet = if (dark) 0xFF131619.toInt() else 0xFFFFFFFF.toInt()
+    val line = tint(0x14)
+    val good = if (dark) 0xFF22C55E.toInt() else 0xFF16A34A.toInt()
+    val onGood = if (dark) 0xFF052E16.toInt() else 0xFFFFFFFF.toInt()
+    val fair = if (dark) 0xFFF59E0B.toInt() else 0xFFD97706.toInt()
+    val poor = if (dark) 0xFFEF4444.toInt() else 0xFFDC2626.toInt()
+    val rec = if (dark) 0xFFF87171.toInt() else 0xFFDC2626.toInt()
+    val end = if (dark) 0xFFEF4444.toInt() else 0xFFDC2626.toInt()
+    val purple = if (dark) 0xFFA855F7.toInt() else 0xFF9333EA.toInt() // on hold
+    val teal = if (dark) 0xFF14B8A6.toInt() else 0xFF0F766E.toInt() // transfer
 
-/** (background, initials) per person: the app's dark avatar colours, picked the same way. */
-private val AVATARS = listOf(
-    0xFF163428.toInt() to 0xFF7DE3B8.toInt(),
-    0xFF25214A.toInt() to 0xFFB7AEFF.toInt(),
-    0xFF38261A.toInt() to 0xFFF4B27A.toInt(),
-    0xFF162A3D.toInt() to 0xFF8EC0F2.toInt(),
-)
+    /** (background, initials) per person: the app's avatar colours, picked the same way. */
+    val avatars = if (dark) listOf(
+        0xFF084E65.toInt() to 0xFF9BDCF2.toInt(),
+        0xFF2E1A4A.toInt() to 0xFFC4A2FA.toInt(),
+        0xFF38261A.toInt() to 0xFFF4B27A.toInt(),
+        0xFF162A3D.toInt() to 0xFF8EC0F2.toInt(),
+    ) else listOf(
+        0xFFD6ECF4.toInt() to 0xFF0B6886.toInt(),
+        0xFFEFE4FB.toInt() to 0xFF7E22CE.toInt(),
+        0xFFFBE8D7.toInt() to 0xFF9A4A12.toInt(),
+        0xFFDBEAFE.toInt() to 0xFF1D4ED8.toInt(),
+    )
+
+    /** White on the dark ink, black on the light page, at [alpha] (0–255). */
+    fun tint(alpha: Int): Int = (alpha shl 24) or (if (dark) 0xFFFFFF else 0x000000)
+}
 
 /**
  * Native ringing + in-call screen (Pocket). Plain Views, built in code, so it
- * paints in one frame on a cold answer and over the lock screen. A dark "ink"
- * surface in both themes, the way most phones show a call: the caller, the
+ * paints in one frame on a cold answer and over the lock screen. Black ink in
+ * the dark theme, the app's light page in the light one: the caller, the
  * quality pill (tap it for every figure), four controls in a dock, then
  * Transfer · End · More. It holds no call state of its own: it renders
  * [CallState.latest] and sends every tap to [PhoneEngine]. Transfer and Add
@@ -73,7 +88,7 @@ class CallActivity : Activity() {
 
     private val ui = Handler(Looper.getMainLooper())
     private var snap = CallSnapshot(emptyMap())
-    private var ground = 0
+    private var ink = Ink(dark = true)
     /** The open sheet: "quality", "more", "transfer" or null. */
     private var sheet: String? = null
     private var keypadOpen = false
@@ -170,6 +185,7 @@ class CallActivity : Activity() {
         super.onCreate(savedInstanceState)
         showOverLockScreen(true)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        ink = Ink(CallState.latest.dark)
         buildViews()
         setContentView(root)
         isShowing = true
@@ -240,12 +256,10 @@ class CallActivity : Activity() {
             finish()
             return
         }
-        val g = if (s.dark) BLACK else INK
-        if (g != ground) {
-            ground = g
-            root.setBackgroundColor(g)
-            window.statusBarColor = g
-            window.navigationBarColor = g
+        if (s.dark != ink.dark) {
+            // The theme changed under a live call: come back in the other ink.
+            recreate()
+            return
         }
         root.layoutDirection = if (s.rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
 
@@ -292,6 +306,11 @@ class CallActivity : Activity() {
             else -> ""
         }
         status.text = line
+        status.setTextColor(when {
+            s.phase == "held" -> ink.purple
+            s.link != "ok" -> ink.fair
+            else -> ink.text2
+        })
         status.visibility = vis(line.isNotBlank())
 
         // Quality pill: 3 bars, the grade word and the MOS, in the grade's colour.
@@ -299,7 +318,7 @@ class CallActivity : Activity() {
             val fg = gradeColor(s.qualityLevel)
             qualityPill.visibility = View.VISIBLE
             qualityPill.background = pill(withAlpha(fg, 0x26), 18f)
-            qualityBars.setQuality(s.qualityLevel, fg, 0x40FFFFFF)
+            qualityBars.setQuality(s.qualityLevel, fg, ink.tint(0x40))
             qualityWord.text = s.qualityWord
             qualityWord.setTextColor(fg)
             mosText.text = s.mos
@@ -352,7 +371,7 @@ class CallActivity : Activity() {
         if (s.canRecord) {
             setDock("third", R.drawable.ic_record,
                 if (s.recording) s.label("stopRecord", "Stop rec") else s.label("record", "Record"),
-                s.recording, onFill = END, onTint = Color.WHITE)
+                s.recording, onFill = ink.end, onTint = Color.WHITE)
         } else {
             setDock("third", R.drawable.ic_dialpad, s.label("keypad", "Keypad"), false)
         }
@@ -377,7 +396,7 @@ class CallActivity : Activity() {
             val fg = gradeColor(s.qualityLevel)
             sheetTitle.text = s.label("callQuality", "Call quality")
             sheetPill.background = pill(withAlpha(fg, 0x26), 18f)
-            sheetBars.setQuality(s.qualityLevel, fg, 0x40FFFFFF)
+            sheetBars.setQuality(s.qualityLevel, fg, ink.tint(0x40))
             sheetWord.text = s.qualityWord
             sheetWord.setTextColor(fg)
             sheetMos.text = s.mos
@@ -388,7 +407,7 @@ class CallActivity : Activity() {
             sheetRows.removeAllViews()
             s.details.forEachIndexed { i, r ->
                 if (i > 0) sheetRows.addView(View(this).apply {
-                    setBackgroundColor(LINE)
+                    setBackgroundColor(ink.line)
                     layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
                 })
                 sheetRows.addView(detailRow(r.getOrElse(0) { "" }, r.getOrElse(1) { "" }))
@@ -494,25 +513,25 @@ class CallActivity : Activity() {
     }
 
     /** The avatar disc inside two faint rings; the view is 44 dp wider than the disc. */
-    private fun rings(fill: Int): Drawable = LayerDrawable(arrayOf(oval(0x08FFFFFF), oval(0x0DFFFFFF), oval(fill))).apply {
+    private fun rings(fill: Int): Drawable = LayerDrawable(arrayOf(oval(ink.tint(0x08)), oval(ink.tint(0x0D)), oval(fill))).apply {
         setLayerInset(1, dp(10), dp(10), dp(10), dp(10))
         setLayerInset(2, dp(22), dp(22), dp(22), dp(22))
     }
 
     private fun gradeColor(level: Int) = when (level) {
-        4, 3 -> GOOD
-        2 -> FAIR
-        1 -> POOR
-        else -> TEXT2
+        4, 3 -> ink.good
+        2 -> ink.fair
+        1 -> ink.poor
+        else -> ink.text2
     }
 
     private fun avatarColors(title: String): Pair<Int, Int> {
         var h = 0L
         for (c in title) h = (h * 31 + c.code) and 0x7fffffffL
-        return AVATARS[(h % AVATARS.size).toInt()]
+        return ink.avatars[(h % ink.avatars.size).toInt()]
     }
 
-    private fun text(sizeSp: Float, weight: Int = 400, color: Int = TEXT, mono: Boolean = false): TextView =
+    private fun text(sizeSp: Float, weight: Int = 400, color: Int = ink.text, mono: Boolean = false): TextView =
         TextView(this).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
             typeface = when {
@@ -544,7 +563,7 @@ class CallActivity : Activity() {
 
     /** A round button with its label under it, filling an equal share of a row. */
     private fun cell(img: ImageView, labelSp: Float, labelWeight: Int = 500): Pair<LinearLayout, TextView> {
-        val label = text(labelSp, labelWeight, TEXT2).apply { setPadding(0, dp(6), 0, 0) }
+        val label = text(labelSp, labelWeight, ink.text2).apply { setPadding(0, dp(6), 0, 0) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -556,7 +575,7 @@ class CallActivity : Activity() {
     }
 
     private fun handle() = View(this).apply {
-        background = pill(0x33FFFFFF, 3f)
+        background = pill(ink.tint(0x33), 3f)
         layoutParams = lp(dp(38), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(14) }
     }
 
@@ -565,7 +584,7 @@ class CallActivity : Activity() {
         setPadding(dp(20), dp(10), dp(20), dp(24))
         isClickable = true // taps on the sheet don't reach the dim behind it
         background = GradientDrawable().apply {
-            setColor(SHEET)
+            setColor(ink.sheet)
             val r = 26f * resources.displayMetrics.density
             cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
         }
@@ -575,7 +594,7 @@ class CallActivity : Activity() {
     private fun qualityPillView(): Triple<LinearLayout, QualityBars, Pair<TextView, TextView>> {
         val bars = QualityBars(this)
         val word = text(13f, 700).apply { setPadding(dp(7), 0, dp(6), 0) }
-        val mos = text(11.5f, color = TEXT2, mono = true)
+        val mos = text(11.5f, color = ink.text2, mono = true)
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -594,12 +613,14 @@ class CallActivity : Activity() {
         buildCall()
         buildKeypad()
         buildSheets()
-        root.setBackgroundColor(INK)
-        if (Build.VERSION.SDK_INT >= 23) {
-            // Light status-bar icons on the ink, in both themes.
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = 0
-        }
+        root.setBackgroundColor(ink.ground)
+        window.statusBarColor = ink.ground
+        window.navigationBarColor = ink.ground
+        // Light status-bar icons on the dark ink, dark ones on the light page.
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (ink.dark) 0 else
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+                (if (Build.VERSION.SDK_INT >= 26) View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0)
     }
 
     private fun buildIncoming() {
@@ -608,21 +629,21 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(16), dp(24), dp(16), dp(28))
         }
-        inAccount = text(13f, color = TEXT2).apply {
+        inAccount = text(13f, color = ink.text2).apply {
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            background = pill(PILL, 16f)
+            background = pill(ink.pill, 16f)
             layoutParams = wrap()
         }
         inAvatar = text(40f, 700).apply { layoutParams = lp(dp(164), dp(164)) }
         inName = text(30f, 800).apply { setPadding(0, dp(18), 0, dp(4)) }
-        inNumber = text(16f, color = TEXT2)
+        inNumber = text(16f, color = ink.text2)
 
         val quick = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
         inBusy = text(15f, 600).apply {
-            background = pill(PILL, 24f)
+            background = pill(ink.pill, 24f)
             layoutParams = lp(0, dp(48), 1f).apply { marginEnd = dp(8) }
             setOnClickListener {
                 Ringer.stop()
@@ -630,7 +651,7 @@ class CallActivity : Activity() {
             }
         }
         inMessage = text(15f, 600).apply {
-            background = pill(PILL, 24f)
+            background = pill(ink.pill, 24f)
             layoutParams = lp(0, dp(48), 1f)
             setOnClickListener {
                 Ringer.stop()
@@ -644,12 +665,12 @@ class CallActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(28) }
         }
-        val decline = cell(icon(R.drawable.ic_call_end, 72, oval(END), Color.WHITE, "Decline") {
+        val decline = cell(icon(R.drawable.ic_call_end, 72, oval(ink.end), Color.WHITE, "Decline") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
             PhoneEngine.action("decline")
         }, 13f, 600)
-        val answer = cell(icon(R.drawable.ic_call, 72, oval(GOOD), ON_GOOD, "Answer") {
+        val answer = cell(icon(R.drawable.ic_call, 72, oval(ink.good), ink.onGood, "Answer") {
             Ringer.stop()
             CallNotifications.cancelIncoming(this)
             PhoneEngine.action("answer")
@@ -681,8 +702,8 @@ class CallActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(icon(R.drawable.ic_chevron_down, 44, null, TEXT2, "Minimise") { MainActivity.open(this) })
-        account = text(12.5f, color = TEXT2).apply { layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
+        header.addView(icon(R.drawable.ic_chevron_down, 44, null, ink.text2, "Minimise") { MainActivity.open(this) })
+        account = text(12.5f, color = ink.text2).apply { layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
         header.addView(account)
         header.addView(View(this).apply { layoutParams = lp(dp(44), 1) })
 
@@ -690,7 +711,7 @@ class CallActivity : Activity() {
         secondText = text(13f, 600)
         secondSwap = text(12.5f, 700).apply {
             setPadding(dp(12), dp(5), dp(12), dp(5))
-            background = pill(0x29FFFFFF, 16f)
+            background = pill(ink.tint(0x29), 16f)
             layoutParams = wrap().apply { marginStart = dp(8) }
             setOnClickListener { PhoneEngine.action(secondAction) }
         }
@@ -698,23 +719,23 @@ class CallActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(5), dp(5), dp(5))
-            background = pill(PILL, 20f)
+            background = pill(ink.pill, 20f)
             layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(4) }
             addView(secondText)
             addView(secondSwap)
         }
 
         xferStatus = text(14.5f, 700)
-        xferHint = text(12f, color = TEXT2).apply { setPadding(dp(4), dp(3), dp(4), dp(12)) }
+        xferHint = text(12f, color = ink.text2).apply { setPadding(dp(4), dp(3), dp(4), dp(12)) }
         xferBack = text(14f, 700).apply {
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = pill(FILL, 24f)
+            background = pill(ink.fill, 24f)
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
             setOnClickListener { PhoneEngine.action("cancelTransfer") }
         }
-        xferJoin = text(14f, 700, ON_GOOD).apply {
+        xferJoin = text(14f, 700, ink.onGood).apply {
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = pill(GOOD, 24f)
+            background = pill(ink.teal, 24f)
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             setOnClickListener { PhoneEngine.action("completeTransfer") }
         }
@@ -722,7 +743,7 @@ class CallActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(14), dp(12), dp(14), dp(14))
-            background = pill(PILL, 22f)
+            background = pill(ink.pill, 22f)
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 .apply { setMargins(dp(20), dp(12), dp(20), 0) }
             addView(xferStatus)
@@ -739,8 +760,8 @@ class CallActivity : Activity() {
         // Caller, time, quality, tags
         avatar = text(36f, 700).apply { layoutParams = lp(dp(148), dp(148)).apply { gravity = Gravity.CENTER_HORIZONTAL } }
         name = text(30f, 800).apply { setPadding(dp(8), dp(14), dp(8), 0) }
-        timer = text(17f, color = TEXT2).apply { fontFeatureSettings = "tnum" }
-        status = text(14f, color = TEXT2).apply { setPadding(dp(8), dp(2), dp(8), 0) }
+        timer = text(17f, color = ink.text2).apply { fontFeatureSettings = "tnum" }
+        status = text(14f, color = ink.text2).apply { setPadding(dp(8), dp(2), dp(8), 0) }
         val q = qualityPillView()
         qualityPill = q.first.apply {
             layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(14) }
@@ -752,18 +773,18 @@ class CallActivity : Activity() {
         mosText = q.third.second
         qualityPill.addView(ImageView(this).apply {
             setImageResource(R.drawable.ic_chevron_down)
-            imageTintList = ColorStateList.valueOf(TEXT2)
+            imageTintList = ColorStateList.valueOf(ink.text2)
             rotation = -90f
             layoutParams = lp(dp(16), dp(16)).apply { marginStart = dp(2) }
         })
-        encrypted = text(12.5f, color = TEXT2).apply {
+        encrypted = text(12.5f, color = ink.text2).apply {
             val lock = getDrawable(R.drawable.ic_lock)?.mutate()?.apply { setBounds(0, 0, dp(14), dp(14)) }
             setCompoundDrawablesRelative(lock, null, null, null)
-            compoundDrawableTintList = ColorStateList.valueOf(TEXT2)
+            compoundDrawableTintList = ColorStateList.valueOf(ink.text2)
             compoundDrawablePadding = dp(5)
             layoutParams = wrap().apply { marginEnd = dp(14) }
         }
-        rec = text(12.5f, 600, REC).apply { layoutParams = wrap() }
+        rec = text(12.5f, 600, ink.rec).apply { layoutParams = wrap() }
         val tags = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -776,10 +797,10 @@ class CallActivity : Activity() {
         val dockRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(6), dp(14), dp(6), dp(12))
-            background = pill(DOCK, 28f)
+            background = pill(ink.dock, 28f)
         }
         listOf("mute", "speaker", "third", "hold").forEach { key ->
-            val img = icon(R.drawable.ic_mic, 54, oval(FILL), TEXT, key) { onDock(key) }
+            val img = icon(R.drawable.ic_mic, 54, oval(ink.fill), ink.text, key) { onDock(key) }
             val (box, label) = cell(img, 11.5f)
             dock[key] = img to label
             dockRow.addView(box)
@@ -791,12 +812,12 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) }
         }
-        val t = cell(icon(R.drawable.ic_transfer, 46, oval(FILL), TEXT, "Transfer") { openTransfer() }, 11.5f)
+        val t = cell(icon(R.drawable.ic_transfer, 46, oval(ink.fill), ink.text, "Transfer") { openTransfer() }, 11.5f)
         transfer = t.second
-        val hang = icon(R.drawable.ic_call_end, 0, pill(END, 29f), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }.apply {
+        val hang = icon(R.drawable.ic_call_end, 0, pill(ink.end, 29f), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }.apply {
             layoutParams = lp(dp(88), dp(60))
         }
-        val m = cell(icon(R.drawable.ic_more, 46, oval(FILL), TEXT, "More") { openSheet("more") }, 11.5f)
+        val m = cell(icon(R.drawable.ic_more, 46, oval(ink.fill), ink.text, "More") { openSheet("more") }, 11.5f)
         more = m.second
         bottom.addView(t.first)
         bottom.addView(hang)
@@ -824,9 +845,9 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(32), dp(24), dp(32), dp(24))
         }
-        keypadTitle = text(13f, color = TEXT2).apply {
+        keypadTitle = text(13f, color = ink.text2).apply {
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            background = pill(PILL, 16f)
+            background = pill(ink.pill, 16f)
             layoutParams = wrap().apply { gravity = Gravity.CENTER_HORIZONTAL }
         }
         keypadDigits = text(34f).apply {
@@ -838,7 +859,7 @@ class CallActivity : Activity() {
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#").forEach { d ->
             keys.addView(text(28f, 500).apply {
                 this.text = d
-                background = oval(FILL)
+                background = oval(ink.fill)
                 layoutParams = GridLayout.LayoutParams().apply {
                     width = dp(74); height = dp(74)
                     setMargins(dp(10), dp(7), dp(10), dp(7))
@@ -851,19 +872,19 @@ class CallActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) }
         }
-        keypadHide = text(15f, 600, TEXT2).apply {
+        keypadHide = text(15f, 600, ink.text2).apply {
             layoutParams = lp(0, dp(56), 1f)
             setOnClickListener { closeKeypad() }
         }
-        keypadEnd = icon(R.drawable.ic_call_end, 74, oval(END), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }
-        keypadCall = icon(R.drawable.ic_call, 74, oval(GOOD), ON_GOOD, "Call") {
+        keypadEnd = icon(R.drawable.ic_call_end, 74, oval(ink.end), Color.WHITE, "Hang up") { PhoneEngine.action("hangup") }
+        keypadCall = icon(R.drawable.ic_call, 74, oval(ink.good), ink.onGood, "Call") {
             val number = dtmfTyped.trim()
             if (number.isNotEmpty()) {
                 closeKeypad()
                 PhoneEngine.action("addCall", mapOf("number" to number))
             }
         }
-        keypadBack = icon(R.drawable.ic_backspace, 56, null, TEXT2, "Delete") {
+        keypadBack = icon(R.drawable.ic_backspace, 56, null, ink.text2, "Delete") {
             dtmfTyped = dtmfTyped.dropLast(1)
             keypadDigits.text = dtmfTyped
             renderKeypad(snap)
@@ -915,12 +936,12 @@ class CallActivity : Activity() {
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(6) }
         }
         fun mosBox(endMargin: Int): Pair<TextView, TextView> {
-            val label = text(11.5f, color = TEXT2).apply { gravity = Gravity.START }
+            val label = text(11.5f, color = ink.text2).apply { gravity = Gravity.START }
             val value = text(24f, 800).apply { gravity = Gravity.START; fontFeatureSettings = "tnum" }
             mosRow.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(9), dp(12), dp(9))
-                background = pill(0x0FFFFFFF, 16f)
+                background = pill(ink.tint(0x0F), 16f)
                 layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = endMargin }
                 addView(label)
                 addView(value)
@@ -941,7 +962,7 @@ class CallActivity : Activity() {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setPadding(0, dp(14), 0, dp(14))
             setCompoundDrawablesRelativeWithIntrinsicBounds(res, 0, 0, 0)
-            compoundDrawableTintList = ColorStateList.valueOf(TEXT)
+            compoundDrawableTintList = ColorStateList.valueOf(ink.text)
             compoundDrawablePadding = dp(16)
             setOnClickListener { onClick() }
             moreSheet.addView(this)
@@ -972,11 +993,11 @@ class CallActivity : Activity() {
         }
         transferInput = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_PHONE
-            setTextColor(TEXT)
-            setHintTextColor(TEXT2)
+            setTextColor(ink.text)
+            setHintTextColor(ink.text2)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             isSingleLine = true
-            background = pill(FILL, 16f)
+            background = pill(ink.fill, 16f)
             setPadding(dp(16), dp(12), dp(16), dp(12))
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             addTextChangedListener(object : TextWatcher {
@@ -996,13 +1017,13 @@ class CallActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = pill(0x0FFFFFFF, 16f)
+            background = pill(ink.tint(0x0F), 16f)
             layoutParams = lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
             addView(ImageView(this@CallActivity).apply {
                 setImageResource(res)
                 scaleType = ImageView.ScaleType.CENTER
-                background = oval(withAlpha(GOOD, 0x29))
-                imageTintList = ColorStateList.valueOf(GOOD)
+                background = oval(withAlpha(ink.good, 0x29))
+                imageTintList = ColorStateList.valueOf(ink.good)
                 layoutParams = lp(dp(40), dp(40))
             })
             addView(LinearLayout(this@CallActivity).apply {
@@ -1010,7 +1031,7 @@ class CallActivity : Activity() {
                 setPadding(dp(14), 0, dp(4), 0)
                 layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 addView(text(15f, 700).apply { gravity = Gravity.START })
-                addView(text(12.5f, color = TEXT2).apply { gravity = Gravity.START; setPadding(0, dp(2), 0, 0) })
+                addView(text(12.5f, color = ink.text2).apply { gravity = Gravity.START; setPadding(0, dp(2), 0, 0) })
             })
             setOnClickListener { onClick() }
         }
@@ -1048,10 +1069,10 @@ class CallActivity : Activity() {
     private fun targetRow(s: CallSnapshot, name: String, ext: String, selected: Boolean): View {
         val presence = PhoneEngine.presence[ext]
         val dotColor = when (presence) {
-            "open" -> GOOD
-            "busy" -> POOR
-            "closed" -> 0xFFB7AEFF.toInt()
-            else -> TEXT2
+            "open" -> ink.good
+            "busy" -> ink.poor
+            "closed" -> ink.purple
+            else -> ink.text2
         }
         val word = when (presence) {
             "open" -> s.label("presenceOpen", "Available")
@@ -1064,7 +1085,7 @@ class CallActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = if (selected) pill(withAlpha(GOOD, 0x29), 12f) else null
+            background = if (selected) pill(withAlpha(ink.good, 0x29), 12f) else null
             addView(FrameLayout(this@CallActivity).apply {
                 layoutParams = lp(dp(40), dp(40))
                 addView(text(15f, 700, avFg).apply {
@@ -1079,7 +1100,7 @@ class CallActivity : Activity() {
                 setPadding(dp(12), 0, 0, 0)
                 layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 addView(text(15f, 600).apply { gravity = Gravity.START; text = name.ifBlank { ext } })
-                addView(text(12f, color = TEXT2).apply { gravity = Gravity.START; text = "$ext · $word" })
+                addView(text(12f, color = ink.text2).apply { gravity = Gravity.START; text = "$ext · $word" })
             })
             setOnClickListener {
                 transferInput.setText(ext)
@@ -1092,7 +1113,7 @@ class CallActivity : Activity() {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, dp(8), 0, dp(8))
-        addView(text(13f, color = TEXT2).apply {
+        addView(text(13f, color = ink.text2).apply {
             this.text = k
             gravity = Gravity.START
             layoutParams = lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -1103,12 +1124,12 @@ class CallActivity : Activity() {
         })
     }
 
-    private fun setDock(key: String, res: Int, label: String, on: Boolean, onFill: Int = TEXT, onTint: Int = INK) {
+    private fun setDock(key: String, res: Int, label: String, on: Boolean, onFill: Int = ink.text, onTint: Int = ink.ground) {
         val (img, t) = dock[key] ?: return
         img.setImageResource(res)
         img.contentDescription = label
-        img.background = oval(if (on) onFill else FILL)
-        img.imageTintList = ColorStateList.valueOf(if (on) onTint else TEXT)
+        img.background = oval(if (on) onFill else ink.fill)
+        img.imageTintList = ColorStateList.valueOf(if (on) onTint else ink.text)
         t.text = label
     }
 
