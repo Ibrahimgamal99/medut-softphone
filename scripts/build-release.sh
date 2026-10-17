@@ -11,7 +11,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 if [ ! -f android/key.properties ]; then
   echo "ERROR: android/key.properties is missing, so the build would be signed" \
-       "with the debug key and Google Play would reject it. See docs/google-play.md." >&2
+       "with the debug key, which a store would reject." >&2
   exit 1
 fi
 

@@ -130,6 +130,7 @@ ios/Runner/
   MedutBridge.swift        the medut/native channel
 assets/translations/       en.json, ar.json (shared with the native screens)
 design/                    design canvases and icon sources
+docs/                      account QR / JSON format, push wake-up setup
 ```
 
 The native engine owns SIP and every call. It starts with the process
@@ -176,6 +177,8 @@ Something on the server side has to send that push:
 Without one, iOS rings only while the app is open. The push payload can carry
 `caller_uri` / `caller_name` (the Medut-SDK push contract, docs/guides/push.md
 in the SDK) to show the caller on the CallKit screen before the INVITE arrives.
+[docs/push.md](docs/push.md) walks through the Firebase and APNs setup, the
+payload, and what the server has to do.
 
 ## Build
 
@@ -187,11 +190,9 @@ flutter run                  # on a connected Android device
 flutter build apk --release  # Android
 ```
 
-**Google Play:** `scripts/build-release.sh` builds the App Bundle signed with
-the upload key from `android/key.properties`, and keeps the Dart debug info in
-`symbols/<version>/`. [docs/google-play.md](docs/google-play.md) covers the key,
-the developer account and every Play Console form. The privacy policy is
-[docs/privacy-policy.md](docs/privacy-policy.md).
+**Release:** `scripts/build-release.sh` builds the App Bundle signed with the
+upload key from `android/key.properties`, and keeps the Dart debug info in
+`symbols/<version>/`.
 
 **iOS** (on a Mac):
 1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK
