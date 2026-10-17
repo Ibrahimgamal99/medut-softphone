@@ -8,6 +8,17 @@ and iOS.
 The app is only an interface: every feature maps to a Medut-SDK call. What the
 SDK does not do (video, conference mixing, call park) is not in the app.
 
+## Download
+
+**Android:** [latest release APK](https://github.com/Ibrahimgamal99/medut-softphone/releases/latest).
+Open the `.apk` on the phone and allow installs from your browser or file
+manager when Android asks. Each release page also lists the APK's SHA-256
+checksum. Updates install over the previous version: every release is signed
+with the same key.
+
+**iOS:** not distributed yet; build from source on a Mac (see
+[Build](#build)).
+
 ## The name
 
 *Medut* is the Ancient Egyptian *mdwt* (/mɛduːt/): "words, speech". The app
