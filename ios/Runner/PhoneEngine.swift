@@ -259,6 +259,7 @@ final class PhoneEngine: NSObject, PKPushRegistryDelegate {
   }
 
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+    MedutPush.clearPushToken()
     setPushToken(nil)
   }
 
