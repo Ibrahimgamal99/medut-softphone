@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -10,6 +11,7 @@ import '../core/accounts.dart';
 import '../core/db.dart';
 import '../core/people.dart';
 import '../core/settings.dart';
+import '../desktop/platform.dart';
 import 'native_bridge.dart';
 import 'probe.dart';
 import 'tones.dart';
@@ -199,6 +201,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
       'ringtone': await _orElse(() => Tones.nativeSource(s.ringtoneId, s.customRingtonePath), 'system'),
       'vibrate': s.vibrate,
       'ringback': s.ringback,
+      'micDevice': s.micDevice,
+      'speakerDevice': s.speakerDevice,
+      'ringDevice': s.ringDevice,
       'autoAnswer': s.autoAnswer,
       'autoAnswerDelay': s.autoAnswerDelay,
       'showCallQuality': s.showCallQuality,
@@ -517,8 +522,9 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
   /// Where recordings go (Settings → Recording → Save recordings in):
   /// shared — Android: Internal storage › Recordings › Medut, next to
   /// Download and DCIM (Music › Medut before Android 12); iOS:
-  /// Documents/Recordings, seen in the Files app; private — inside the app
-  /// only; custom — an Android folder of your choice. Native records there.
+  /// Documents/Recordings, seen in the Files app; desktop: Documents ›
+  /// Recordings › Medut; private — inside the app only; custom — a folder of
+  /// your choice (Android and desktop). Native records there.
   static Future<Directory> recordingsDir(AppSettings settings) async {
     switch (settings.recordingDir) {
       case 'custom' when settings.recordingCustomDir.isNotEmpty:
@@ -527,6 +533,8 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
         return Directory('${(await getApplicationSupportDirectory()).path}/recordings');
       default:
         if (Platform.isAndroid) return _sharedRecordings ??= _findSharedRecordings();
+        // Desktop: Documents › Recordings › Medut, as Android's Recordings › Medut.
+        if (isDesktop) return Directory(p.join((await getApplicationDocumentsDirectory()).path, 'Recordings', 'Medut'));
         return Directory('${(await getApplicationDocumentsDirectory()).path}/Recordings');
     }
   }

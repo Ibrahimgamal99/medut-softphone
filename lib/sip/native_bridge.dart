@@ -2,8 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+/// Handles what would go over the channel, in this isolate: the desktop
+/// engine (lib/desktop/engine.dart), which has no native side.
+typedef BridgeHost = Future<Object?> Function(String method, Object? args);
+
 /// Dart side of the `medut/native` channel to the native engine
-/// (NativeBridge.kt / MedutBridge.swift).
+/// (NativeBridge.kt / MedutBridge.swift). On desktop the same calls go to a
+/// [host] instead, and it answers through [deliver].
 class NativeBridge {
   NativeBridge._() {
     _ch.setMethodCallHandler(_onCall);
@@ -11,6 +16,13 @@ class NativeBridge {
 
   static final NativeBridge instance = NativeBridge._();
   static const _ch = MethodChannel('medut/native');
+
+  /// Set before anything uses the bridge (desktop main).
+  BridgeHost? host;
+
+  /// What native would send over the channel: `state`, `openRoute`,
+  /// `historyChanged`, `notice`.
+  void deliver(String method, [Object? args]) => _onCall(MethodCall(method, args));
 
   final _states = StreamController<Map<String, dynamic>>.broadcast();
   final _routes = StreamController<String>.broadcast();
@@ -46,6 +58,8 @@ class NativeBridge {
   }
 
   Future<T?> _invoke<T>(String method, [Object? args]) async {
+    final h = host;
+    if (h != null) return await h(method, args) as T?;
     try {
       return await _ch.invokeMethod<T>(method, args);
     } on MissingPluginException {
@@ -70,6 +84,11 @@ class NativeBridge {
 
   /// Replaces every saved account; native re-registers what changed.
   Future<bool> setAccounts(List<Map<String, dynamic>> accounts) async {
+    final h = host;
+    if (h != null) {
+      await h('setAccounts', {'accounts': accounts});
+      return true;
+    }
     try {
       await _ch.invokeMethod<void>('setAccounts', {'accounts': accounts});
       return true;

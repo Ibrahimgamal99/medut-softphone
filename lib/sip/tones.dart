@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../desktop/platform.dart';
+import '../desktop/wav_player.dart';
+
 /// A selectable ringtone. Bundled ones ship in `assets/sounds/ringtones/` and,
 /// for CallKit, in the iOS app bundle as `medut_<id>.wav`.
 class RingtoneOption {
@@ -48,10 +51,23 @@ class Tones {
   // ── Preview (settings) ────────────────────────────────────────────────────
 
   static AudioPlayer? _preview;
+  static WavPlayer? _desktopPreview;
 
   static Future<void> preview(String id, String customPath) async {
     await stopPreview();
     final r = byId(id);
+    if (isDesktop) {
+      // No system ringtone on a computer: "system" rings Medut's classic tone.
+      final p = WavPlayer();
+      _desktopPreview = p;
+      try {
+        await p.setFilePath(await nativeSource(r.id == system.id ? classic.id : r.id, customPath));
+        await p.play();
+      } catch (e) {
+        debugPrint('ringtone preview failed: $e');
+      }
+      return;
+    }
     final p = AudioPlayer();
     _preview = p;
     try {
@@ -69,6 +85,9 @@ class Tones {
   }
 
   static Future<void> stopPreview() async {
+    final d = _desktopPreview;
+    _desktopPreview = null;
+    await d?.dispose();
     final p = _preview;
     _preview = null;
     try {

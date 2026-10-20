@@ -14,6 +14,7 @@ import '../core/accounts.dart';
 import '../core/language.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../desktop/platform.dart';
 import '../sip/probe.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
@@ -378,8 +379,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         .read(accountsProvider)
         .save(c.copyWith(name: label.isEmpty ? c.domain : label));
     // Ask once, at the moment it makes sense: calls need the mic, and
-    // ringing in the background needs notifications.
-    await [Permission.microphone, Permission.notification].request();
+    // ringing in the background needs notifications. A computer does not ask.
+    if (!isDesktop) await [Permission.microphone, Permission.notification].request();
     // First launch: the app root switches to the tabs by itself.
     if (mounted && widget.another) Navigator.pop(context);
   }
@@ -441,7 +442,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 8),
-          ListTile(leading: const Icon(Icons.qr_code_scanner), title: Text('scanQr'.tr()), onTap: () => Navigator.pop(ctx, 'scan')),
+          if (!isDesktop)
+            ListTile(leading: const Icon(Icons.qr_code_scanner), title: Text('scanQr'.tr()), onTap: () => Navigator.pop(ctx, 'scan')),
           ListTile(
               leading: const Icon(Icons.description_outlined),
               title: Text('importFile'.tr()),
@@ -607,8 +609,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: t.text2)),
       const SizedBox(height: 10),
       Row(children: [
-        Expanded(child: _Tile(icon: Icons.qr_code_scanner, label: 'scanQr'.tr(), onTap: _scan)),
-        const SizedBox(width: 8),
+        // No camera to scan with on a computer.
+        if (!isDesktop) ...[
+          Expanded(child: _Tile(icon: Icons.qr_code_scanner, label: 'scanQr'.tr(), onTap: _scan)),
+          const SizedBox(width: 8),
+        ],
         Expanded(child: _Tile(icon: Icons.description_outlined, label: 'importFile'.tr(), onTap: _import)),
         const SizedBox(width: 8),
         Expanded(child: _Tile(icon: Icons.content_paste, label: 'paste'.tr(), onTap: _paste)),

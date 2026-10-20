@@ -1,9 +1,9 @@
 # Medut Softphone
 
-A mobile softphone for any SIP PBX (Asterisk, FreeSWITCH, Kamailio, OpenSIPS,
-3CX or a carrier SBC), built on [Medut-SDK](https://github.com/Ibrahimgamal99/Medut-SDK).
-The app is Flutter; the ringing and call screens are native. It runs on Android
-and iOS.
+A softphone for any SIP PBX (Asterisk, FreeSWITCH, Kamailio, OpenSIPS, 3CX or
+a carrier SBC), built on [Medut-SDK](https://github.com/Ibrahimgamal99/Medut-SDK).
+The app is Flutter; on the phone the ringing and call screens are native. It
+runs on Android, iOS, Linux and Windows.
 
 The app is only an interface: every feature maps to a Medut-SDK call. What the
 SDK does not do (video, conference mixing, call park) is not in the app.
@@ -18,6 +18,40 @@ with the same key.
 
 **iOS:** not distributed yet; build from source on a Mac (see
 [Build](#build)).
+
+**Linux:** the `.rpm` (Fedora: `sudo dnf install ./medut-*.rpm`) or the
+`.tar.gz`, which runs from any folder (`./medut`). The tray icon needs a
+StatusNotifier host: KDE, Xfce and Cinnamon have one, GNOME needs the
+AppIndicator extension. Passwords go in the desktop keyring (libsecret).
+
+**Windows:** the `-setup.exe` installs for your user, with no administrator
+rights; the `.zip` runs from any folder. Windows 10 or later.
+
+## On the desktop
+
+The same app, laid out for a window, with the desktop around it:
+
+- **Layout:** a narrow window is the phone app. A wide one puts the tabs down
+  the side and keeps the keypad in a pane on the right, which becomes the
+  call while one is up.
+- **Tray:** closing the window keeps Medut registered in the tray; Quit is in
+  its menu, with Do not disturb and Hang up. The icon shows connected,
+  offline, in a call and missed calls.
+- **Ringing:** while you are in another window a call rings in a small card
+  on top, in the corner, with Answer and Decline. Wayland does not let an app
+  put itself on top, so there it also shows a notification with both buttons.
+  Enter answers and Esc declines.
+- **Audio:** pick the microphone and speaker in the call or in Settings ›
+  This computer › Audio devices; on Linux the ring can go to another device
+  (the speakers while calls use a headset).
+- **Call links:** `tel:`, `sip:`, `sips:` and `callto:` links open Medut and
+  dial. Settings › This computer › Call links makes Medut their app (on
+  Windows you confirm it in Default apps). `medut 201` dials from a terminal;
+  `medut --answer` and `medut --hangup` answer and hang up.
+- **Start at login:** in the tray, ready for calls.
+
+There is no push wake-up on the desktop: the app stays registered while it
+runs.
 
 ## The name
 
@@ -139,7 +173,13 @@ ios/Runner/
   EngineSupport.swift      account store, settings, history writer, quality
   CallViewController.swift in-call screen, Transfer, Add call
   MedutBridge.swift        the medut/native channel
-assets/translations/       en.json, ar.json (shared with the native screens)
+lib/desktop/
+  engine.dart              the phone on Linux and Windows: Medut-SDK over
+                           dart:ffi, behind the same medut/native surface
+  call_view.dart           the call screen (CallActivity in Flutter)
+  desktop_shell.dart       window, tray, ringing card, notifications, links
+linux/, windows/           runners: one instance, links handed to it
+assets/translations/       nine languages (shared with the native screens)
 design/                    design canvases and icon sources
 docs/                      account QR / JSON format, push wake-up setup
 ```
@@ -212,6 +252,22 @@ debug-signed, and attaches it with its checksum and debug symbols to the
 release for that tag. Signing comes from the repository secrets listed at the
 top of `.github/workflows/android-release.yml`.
 
+**Linux** (Fedora; Debian and Ubuntu have the same libraries under -dev names):
+1. `sudo dnf install clang cmake ninja-build gtk3-devel libsecret-devel
+   libayatana-appindicator-gtk3-devel openssl-devel
+   webrtc-audio-processing-devel pulseaudio-libs-devel rpm-build`
+2. `scripts/desktop-sdk.sh` builds `medut.so` from the Medut-SDK commit
+   `pubspec.yaml` pins, into `linux/medut/`.
+3. `flutter run -d linux`, or `scripts/build-desktop.sh` for the `.tar.gz`
+   and `.rpm` in `dist/`.
+
+**Windows:** the `desktop` workflow builds `medut.dll` with Medut-SDK's
+`scripts/build-windows.ps1` (vcpkg's OpenSSL, zlib and abseil, linked in),
+then the app and its Inno Setup installer (`windows/installer.iss`). To build
+by hand, put `medut.dll` in `windows/medut/` and run `flutter build windows`.
+The workflow also builds Linux on every push, and a `v*` tag attaches both to
+the release.
+
 **iOS** (on a Mac):
 1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK
    repo does not ship it yet, and `pod install` reports it missing otherwise.
@@ -222,7 +278,7 @@ top of `.github/workflows/android-release.yml`.
    `com.medut.generic.phone`.
 4. `flutter run` on a real device, because PushKit and CallKit need hardware.
 
-The app id is `com.medut.generic.phone` on both platforms.
+The app id is `com.medut.generic.phone` on every platform.
 
 ## License
 

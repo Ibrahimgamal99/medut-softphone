@@ -138,6 +138,17 @@ class AppSettings extends ChangeNotifier {
   bool get ringback => _b('ringback', true);
   set ringback(bool v) => _set('ringback', v);
 
+  // Desktop: audio devices by the SDK's name ('' = the system default), and
+  // whether closing the window keeps Medut running in the tray.
+  String get micDevice => _s('micDevice', '');
+  set micDevice(String v) => _set('micDevice', v);
+  String get speakerDevice => _s('speakerDevice', '');
+  set speakerDevice(String v) => _set('speakerDevice', v);
+  String get ringDevice => _s('ringDevice', '');
+  set ringDevice(String v) => _set('ringDevice', v);
+  bool get closeToTray => _b('closeToTray', true);
+  set closeToTray(bool v) => _set('closeToTray', v);
+
   // Calls
   bool get autoAnswer => _b('autoAnswer', false);
   set autoAnswer(bool v) => _set('autoAnswer', v);

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Medut
+GenericName=Softphone
+Comment=Calls over your SIP PBX
+Exec=medut %u
+Icon=com.medut.generic.phone
+Terminal=false
+Categories=Network;Telephony;
+MimeType=x-scheme-handler/tel;x-scheme-handler/sip;x-scheme-handler/sips;x-scheme-handler/callto;
+StartupWMClass=com.medut.generic.phone
+StartupNotify=true

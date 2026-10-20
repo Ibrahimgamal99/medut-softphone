@@ -1,0 +1,159 @@
+name: Desktop build
+
+# Builds the Linux and Windows apps on every push: there is no Windows machine
+# in the loop, so this is where Windows code gets compiled. Medut-SDK's C
+# library is built from the sha pinned in pubspec.yaml (medut.so with
+# scripts/desktop-sdk.sh, medut.dll with the SDK's scripts/build-windows.ps1).
+#
+# Linux: the .rpm and a .tar.gz of the bundle, built on Fedora (the SDK needs
+# webrtc-audio-processing 1.x). Windows: an installer (Inno Setup) and a .zip.
+# A pushed v* tag attaches them to that GitHub Release, beside the APK.
+on:
+  push:
+    branches: [main, desktop]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: 3.44.8
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: fedora:43
+    name: Linux (rpm, tar.gz)
+    steps:
+      - name: Build tools and libraries
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            git curl unzip xz which tar findutils file rpm-build \
+            clang gcc gcc-c++ cmake ninja-build pkgconf-pkg-config \
+            gtk3-devel libsecret-devel libayatana-appindicator-gtk3-devel \
+            openssl-devel webrtc-audio-processing-devel pulseaudio-libs-devel zlib-ng-compat-devel
+
+      - uses: actions/checkout@v4
+
+      - name: Trust the checkout (container user)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Dart analysis and tests
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: medut.so at the pinned Medut-SDK commit
+        run: scripts/desktop-sdk.sh
+
+      - name: Build and package
+        run: scripts/build-desktop.sh
+
+      - name: Checksums
+        run: cd dist && sha256sum medut-* > SHA256SUMS-linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: medut-linux
+          path: dist/*
+
+  windows:
+    runs-on: windows-latest
+    name: Windows (installer, zip)
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Version and Medut-SDK sha from pubspec.yaml
+        id: meta
+        run: |
+          $pub = Get-Content pubspec.yaml -Raw
+          $version = [regex]::Match($pub, '(?m)^version:\s*([^+\s]+)').Groups[1].Value
+          $ref = [regex]::Match($pub, '(?ms)^  medut:.*?ref:\s*([0-9a-f]{40})').Groups[1].Value
+          if (-not $ref) { throw "no Medut-SDK sha in pubspec.yaml" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "ref=$ref" >> $env:GITHUB_OUTPUT
+
+      - name: Medut-SDK source
+        run: |
+          git clone --quiet --no-checkout https://github.com/Ibrahimgamal99/Medut-SDK.git sdk
+          git -C sdk -c advice.detachedHead=false checkout --quiet ${{ steps.meta.outputs.ref }}
+
+      - name: vcpkg libraries cache
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-x64-windows-static-md-openssl-zlib-abseil-v1
+
+      - name: OpenSSL, zlib and abseil (static, for medut.dll)
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl zlib abseil --triplet x64-windows-static-md
+
+      - name: medut.dll
+        run: |
+          ./sdk/scripts/build-windows.ps1 -VcpkgRoot $env:VCPKG_INSTALLATION_ROOT
+          New-Item -ItemType Directory -Force windows\medut | Out-Null
+          Copy-Item sdk\dist\windows\x64\medut.dll windows\medut\medut.dll
+
+      - name: Build the app
+        run: |
+          flutter pub get
+          flutter build windows --release --dart-define=MEDUT_VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Installer and zip
+        run: |
+          $v = "${{ steps.meta.outputs.version }}"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc /DAppVersion=$v /DSourceDir=..\build\windows\x64\runner\Release windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "dist\medut-$v-windows-x64.zip"
+          Get-ChildItem dist\medut-* | ForEach-Object {
+            "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content dist\SHA256SUMS-windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: medut-windows
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    name: Attach to the GitHub Release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if ! gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --title "Medut Softphone ${tag#v}" --generate-notes
+          fi
+          gh release upload "$tag" -R "$GITHUB_REPOSITORY" dist/* --clobber

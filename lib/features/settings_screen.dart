@@ -13,6 +13,9 @@ import '../core/providers.dart';
 import '../core/theme.dart';
 import '../core/db.dart';
 import '../core/language.dart';
+import '../desktop/desktop_files.dart';
+import '../desktop/desktop_settings.dart';
+import '../desktop/platform.dart';
 import '../sip/native_bridge.dart';
 import '../sip/sip_service.dart';
 import '../sip/tones.dart';
@@ -173,7 +176,7 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Tones.byId(s.ringtoneId).labelKey.tr(),
             onTap: () => open(const RingtoneScreen()),
           ),
-          _switch(context, Icons.vibration, t.info, 'vibrate'.tr(), null, s.vibrate, (v) => s.vibrate = v),
+          if (!isDesktop) _switch(context, Icons.vibration, t.info, 'vibrate'.tr(), null, s.vibrate, (v) => s.vibrate = v),
           _switch(context, Icons.ring_volume_outlined, t.info, 'ringbackTone'.tr(), 'ringbackSub'.tr(), s.ringback,
               (v) => s.ringback = v),
           _switch(context, Icons.call_received, t.success, 'autoAnswer'.tr(), 'autoAnswerSub'.tr(), s.autoAnswer,
@@ -203,6 +206,7 @@ class SettingsScreen extends ConsumerWidget {
         ]),
         if (Platform.isAndroid)
           const Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, 0), child: ReachabilityBanner()),
+        if (isDesktop) const DesktopSettingsSection(),
         SettingsSection(title: 'recording'.tr(), children: [
           SettingsTile(
             icon: Icons.fiber_manual_record,
@@ -310,7 +314,12 @@ class SettingsScreen extends ConsumerWidget {
       CallRecord.csvHeader.join(','),
       for (final c in calls) c.toCsv().map(cell).join(','),
     ].join('\n');
-    final f = File('${(await getTemporaryDirectory()).path}/medut-calls-${DateTime.now().millisecondsSinceEpoch}.csv');
+    final name = 'medut-calls-${DateTime.now().millisecondsSinceEpoch}.csv';
+    if (isDesktop) {
+      await saveTextAs(name, csv);
+      return;
+    }
+    final f = File('${(await getTemporaryDirectory()).path}/$name');
     await f.writeAsString(csv);
     await Share.shareXFiles([XFile(f.path)]);
   }
@@ -597,10 +606,12 @@ class DiagnosticsScreen extends ConsumerWidget {
               );
             }),
         ]),
-        SettingsSection(title: 'permissions'.tr(), children: const [
-          _PermissionTile(Permission.microphone, 'microphone', Icons.mic_none),
-          _PermissionTile(Permission.notification, 'notifications', Icons.notifications_none),
-        ]),
+        // A computer has no app permissions to show.
+        if (!isDesktop)
+          SettingsSection(title: 'permissions'.tr(), children: const [
+            _PermissionTile(Permission.microphone, 'microphone', Icons.mic_none),
+            _PermissionTile(Permission.notification, 'notifications', Icons.notifications_none),
+          ]),
         SettingsSection(title: 'diagnostics'.tr(), children: [
           _switch(context, Icons.bug_report_outlined, t.warn, 'debugLogging'.tr(), 'restartApp'.tr(), s.debugLogging,
               (v) => s.debugLogging = v),
@@ -694,8 +705,14 @@ class LogScreen extends ConsumerWidget {
             onPressed: log.isEmpty
                 ? null
                 : () async {
-                    final f = File('${(await getTemporaryDirectory()).path}/medut-sip-${DateTime.now().millisecondsSinceEpoch}.log');
-                    await f.writeAsString(log.reversed.join('\n\n'));
+                    final name = 'medut-sip-${DateTime.now().millisecondsSinceEpoch}.log';
+                    final text = log.reversed.join('\n\n');
+                    if (isDesktop) {
+                      await saveTextAs(name, text);
+                      return;
+                    }
+                    final f = File('${(await getTemporaryDirectory()).path}/$name');
+                    await f.writeAsString(text);
                     await Share.shareXFiles([XFile(f.path)]);
                   },
           ),
@@ -1068,7 +1085,11 @@ class _RecordingFolderSheet extends ConsumerWidget {
               value: 'shared',
               activeColor: t.accent,
               title: Text('folderShared'.tr()),
-              subtitle: Text(Platform.isIOS ? 'folderSharedIos'.tr() : 'folderSharedAndroid'.tr()),
+              subtitle: Text(Platform.isIOS
+                  ? 'folderSharedIos'.tr()
+                  : isDesktop
+                      ? 'folderSharedDesktop'.tr()
+                      : 'folderSharedAndroid'.tr()),
             ),
             RadioListTile<String>(
               value: 'private',
@@ -1076,7 +1097,7 @@ class _RecordingFolderSheet extends ConsumerWidget {
               title: Text('folderPrivate'.tr()),
               subtitle: Text('folderPrivateSub'.tr()),
             ),
-            if (Platform.isAndroid)
+            if (Platform.isAndroid || isDesktop)
               RadioListTile<String>(
                 value: 'custom',
                 activeColor: t.accent,

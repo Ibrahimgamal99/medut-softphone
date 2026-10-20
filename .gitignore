@@ -53,3 +53,8 @@ ios/Runner/GoogleService-Info.plist
 
 # Dart debug info from scripts/build-release.sh (keep a copy per release)
 /symbols/
+
+# Medut-SDK desktop libraries (scripts/desktop-sdk.sh)
+/linux/medut/
+/windows/medut/
+/dist/

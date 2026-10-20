@@ -16,6 +16,9 @@ import '../core/db.dart';
 import '../core/people.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../desktop/desktop_files.dart';
+import '../desktop/platform.dart';
+import '../desktop/wav_player.dart';
 import '../sip/quality.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
@@ -1102,7 +1105,7 @@ class _RecordingPlayer extends ConsumerStatefulWidget {
 }
 
 class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
-  final _player = AudioPlayer();
+  final _player = Playback();
   bool _missing = false;
   bool _ready = false;
   List<double> _peaks = const [];
@@ -1125,7 +1128,7 @@ class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
       // Play out loud: after a call the phone can still be routed to the
       // earpiece. Media attributes put it on the speaker (or a headset).
       // Never touch the session under a live call: it is the call's.
-      if (!ref.read(sipProvider).hasCall) {
+      if (!isDesktop && !ref.read(sipProvider).hasCall) {
         final session = await AudioSession.instance;
         await session.configure(const AudioSessionConfiguration.music());
         await session.setActive(true);
@@ -1213,11 +1216,19 @@ class _RecordingPlayerState extends ConsumerState<_RecordingPlayer> {
                 },
               ),
             ),
-            IconButton(
-              tooltip: 'shareRecording'.tr(),
-              icon: Icon(Icons.ios_share, color: t.text2, size: 20),
-              onPressed: () => Share.shareXFiles([XFile(widget.path)]),
-            ),
+            // A computer has no share sheet for files: show it in its folder.
+            if (isDesktop)
+              IconButton(
+                tooltip: 'showInFolder'.tr(),
+                icon: Icon(Icons.folder_open_outlined, color: t.text2, size: 20),
+                onPressed: () => showInFolder(widget.path),
+              )
+            else
+              IconButton(
+                tooltip: 'shareRecording'.tr(),
+                icon: Icon(Icons.ios_share, color: t.text2, size: 20),
+                onPressed: () => Share.shareXFiles([XFile(widget.path)]),
+              ),
           ]);
         },
       ),

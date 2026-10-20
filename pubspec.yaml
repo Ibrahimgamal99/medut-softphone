@@ -48,6 +48,24 @@ dependencies:
   audio_session: ^0.2.4
   qr_flutter: ^4.1.0
 
+  # Desktop (Linux, Windows): none of these is used on Android or iOS.
+  # The window (and where the ringing card goes), the tray icon, "start at login"
+  window_manager: ^0.5.2
+  screen_retriever: ^0.2.2
+  tray_manager: ^0.5.3
+  launch_at_startup: ^0.5.1
+  # medut.db through sqlite3 over FFI. Kept on the 2.3 line: its sqlite3 2.x
+  # loads the system library (desktop/sqlite.dart) where 3.x would add a
+  # build hook to every platform, Android included.
+  sqflite_common_ffi: ">=2.3.0 <2.4.0"
+  sqlite3: ^2.9.4
+  # Incoming-call and missed-call notifications on Linux
+  flutter_local_notifications_linux: ^8.0.2
+  # Windows: the ringtone (winmm PlaySound) and the tel:/sip: registry keys
+  win32: ^5.15.0
+  win32_registry: ^2.1.0
+  ffi: ^2.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

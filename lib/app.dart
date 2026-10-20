@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/language.dart';
 import 'core/providers.dart';
 import 'core/theme.dart';
+import 'desktop/desktop_frame.dart';
+import 'desktop/desktop_shell.dart';
+import 'desktop/platform.dart';
 import 'features/shell.dart';
 import 'features/sign_in.dart';
 
@@ -40,6 +43,8 @@ class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindi
   @override
   void didChangeLocales(List<Locale>? locales) => phoneLanguageChanged(context);
 
+  String? _trayLanguage;
+
   bool _isDark(String mode) =>
       mode == 'dark' ||
       (mode == 'system' && SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
@@ -59,6 +64,11 @@ class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindi
     sip.isDark = () => _isDark(ref.read(settingsProvider).themeMode);
     sip.isRtl = () => rtl;
     if (changed) WidgetsBinding.instance.addPostFrameCallback((_) => sip.refreshNative());
+    // The tray menu is not a widget: rebuild it in the new language.
+    if (isDesktop && _trayLanguage != language) {
+      _trayLanguage = language;
+      WidgetsBinding.instance.addPostFrameCallback((_) => DesktopShell.instance.refreshTray());
+    }
 
     return MaterialApp(
       title: 'Medut',
@@ -73,6 +83,8 @@ class _MedutPhoneAppState extends ConsumerState<MedutPhoneApp> with WidgetsBindi
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
+      // Desktop: the call screen and the ringing card around the app.
+      builder: isDesktop ? (context, child) => DesktopFrame(child: child ?? const SizedBox.shrink()) : null,
       home: const _Root(),
     );
   }

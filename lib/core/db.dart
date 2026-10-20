@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+
+import '../desktop/platform.dart';
 
 enum CallDirection { incoming, outgoing }
 
@@ -229,8 +232,11 @@ class LocalDb extends ChangeNotifier {
   final Database _db;
 
   static Future<LocalDb> open() async {
+    // On desktop sqflite's own folder is relative to the working directory:
+    // keep the file with the app's other data instead.
+    final dir = isDesktop ? (await getApplicationSupportDirectory()).path : await getDatabasesPath();
     final db = await openDatabase(
-      p.join(await getDatabasesPath(), 'medut.db'),
+      p.join(dir, 'medut.db'),
       version: 4,
       onUpgrade: (db, from, to) async {
         if (from < 2) {

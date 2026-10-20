@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../core/db.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../desktop/platform.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'keypad_sheets.dart';
@@ -19,6 +20,7 @@ import 'sign_in.dart';
 
 /// Ask for the microphone before the first call; returns false if refused.
 Future<bool> ensureMic(BuildContext context) async {
+  if (isDesktop) return true; // no microphone permission to ask for
   final s = await Permission.microphone.request();
   return s.isGranted;
 }

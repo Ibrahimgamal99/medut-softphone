@@ -14,6 +14,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../core/accounts.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../desktop/platform.dart';
 import '../sip/sip_service.dart';
 import '../ui/widgets.dart';
 import 'sign_in.dart' show PasteAccountDialog;
@@ -260,8 +261,8 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
     final saved = store.byId(_id);
     await store.save(saved == null ? c : c.copyWith(pbx: saved.pbx, codes: saved.codes));
     // Ask once, at the moment it makes sense: calls need the mic, and ringing
-    // in the background needs notifications.
-    await [Permission.microphone, Permission.notification].request();
+    // in the background needs notifications. A computer does not ask.
+    if (!isDesktop) await [Permission.microphone, Permission.notification].request();
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -396,8 +397,10 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
                   _head(context, c),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Expanded(child: _Chip(icon: Icons.qr_code_scanner, label: 'scanQr'.tr(), onTap: _scan)),
-                    const SizedBox(width: 8),
+                    if (!isDesktop) ...[
+                      Expanded(child: _Chip(icon: Icons.qr_code_scanner, label: 'scanQr'.tr(), onTap: _scan)),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(child: _Chip(icon: Icons.description_outlined, label: 'importFile'.tr(), onTap: _import)),
                     const SizedBox(width: 8),
                     Expanded(child: _Chip(icon: Icons.content_paste, label: 'paste'.tr(), onTap: _paste)),
