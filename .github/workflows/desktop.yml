@@ -2,12 +2,12 @@ name: Desktop build
 
 # Builds the Linux and Windows apps on every push: there is no Windows machine
 # in the loop, so this is where Windows code gets compiled. Medut-SDK's C
-# library is built from the sha pinned in pubspec.yaml (medut.so with
-# scripts/desktop-sdk.sh, medut.dll with the SDK's scripts/build-windows.ps1).
+# library comes prebuilt with the medut plugin at the sha pubspec.yaml pins
+# (medut.so, medut.dll); Flutter bundles it.
 #
-# Linux: the .rpm and a .tar.gz of the bundle, built on Fedora (the SDK needs
-# webrtc-audio-processing 1.x). Windows: an installer (Inno Setup) and a .zip.
-# A pushed v* tag attaches them to that GitHub Release, beside the APK.
+# Linux: the .rpm and a .tar.gz of the bundle, built on Fedora (rpmbuild).
+# Windows: an installer (Inno Setup) and a .zip. A pushed v* tag attaches
+# them to that GitHub Release, beside the APK.
 on:
   push:
     branches: [main, desktop]
@@ -34,10 +34,9 @@ jobs:
       - name: Build tools and libraries
         run: |
           dnf install -y --setopt=install_weak_deps=False \
-            git curl unzip xz which tar findutils file rpm-build \
+            git curl jq unzip xz which tar findutils file rpm-build \
             clang gcc gcc-c++ cmake ninja-build pkgconf-pkg-config \
-            gtk3-devel libsecret-devel libayatana-appindicator-gtk3-devel \
-            openssl-devel webrtc-audio-processing-devel pulseaudio-libs-devel zlib-ng-compat-devel
+            gtk3-devel libsecret-devel libayatana-appindicator-gtk3-devel
 
       - uses: actions/checkout@v4
 
@@ -55,9 +54,6 @@ jobs:
           flutter pub get
           flutter analyze
           flutter test
-
-      - name: medut.so at the pinned Medut-SDK commit
-        run: scripts/desktop-sdk.sh
 
       - name: Build and package
         run: scripts/build-desktop.sh
@@ -85,41 +81,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Version and Medut-SDK sha from pubspec.yaml
+      - name: Version from pubspec.yaml
         id: meta
         run: |
           $pub = Get-Content pubspec.yaml -Raw
           $version = [regex]::Match($pub, '(?m)^version:\s*([^+\s]+)').Groups[1].Value
-          $ref = [regex]::Match($pub, '(?ms)^  medut:.*?ref:\s*([0-9a-f]{40})').Groups[1].Value
-          if (-not $ref) { throw "no Medut-SDK sha in pubspec.yaml" }
           "version=$version" >> $env:GITHUB_OUTPUT
-          "ref=$ref" >> $env:GITHUB_OUTPUT
-
-      - name: Medut-SDK source
-        run: |
-          git clone --quiet --no-checkout https://github.com/Ibrahimgamal99/Medut-SDK.git sdk
-          git -C sdk -c advice.detachedHead=false checkout --quiet ${{ steps.meta.outputs.ref }}
-
-      - name: vcpkg libraries cache
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed
-          key: vcpkg-x64-windows-static-md-openssl-zlib-abseil-v1
-
-      - name: OpenSSL, zlib and abseil (static, for medut.dll)
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl zlib abseil --triplet x64-windows-static-md
-
-      - name: medut.dll
-        run: |
-          ./sdk/scripts/build-windows.ps1 -VcpkgRoot $env:VCPKG_INSTALLATION_ROOT
-          New-Item -ItemType Directory -Force windows\medut | Out-Null
-          Copy-Item sdk\dist\windows\x64\medut.dll windows\medut\medut.dll
 
       - name: Build the app
         run: |
           flutter pub get
           flutter build windows --release --dart-define=MEDUT_VERSION=${{ steps.meta.outputs.version }}
+          if (-not (Test-Path build\windows\x64\runner\Release\medut.dll)) { throw "medut.dll is not in the bundle" }
 
       - name: Installer and zip
         run: |

@@ -254,19 +254,18 @@ top of `.github/workflows/android-release.yml`.
 
 **Linux** (Fedora; Debian and Ubuntu have the same libraries under -dev names):
 1. `sudo dnf install clang cmake ninja-build gtk3-devel libsecret-devel
-   libayatana-appindicator-gtk3-devel openssl-devel
-   webrtc-audio-processing-devel pulseaudio-libs-devel rpm-build`
-2. `scripts/desktop-sdk.sh` builds `medut.so` from the Medut-SDK commit
-   `pubspec.yaml` pins, into `linux/medut/`.
-3. `flutter run -d linux`, or `scripts/build-desktop.sh` for the `.tar.gz`
+   libayatana-appindicator-gtk3-devel rpm-build`
+2. `flutter run -d linux`, or `scripts/build-desktop.sh` for the `.tar.gz`
    and `.rpm` in `dist/`.
 
-**Windows:** the `desktop` workflow builds `medut.dll` with Medut-SDK's
-`scripts/build-windows.ps1` (vcpkg's OpenSSL, zlib and abseil, linked in),
-then the app and its Inno Setup installer (`windows/installer.iss`). To build
-by hand, put `medut.dll` in `windows/medut/` and run `flutter build windows`.
-The workflow also builds Linux on every push, and a `v*` tag attaches both to
-the release.
+**Windows:** `flutter build windows` (Visual Studio 2022 with C++ and ATL).
+The `desktop` workflow builds it with its Inno Setup installer
+(`windows/installer.iss`), and Linux too, on every push; a `v*` tag attaches
+both to the release.
+
+`medut.so` and `medut.dll` (x64 and arm64) come prebuilt with the medut
+plugin at the Medut-SDK commit `pubspec.yaml` pins, and Flutter bundles the
+one for the target: an SDK fix reaches the desktop once the pin moves.
 
 **iOS** (on a Mac):
 1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK

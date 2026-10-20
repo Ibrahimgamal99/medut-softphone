@@ -134,15 +134,6 @@ install(CODE "
 install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
 
-# Medut-SDK's C library, which lib/desktop/engine.dart loads over dart:ffi
-# from lib/. scripts/desktop-sdk.sh builds it from the pinned SDK commit.
-set(MEDUT_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/medut/medut.so" CACHE FILEPATH "Medut-SDK medut.so")
-if(NOT EXISTS "${MEDUT_LIBRARY}")
-  message(FATAL_ERROR "${MEDUT_LIBRARY} is missing: run scripts/desktop-sdk.sh first")
-endif()
-install(FILES "${MEDUT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  COMPONENT Runtime)
-
 # The window and notification icon, the tray icons (lib/desktop/desktop_shell.dart
 # finds them beside flutter_assets) and the .desktop entry packages install.
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/medut.png"

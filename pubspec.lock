@@ -433,8 +433,8 @@ packages:
     dependency: "direct main"
     description:
       path: "bindings/flutter"
-      ref: "88c1c463ad59fc1b448fea35424da044a81e85b7"
-      resolved-ref: "88c1c463ad59fc1b448fea35424da044a81e85b7"
+      ref: "38c1f7b5989b9448c65ec3c1d0b2bffc987874fd"
+      resolved-ref: "38c1f7b5989b9448c65ec3c1d0b2bffc987874fd"
       url: "https://github.com/Ibrahimgamal99/Medut-SDK.git"
     source: git
     version: "1.0.0"

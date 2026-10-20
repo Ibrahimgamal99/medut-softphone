@@ -187,7 +187,8 @@ class DesktopEngine {
     _statusTick = Timer.periodic(const Duration(minutes: 1), (_) => _publishStatus()); // office hours
   }
 
-  /// medut.so in the bundle's lib/ (Linux), medut.dll beside the .exe (Windows).
+  /// medut.so in the bundle's lib/ (Linux), medut.dll beside the .exe
+  /// (Windows): where Flutter puts the medut plugin's prebuilt core.
   static String libraryPath() {
     final dir = p.dirname(Platform.resolvedExecutable);
     return Platform.isWindows ? p.join(dir, 'medut.dll') : p.join(dir, 'lib', 'medut.so');

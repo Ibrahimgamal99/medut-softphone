@@ -8,7 +8,8 @@
 #
 #   scripts/build-desktop.sh
 #
-# medut.so must be in linux/medut/ first: scripts/desktop-sdk.sh.
+# medut.so is the medut plugin's prebuilt core for the pinned Medut-SDK
+# commit; Flutter bundles it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
@@ -17,8 +18,6 @@ VERSION="$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml
 APP_ID="com.medut.generic.phone"
 DIST="${ROOT}/dist"
 BUNDLE="${ROOT}/build/linux/x64/release/bundle"
-
-[[ -f linux/medut/medut.so ]] || { echo "linux/medut/medut.so is missing: run scripts/desktop-sdk.sh" >&2; exit 1; }
 
 flutter build linux --release --dart-define=MEDUT_VERSION="${VERSION}"
 

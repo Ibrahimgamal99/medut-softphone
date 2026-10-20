@@ -102,16 +102,6 @@ install(CODE "
 install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
 
-# Medut-SDK's C library, which lib/desktop/engine.dart loads over dart:ffi
-# from beside the .exe: the SDK's scripts/build-windows.ps1 builds it
-# (.github/workflows/desktop.yml).
-set(MEDUT_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/medut/medut.dll" CACHE FILEPATH "Medut-SDK medut.dll")
-if(NOT EXISTS "${MEDUT_LIBRARY}")
-  message(FATAL_ERROR "${MEDUT_LIBRARY} is missing: build it with Medut-SDK's scripts/build-windows.ps1")
-endif()
-install(FILES "${MEDUT_LIBRARY}" DESTINATION "${CMAKE_INSTALL_PREFIX}"
-  COMPONENT Runtime)
-
 # The tray icons, which lib/desktop/desktop_shell.dart finds beside flutter_assets.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tray"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)

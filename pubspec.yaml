@@ -13,13 +13,14 @@ dependencies:
     sdk: flutter
 
   # Medut-SDK: brings its Kotlin SDK (Android) and MedutKit (iOS) into the
-  # build. The app's native PhoneEngine drives them; Dart never imports it.
-  # Pinned to a full sha so the native binaries cannot move under a build.
+  # build, which the native PhoneEngine drives, and on Linux and Windows the
+  # prebuilt C library (medut.so / medut.dll) lib/desktop/engine.dart drives
+  # over dart:ffi. Pinned to a full sha so the binaries cannot move under a build.
   medut:
     git:
       url: https://github.com/Ibrahimgamal99/Medut-SDK.git
       path: bindings/flutter
-      ref: 88c1c463ad59fc1b448fea35424da044a81e85b7
+      ref: 38c1f7b5989b9448c65ec3c1d0b2bffc987874fd
 
   flutter_riverpod: ^2.6.1
 
