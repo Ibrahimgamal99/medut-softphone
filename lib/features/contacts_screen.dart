@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../core/people.dart';
 import '../core/providers.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
+import '../desktop/platform.dart';
 import '../sip/sip_service.dart' show PresenceStatus;
 import '../ui/widgets.dart';
 import 'chat.dart';
@@ -51,6 +53,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           Expanded(
             child: Text('tabContacts'.tr(), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
           ),
+          if (isDesktop) ...[
+            RoundIcon(icon: Icons.upload_file_outlined, size: 40, tooltip: 'importContacts'.tr(), onTap: () => importContacts(context, contacts)),
+            const SizedBox(width: 8),
+          ],
           RoundIcon(icon: Icons.add, size: 40, tooltip: 'addExtension'.tr(), onTap: () => _addExtension(context)),
         ]),
       ),
@@ -129,7 +135,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                       fromCalls: !book.isKnown(n),
                       onTap: () => showPersonSheet(context, number: n),
                     ),
-                  if (!contacts.permitted && q.isEmpty) _AllowContacts(onAllow: () => contacts.load(ask: true)),
+                  // A computer has no phone address book to ask for: bring one in from a file.
+                  if (isDesktop && contacts.contacts.isEmpty && q.isEmpty)
+                    _ImportContacts(onImport: () => importContacts(context, contacts))
+                  else if (!isDesktop && !contacts.permitted && q.isEmpty)
+                    _AllowContacts(onAllow: () => contacts.load(ask: true)),
                   if (nothing)
                     Padding(
                       padding: const EdgeInsets.all(32),
@@ -404,6 +414,58 @@ class _PersonRow extends ConsumerWidget {
   }
 }
 
+/// Desktop: adds the people in a .vcf or .csv the user picks, and says how many.
+Future<void> importContacts(BuildContext context, ContactsService contacts) async {
+  final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['vcf', 'vcard', 'csv']);
+  final path = r?.files.single.path;
+  if (path == null) return;
+  int? n;
+  try {
+    n = await contacts.importFile(path);
+  } catch (_) {
+    n = null;
+  }
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(switch (n) {
+      null => 'importContactsNone'.tr(),
+      0 => 'importContactsNoneNew'.tr(),
+      _ => 'importedContacts'.plural(n),
+    }),
+  ));
+}
+
+/// Desktop, before any contact is here: where they come from.
+class _ImportContacts extends StatelessWidget {
+  const _ImportContacts({required this.onImport});
+  final VoidCallback onImport;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: ECard(
+        padding: const EdgeInsets.all(18),
+        child: Column(children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(color: t.accentSoft, shape: BoxShape.circle),
+            child: Icon(Icons.contacts_outlined, color: t.accentText),
+          ),
+          const SizedBox(height: 10),
+          Text('yourContacts'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text('importContactsSub'.tr(), textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: t.text2, height: 1.4)),
+          const SizedBox(height: 12),
+          PrimaryButton(label: 'importContacts'.tr(), onPressed: onImport),
+        ]),
+      ),
+    );
+  }
+}
+
 class _AllowContacts extends StatelessWidget {
   const _AllowContacts({required this.onAllow});
   final VoidCallback onAllow;
@@ -534,7 +596,20 @@ class _PersonSheet extends ConsumerWidget {
           value: fav,
           onChanged: (on) => settings.favourites = on ? {...settings.favourites, number} : settings.favourites.difference({number}),
         ),
-        if (ext && !inContacts && watched == null)
+        if (isDesktop && !inContacts && watched == null)
+          option(Icons.person_add_alt, 'saveToMedutContacts'.tr(), sub: 'saveToContactsSub'.tr(namedArgs: {'n': number}),
+              onTap: () async {
+            final name = await _askName(context, display);
+            if (name == null) return;
+            nav.pop();
+            await contacts.saveContact(name, number);
+          }),
+        if (isDesktop && inContacts)
+          option(Icons.person_remove_outlined, 'removeFromContacts'.tr(), color: t.danger, onTap: () async {
+            nav.pop();
+            await contacts.removeContact(number);
+          }),
+        if (!isDesktop && ext && !inContacts && watched == null)
           option(Icons.person_add_alt, 'saveToContacts'.tr(), sub: 'saveToContactsSub'.tr(namedArgs: {'n': number}), onTap: () async {
             nav.pop();
             await FlutterContacts.openExternalInsert(Contact(phones: [Phone(number)]));
@@ -683,4 +758,27 @@ class StatusRulesScreen extends ConsumerWidget {
       ]),
     );
   }
+}
+
+/// Desktop "Save to contacts": the name to save under, or null.
+Future<String?> _askName(BuildContext context, String suggested) async {
+  final c = TextEditingController(text: suggested);
+  final name = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('saveToMedutContacts'.tr()),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        decoration: InputDecoration(labelText: 'name'.tr()),
+        onSubmitted: (v) => Navigator.pop(ctx, v),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text('cancel'.tr())),
+        FilledButton(onPressed: () => Navigator.pop(ctx, c.text), child: Text('save'.tr())),
+      ],
+    ),
+  );
+  final t = name?.trim() ?? '';
+  return t.isEmpty ? null : t;
 }

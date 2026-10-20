@@ -607,5 +607,20 @@
   "closeToTray": "الاستمرار في العمل عند الإغلاق",
   "closeToTraySub": "إغلاق النافذة يُبقي Medut في شريط النظام، فتستمر المكالمات في الرنين",
   "folderSharedDesktop": "المستندات › Recordings › Medut",
-  "refresh": "تحديث"
+  "refresh": "تحديث",
+  "yourContacts": "جهات اتصالك",
+  "importContacts": "استيراد جهات الاتصال",
+  "importContactsSub": "أضف ملف ‎.vcf‎ أو ‎.csv‎ مُصدَّرًا من جهات اتصال Google أو Outlook أو Thunderbird.",
+  "importContactsNone": "لا توجد في هذا الملف جهات اتصال بأرقام هواتف",
+  "importContactsNoneNew": "كل من في هذا الملف موجود بالفعل",
+  "importedContacts": {
+    "zero": "لم تُستورد أي جهة اتصال",
+    "one": "استُوردت جهة اتصال واحدة",
+    "two": "استُوردت جهتا اتصال",
+    "few": "استُوردت {} جهات اتصال",
+    "many": "استُوردت {} جهة اتصال",
+    "other": "استُوردت {} جهة اتصال"
+  },
+  "saveToMedutContacts": "حفظ في جهات الاتصال",
+  "removeFromContacts": "إزالة من جهات الاتصال"
 }

@@ -595,5 +595,16 @@
   "closeToTray": "پس از بستن، در حال اجرا بماند",
   "closeToTraySub": "با بستن پنجره، Medut در سینی سیستم می‌ماند و تماس‌ها زنگ می‌خورند",
   "folderSharedDesktop": "اسناد › Recordings › Medut",
-  "refresh": "تازه‌سازی"
+  "refresh": "تازه‌سازی",
+  "yourContacts": "مخاطبان شما",
+  "importContacts": "وارد کردن مخاطبان",
+  "importContactsSub": "فایل ‎.vcf‎ یا ‎.csv‎ صادرشده از مخاطبین Google، Outlook یا Thunderbird را وارد کنید.",
+  "importContactsNone": "در این فایل مخاطبی با شماره تلفن نیست",
+  "importContactsNoneNew": "همه افراد این فایل از قبل اینجا هستند",
+  "importedContacts": {
+    "one": "1 مخاطب وارد شد",
+    "other": "{} مخاطب وارد شد"
+  },
+  "saveToMedutContacts": "ذخیره در مخاطبان",
+  "removeFromContacts": "حذف از مخاطبان"
 }

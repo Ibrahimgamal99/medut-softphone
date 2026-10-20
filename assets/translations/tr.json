@@ -595,5 +595,16 @@
   "closeToTray": "Kapatınca çalışmaya devam et",
   "closeToTraySub": "Pencereyi kapatmak Medut'u tepside tutar, aramalar çalmaya devam eder",
   "folderSharedDesktop": "Belgeler › Recordings › Medut",
-  "refresh": "Yenile"
+  "refresh": "Yenile",
+  "yourContacts": "Kişileriniz",
+  "importContacts": "Kişileri içe aktar",
+  "importContactsSub": "Google Kişiler, Outlook veya Thunderbird'den dışa aktarılmış bir .vcf ya da .csv dosyası ekleyin.",
+  "importContactsNone": "Bu dosyada telefon numarası olan kişi yok",
+  "importContactsNoneNew": "Bu dosyadaki herkes zaten burada",
+  "importedContacts": {
+    "one": "1 kişi içe aktarıldı",
+    "other": "{} kişi içe aktarıldı"
+  },
+  "saveToMedutContacts": "Kişilere kaydet",
+  "removeFromContacts": "Kişilerden kaldır"
 }

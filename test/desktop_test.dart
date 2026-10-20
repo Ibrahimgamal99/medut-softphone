@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medut_phone/desktop/call_links.dart';
+import 'package:medut_phone/desktop/contact_import.dart';
 import 'package:medut_phone/desktop/engine_config.dart';
 import 'package:medut_phone/desktop/engine_log.dart';
 
@@ -66,5 +67,46 @@ void main() {
     expect(r['reset'], isFalse);
     expect((r['lines'] as List).single, endsWith('two'));
     expect(EngineLog.read('conn', 0)['reset'], isTrue);
+  });
+
+  group('contacts import', () {
+    test('vCard 3 from Google: folded lines, grouped TEL, escapes', () {
+      const vcf = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Sara Ahmed\\, Sales\r\nN:Ahmed;Sara;;;\r\n'
+          'item1.TEL;TYPE=CELL:+20 100 123\r\n 4567\r\nTEL;TYPE=WORK:201\r\nEND:VCARD\r\n'
+          'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:No Phone\r\nEMAIL:x@y.z\r\nEND:VCARD\r\n';
+      final c = parseContactsFile(vcf);
+      expect(c, hasLength(1));
+      expect(c.single.name, 'Sara Ahmed, Sales');
+      expect(c.single.numbers, ['+201001234567', '201']);
+    });
+
+    test('vCard 2.1 with only N, and a tel: URI', () {
+      final c = parseContactsFile('BEGIN:VCARD\nVERSION:2.1\nN:Hassan;Omar\nTEL;VALUE=uri:tel:+44-20-7946-0958\nEND:VCARD\n');
+      expect(c.single.name, 'Omar Hassan');
+      expect(c.single.numbers, ['+442079460958']);
+    });
+
+    test('Google CSV: name parts and several numbers in one cell', () {
+      const csv = 'First Name,Middle Name,Last Name,Phone 1 - Label,Phone 1 - Value\n'
+          'Mona,,Ali,Mobile,"+20 122 000 1111 ::: 0100 222 3333"\n'
+          'Empty,,Row,,\n';
+      final c = parseContactsFile(csv);
+      expect(c.single.name, 'Mona Ali');
+      expect(c.single.numbers, ['+201220001111', '01002223333']);
+    });
+
+    test('Outlook CSV, and Excel semicolons', () {
+      final outlook = parseContactsFile('"First Name","Last Name","Company","Mobile Phone","Business Phone"\n'
+          '"","","Acme Ltd","","(02) 2345-6789"\n');
+      expect(outlook.single.name, 'Acme Ltd');
+      expect(outlook.single.numbers, ['0223456789']);
+      final excel = parseContactsFile('Name;Phone\nKarim;105\n');
+      expect(excel.single.name, 'Karim');
+      expect(excel.single.numbers, ['105']);
+    });
+
+    test('a file that is neither', () {
+      expect(parseContactsFile('hello world'), isEmpty);
+    });
   });
 }

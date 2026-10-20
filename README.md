@@ -19,7 +19,8 @@ with the same key.
 **iOS:** not distributed yet; build from source on a Mac (see
 [Build](#build)).
 
-**Linux:** the `.rpm` (Fedora: `sudo dnf install ./medut-*.rpm`) or the
+**Linux:** the `.rpm` (Fedora: `sudo dnf install ./medut-*.rpm`), the `.deb`
+(Debian 13, Ubuntu 24.04 or later: `sudo apt install ./medut_*.deb`) or the
 `.tar.gz`, which runs from any folder (`./medut`). The tray icon needs a
 StatusNotifier host: KDE, Xfce and Cinnamon have one, GNOME needs the
 AppIndicator extension. Passwords go in the desktop keyring (libsecret).
@@ -255,8 +256,9 @@ top of `.github/workflows/android-release.yml`.
 **Linux** (Fedora; Debian and Ubuntu have the same libraries under -dev names):
 1. `sudo dnf install clang cmake ninja-build gtk3-devel libsecret-devel
    libayatana-appindicator-gtk3-devel rpm-build`
-2. `flutter run -d linux`, or `scripts/build-desktop.sh` for the `.tar.gz`
-   and `.rpm` in `dist/`.
+2. `flutter run -d linux`, or `scripts/build-desktop.sh` for the `.tar.gz`,
+   `.deb` and `.rpm` in `dist/` (`scripts/build-desktop.sh deb` or `rpm` for
+   one; the `.deb` needs `dpkg`).
 
 **Windows:** `flutter build windows` (Visual Studio 2022 with C++ and ATL).
 The `desktop` workflow builds it with its Inno Setup installer

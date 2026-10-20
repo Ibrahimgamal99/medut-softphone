@@ -595,5 +595,16 @@
   "closeToTray": "Nach dem Schließen weiterlaufen",
   "closeToTraySub": "Das Fenster zu schließen lässt Medut im Infobereich, Anrufe klingeln weiter",
   "folderSharedDesktop": "Dokumente › Recordings › Medut",
-  "refresh": "Aktualisieren"
+  "refresh": "Aktualisieren",
+  "yourContacts": "Ihre Kontakte",
+  "importContacts": "Kontakte importieren",
+  "importContactsSub": "Übernehmen Sie eine .vcf- oder .csv-Datei aus Google Kontakte, Outlook oder Thunderbird.",
+  "importContactsNone": "In dieser Datei ist kein Kontakt mit Telefonnummer",
+  "importContactsNoneNew": "Alle aus dieser Datei sind schon da",
+  "importedContacts": {
+    "one": "1 Kontakt importiert",
+    "other": "{} Kontakte importiert"
+  },
+  "saveToMedutContacts": "In Kontakten speichern",
+  "removeFromContacts": "Aus Kontakten entfernen"
 }

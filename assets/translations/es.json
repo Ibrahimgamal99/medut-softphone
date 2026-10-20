@@ -595,5 +595,16 @@
   "closeToTray": "Seguir en marcha al cerrar",
   "closeToTraySub": "Cerrar la ventana deja Medut en la bandeja y las llamadas siguen sonando",
   "folderSharedDesktop": "Documentos › Recordings › Medut",
-  "refresh": "Actualizar"
+  "refresh": "Actualizar",
+  "yourContacts": "Tus contactos",
+  "importContacts": "Importar contactos",
+  "importContactsSub": "Trae un archivo .vcf o .csv exportado de Contactos de Google, Outlook o Thunderbird.",
+  "importContactsNone": "Ese archivo no tiene contactos con número de teléfono",
+  "importContactsNoneNew": "Todos los de ese archivo ya están aquí",
+  "importedContacts": {
+    "one": "1 contacto importado",
+    "other": "{} contactos importados"
+  },
+  "saveToMedutContacts": "Guardar en contactos",
+  "removeFromContacts": "Quitar de contactos"
 }

@@ -595,5 +595,16 @@
   "closeToTray": "关闭后继续运行",
   "closeToTraySub": "关闭窗口后 Medut 留在托盘中，来电仍会响铃",
   "folderSharedDesktop": "文档 › Recordings › Medut",
-  "refresh": "刷新"
+  "refresh": "刷新",
+  "yourContacts": "你的联系人",
+  "importContacts": "导入联系人",
+  "importContactsSub": "导入从 Google 通讯录、Outlook 或 Thunderbird 导出的 .vcf 或 .csv 文件。",
+  "importContactsNone": "该文件中没有带电话号码的联系人",
+  "importContactsNoneNew": "该文件中的联系人都已存在",
+  "importedContacts": {
+    "one": "已导入 1 位联系人",
+    "other": "已导入 {} 位联系人"
+  },
+  "saveToMedutContacts": "保存到联系人",
+  "removeFromContacts": "从联系人中移除"
 }

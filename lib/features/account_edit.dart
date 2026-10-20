@@ -597,7 +597,8 @@ String _summary(_Section s, SipAccountConfig c, List<String> codecOrder) {
       ].join(' · ').ifEmpty('sumNoRules'.tr()),
     _Section.extras => [
         if (c.headers.isNotEmpty) 'sumHeaders'.tr(namedArgs: {'n': '${c.headers.split('\n').where((l) => l.contains(':')).length}'}),
-        c.push ? 'sumPushOn'.tr() : 'sumPushOff'.tr(),
+        // A computer stays registered while Medut runs: there is no push to wake it.
+        if (!isDesktop) c.push ? 'sumPushOn'.tr() : 'sumPushOff'.tr(),
         if (c.isDefault) 'sumDefault'.tr(),
       ].join(' · '),
   };
@@ -771,7 +772,7 @@ class _SectionPage extends StatelessWidget {
     return [
       const SizedBox(height: 8),
       _Field(draft.headers, 'customHeaders'.tr(), hint: 'Privacy: id\nX-Department: sales', lines: 4, code: true),
-      _Switch('push'.tr(), 'pushSub'.tr(), a.push, (v) => draft.set((x) => x.copyWith(push: v))),
+      if (!isDesktop) _Switch('push'.tr(), 'pushSub'.tr(), a.push, (v) => draft.set((x) => x.copyWith(push: v))),
       _Switch('setDefault'.tr(), 'setDefaultSub'.tr(), a.isDefault, (v) => draft.set((x) => x.copyWith(isDefault: v))),
     ];
   }

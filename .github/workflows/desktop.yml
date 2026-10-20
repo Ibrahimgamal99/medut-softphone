@@ -5,7 +5,7 @@ name: Desktop build
 # library comes prebuilt with the medut plugin at the sha pubspec.yaml pins
 # (medut.so, medut.dll); Flutter bundles it.
 #
-# Linux: the .rpm and a .tar.gz of the bundle, built on Fedora (rpmbuild).
+# Linux: the .rpm, the .deb and a .tar.gz of the bundle, built on Fedora.
 # Windows: an installer (Inno Setup) and a .zip. A pushed v* tag attaches
 # them to that GitHub Release, beside the APK.
 on:
@@ -29,19 +29,21 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container: fedora:43
-    name: Linux (rpm, tar.gz)
+    name: Linux (rpm, deb, tar.gz)
     steps:
       - name: Build tools and libraries
         run: |
           dnf install -y --setopt=install_weak_deps=False \
-            git curl jq unzip xz which tar findutils file rpm-build \
+            git curl jq unzip xz which tar findutils file binutils rpm-build dpkg \
             clang gcc gcc-c++ cmake ninja-build pkgconf-pkg-config \
             gtk3-devel libsecret-devel libayatana-appindicator-gtk3-devel
 
       - uses: actions/checkout@v4
 
-      - name: Trust the checkout (container user)
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # The container's user does not own the checkout or the Flutter SDK
+      # flutter-action unpacks, and git refuses both unless told otherwise.
+      - name: Trust the checkouts (container user)
+        run: git config --global --add safe.directory '*'
 
       - uses: subosito/flutter-action@v2
         with:

@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications_linux/flutter_local_notifications_linux.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:path/path.dart' as p;
@@ -25,7 +26,7 @@ enum WindowMode { normal, ringing }
 /// The desktop around the app: the window (close keeps Medut in the tray),
 /// the tray icon and its menu, the ringing pop-up and notifications, links
 /// and command lines handed over by a second launch, and start at login.
-class DesktopShell with WindowListener, TrayListener {
+class DesktopShell with WindowListener, TrayListener, WidgetsBindingObserver {
   DesktopShell._();
   static final instance = DesktopShell._();
 
@@ -63,6 +64,9 @@ class DesktopShell with WindowListener, TrayListener {
     _db = db;
     await windowManager.ensureInitialized();
     windowManager.addListener(this);
+    // The close button reaches Dart either as window_manager's close event or
+    // as Flutter's own "may the app exit?" (whichever handler GTK runs first).
+    WidgetsBinding.instance.addObserver(this);
     await windowManager.setPreventClose(true);
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(size: normalSize, minimumSize: minSize, center: true, title: 'Medut'),
@@ -125,10 +129,20 @@ class DesktopShell with WindowListener, TrayListener {
   void onWindowBlur() => _focused = false;
 
   @override
-  void onWindowClose() async {
+  void onWindowClose() => unawaited(_close());
+
+  /// Flutter asks before the window's close button ends the app: only Quit does.
+  @override
+  Future<AppExitResponse> didRequestAppExit() async {
+    if (_quitting) return AppExitResponse.exit;
+    await _close();
+    return _quitting ? AppExitResponse.exit : AppExitResponse.cancel;
+  }
+
+  /// Closing hides to the tray, so calls still ring; with no tray to come
+  /// back from (GNOME without the AppIndicator extension), minimise instead.
+  Future<void> _close() async {
     if (_quitting) return;
-    // Closing hides to the tray, so calls still ring; with no tray to come
-    // back from (GNOME without the AppIndicator extension), minimise instead.
     if (!_settings.closeToTray) return quit();
     if (_trayUp && await _hasTray()) {
       await windowManager.hide();
@@ -180,7 +194,21 @@ class DesktopShell with WindowListener, TrayListener {
   /// does not let an app put itself on top, a notification with Answer and
   /// Decline). When it stops ringing the window goes back as it was, unless
   /// the call was answered.
-  Future<void> _ringing(bool on) async {
+  Future<void> _ringing(bool on) {
+    // One change of the window at a time, each to where the ringing is now:
+    // a call answered or ended while the card was still being put up must
+    // not leave the window small or on top.
+    _wantRing = on;
+    return _ringStep = _ringStep.then((_) => _applyRinging(_wantRing)).catchError((Object e) {
+      debugPrint('ringing window: $e');
+    });
+  }
+
+  bool _wantRing = false;
+  Future<void> _ringStep = Future.value();
+
+  Future<void> _applyRinging(bool on) async {
+    if (on && mode.value == WindowMode.ringing) return; // already the card
     if (on) {
       callOpen.value = true;
       final visible = await windowManager.isVisible();

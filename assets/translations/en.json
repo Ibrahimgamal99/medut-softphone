@@ -595,5 +595,16 @@
   "closeToTray": "Keep running when closed",
   "closeToTraySub": "Closing the window keeps Medut in the tray, so calls still ring",
   "folderSharedDesktop": "Documents › Recordings › Medut",
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "yourContacts": "Your contacts",
+  "importContacts": "Import contacts",
+  "importContactsSub": "Bring in a .vcf or .csv file exported from Google Contacts, Outlook or Thunderbird.",
+  "importContactsNone": "No contacts with a phone number in that file",
+  "importContactsNoneNew": "Everyone in that file is here already",
+  "importedContacts": {
+    "one": "1 contact imported",
+    "other": "{} contacts imported"
+  },
+  "saveToMedutContacts": "Save to contacts",
+  "removeFromContacts": "Remove from contacts"
 }

@@ -35,13 +35,28 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   if (!self->start_hidden) gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
-// The window's icon: data/medut.png in the bundle, beside the executable.
+// The window's icon (taskbar, Alt+Tab): data/medut.png in the bundle, beside
+// the executable, at the sizes desktops ask for. Not the 512 px original:
+// GTK leaves _NET_WM_ICON out when the icon does not fit in one X request,
+// and the taskbar then shows a generic one.
 static void set_icon(GtkWindow* window) {
   g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
   if (exe == nullptr) return;
   g_autofree gchar* dir = g_path_get_dirname(exe);
-  g_autofree gchar* icon = g_build_filename(dir, "data", "medut.png", nullptr);
-  gtk_window_set_icon_from_file(window, icon, nullptr);
+  g_autofree gchar* path = g_build_filename(dir, "data", "medut.png", nullptr);
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(GdkPixbuf) icon = gdk_pixbuf_new_from_file(path, &error);
+  if (icon == nullptr) {
+    g_warning("window icon %s: %s", path, error->message);
+    return;
+  }
+  GList* sizes = nullptr;
+  static constexpr int kSizes[] = {16, 24, 32, 48, 64, 128, 256};
+  for (int size : kSizes) {
+    sizes = g_list_append(sizes, gdk_pixbuf_scale_simple(icon, size, size, GDK_INTERP_BILINEAR));
+  }
+  gtk_window_set_icon_list(window, sizes);
+  g_list_free_full(sizes, g_object_unref);
 }
 
 // Implements GApplication::activate.
