@@ -374,7 +374,10 @@ class DesktopShell with WindowListener, TrayListener, WidgetsBindingObserver {
     if (icon != _lastIcon) {
       _lastIcon = icon;
       // Installed beside flutter_assets (linux/ and windows/ CMakeLists.txt).
-      await trayManager.setIcon('../tray/$icon.${Platform.isWindows ? 'ico' : 'png'}');
+      // The medut- prefix keeps the name out of icon themes: on Linux the
+      // tray gets only the name, and KDE's Breeze has its own "online" and
+      // "offline", which it showed in place of these.
+      await trayManager.setIcon('../tray/medut-$icon.${Platform.isWindows ? 'ico' : 'png'}');
     }
     final key = '$tip|$dnd|$inCall';
     if (key == _lastMenu) return;
