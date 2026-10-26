@@ -219,15 +219,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final s = _address.text.trim().replaceFirst(RegExp(r'^sips?:', caseSensitive: false), '');
     final at = s.lastIndexOf('@');
     if (at <= 0 || at == s.length - 1) return null;
-    var host = s.substring(at + 1);
-    var port = 0;
-    final colon = host.lastIndexOf(':');
-    if (colon > 0) {
-      port = int.tryParse(host.substring(colon + 1)) ?? -1;
-      host = host.substring(0, colon);
-    }
-    if (port < 0 || host.isEmpty || host.contains(' ')) return null;
-    return (user: s.substring(0, at), domain: host, port: port);
+    final hp = SipAccountConfig.splitHostPort(s.substring(at + 1));
+    if (hp == null || hp.host.isEmpty || hp.host.contains(' ')) return null;
+    return (user: s.substring(0, at), domain: hp.host, port: hp.port);
   }
 
   bool get _canSubmit => _stage != _Stage.checking && _address.text.trim().isNotEmpty && _pass.text.isNotEmpty;
@@ -543,9 +537,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               onSubmitted: (_) => _passFocus.requestFocus(),
               decoration: InputDecoration(
                 labelText: 'sipAddress'.tr(),
-                hintText: '201@pbx.example.com',
-                helperText: form ? 'sipAddressHelp'.tr() : null,
-                helperMaxLines: 2,
+                hintText: '201@pbx.example.com:port',
                 floatingLabelBehavior: FloatingLabelBehavior.always,
               ),
             ),

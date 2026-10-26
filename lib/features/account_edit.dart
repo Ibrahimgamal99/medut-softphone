@@ -121,16 +121,42 @@ class AccountDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// User, server and port as they stand. User takes a whole SIP address
+  /// too (100@pbx.example.com:5162), and Server a port after the host
+  /// (pbx.example.com:5162); a port written there wins over the Port field.
+  /// Port -1 when one of them holds something that is not 1–65535.
+  ({String user, String host, int port}) get address {
+    final u = user.text.trim().replaceFirst(RegExp(r'^sips?:', caseSensitive: false), '');
+    final at = u.lastIndexOf('@');
+    final name = at < 0 ? u : u.substring(0, at);
+    final hp = SipAccountConfig.splitHostPort(at < 0 ? domain.text.trim() : u.substring(at + 1));
+    if (hp == null) return (user: name, host: domain.text.trim(), port: -1);
+    if (hp.port > 0) return (user: name, host: hp.host, port: hp.port);
+    final v = port.text.trim();
+    final n = v.isEmpty ? 0 : int.tryParse(v) ?? -1;
+    return (user: name, host: hp.host, port: n >= 0 && n <= 65535 ? n : -1);
+  }
+
+  /// Spreads an address typed into User or Server over User, Server and
+  /// Port, so each field shows its own part. Run when the Sign-in page closes.
+  void splitAddress() {
+    final a = address;
+    if (a.port < 0) return;
+    user.text = a.user;
+    domain.text = a.host;
+    port.text = a.port > 0 ? '${a.port}' : '';
+  }
+
   /// The account as it stands, keeping the id it was opened with.
   SipAccountConfig build(String id) {
-    final d = domain.text.trim();
+    final (user: u, host: d, port: p) = address;
     final c = SipAccountConfig.fromJson({..._a.toJson(), 'id': id}, password: pass.text, turnPass: turnPass.text);
     return c.copyWith(
       mediaEnc: canEncrypt(c.transport) ? null : 'none',
       name: name.text.trim().isEmpty ? d : name.text.trim(),
-      user: user.text.trim(),
+      user: u,
       domain: d,
-      port: int.tryParse(port.text.trim()) ?? 0,
+      port: p > 0 ? p : 0,
       serverUrl: wsUrl.text.trim(),
       authUser: authUser.text.trim(),
       displayName: display.text.trim(),
@@ -200,6 +226,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
   /// What is missing before the account can be tried, or null.
   String? _missing(SipAccountConfig c) {
     if (c.user.isEmpty || c.domain.isEmpty) return 'needUserServer'.tr();
+    if (_d.address.port < 0) return 'portInvalid'.tr();
     final web = c.transport == 'ws' || c.transport == 'wss';
     if (web && !RegExp(r'^wss?://', caseSensitive: false).hasMatch(c.serverUrl)) return 'webLinkNeeded'.tr();
     return null;
@@ -368,7 +395,7 @@ class _AccountEditScreenState extends ConsumerState<AccountEditScreen> {
             section: s,
             recordingAlways: ref.read(settingsProvider).recordingMode == 'always',
             codecOrder: ref.read(settingsProvider).codecs),
-      ));
+      )).then((_) => _d.splitAddress());
 
   // ── Layout ────────────────────────────────────────────────────────────────
 
@@ -642,7 +669,7 @@ class _SectionPage extends StatelessWidget {
 
   List<Widget> _signIn(BuildContext context) => [
         _Field(draft.name, 'accountName'.tr(), hint: 'Office PBX', ltr: false),
-        _Field(draft.user, 'user'.tr(), hint: '201'),
+        _Field(draft.user, 'user'.tr(), hint: '201', helper: 'userAddressHelp'.tr()),
         _PasswordField(draft.pass, 'password'.tr()),
         _Field(draft.domain, 'server'.tr(), hint: 'serverHint'.tr(), keyboard: TextInputType.url),
         _Field(draft.authUser, 'loginName'.tr(), helper: 'loginNameSub'.tr()),

@@ -152,6 +152,24 @@ void main() {
     expect(popped, isTrue);
   });
 
+  test('User takes a whole SIP address, and its port wins over the Port field', () {
+    final d = AccountDraft(const SipAccountConfig(id: 'b', name: '', user: '201', domain: 'old.example', port: 5061));
+    d.user.text = 'sip:100@pbx.com:5162';
+    final c = d.build('b');
+    expect([c.user, c.domain, c.port, c.aor], ['100', 'pbx.com', 5162, '100@pbx.com:5162']);
+    d.splitAddress();
+    expect([d.user.text, d.domain.text, d.port.text], ['100', 'pbx.com', '5162']);
+
+    d.user.text = '100@pbx.com';
+    expect(d.build('b').port, 5162, reason: 'no port in the address: the Port field applies');
+    d.domain.text = 'pbx.com:5070';
+    d.user.text = '100';
+    expect(d.build('b').port, 5070, reason: 'Server takes host:port too');
+    d.user.text = '100@pbx.com:70000';
+    expect(d.address.port, -1);
+    d.dispose();
+  });
+
   testWidgets('choosing a web link on the Connection page brings DTLS and ICE', (tester) async {
     await open(tester, const RegProbe(RegStatus.registered));
     final d = AccountDraft(const SipAccountConfig(id: 'b', name: '', user: '201', domain: 'pbx.example.com'));

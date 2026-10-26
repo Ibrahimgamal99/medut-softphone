@@ -34,6 +34,16 @@ void main() {
       expect(a.transport, 'tcp');
     });
 
+    test('a port after the server is split off, and only 1–65535 is a port', () {
+      expect(SipAccountConfig.splitHostPort('pbx.example.com:5070'), (host: 'pbx.example.com', port: 5070));
+      expect(SipAccountConfig.splitHostPort('pbx.example.com'), (host: 'pbx.example.com', port: 0));
+      expect(SipAccountConfig.splitHostPort('[2001:db8::1]:5061'), (host: '[2001:db8::1]', port: 5061));
+      expect(SipAccountConfig.splitHostPort('2001:db8::1'), (host: '2001:db8::1', port: 0));
+      for (final bad in ['pbx:', 'pbx:0', 'pbx:70000', 'pbx:tls']) {
+        expect(SipAccountConfig.splitHostPort(bad), isNull, reason: bad);
+      }
+    });
+
     test('rejects anything else', () {
       expect(SipAccountConfig.parseProvisioning('hello'), isNull);
       expect(SipAccountConfig.parseProvisioning('{"uri": "nope"}'), isNull);

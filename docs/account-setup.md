@@ -21,6 +21,18 @@ The same text works in all of them. Two forms are accepted:
 
 Anything else shows *That isn't a SIP account*.
 
+## A server on another port
+
+When the PBX does not listen on the usual port (5060 for UDP and TCP, 5061
+for TLS), put the port after the server in the SIP address:
+`100@pbx.example.com:5162`. That works in the sign-in address and in *User*
+in Edit account, which spreads it over *User*, *Server* and *Port* when you
+leave the page. *Server* also takes `pbx.example.com:5162`, and *Port* in
+*Connection* sets it on its own. A port written in the address wins over the
+*Port* field. With *Auto* on the sign-in screen, every check (TLS, TCP, UDP,
+WebSocket) uses that one port. A web link carries its own port:
+`wss://pbx.example.com:8089/ws`.
+
 ## What happens after reading
 
 **On the sign-in screen**, the form is filled in, then:

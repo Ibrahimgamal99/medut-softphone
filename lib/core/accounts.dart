@@ -257,6 +257,17 @@ class SipAccountConfig {
 
   static String newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
+  /// `pbx.example.com:5070` → (pbx.example.com, 5070); no port → 0. A
+  /// bracketed IPv6 address keeps its colons. Null when what follows the
+  /// colon is not a port (1–65535).
+  static ({String host, int port})? splitHostPort(String s) {
+    final m = RegExp(r'^(\[[^\]]*\]|[^:]*):([^:]*)$').firstMatch(s);
+    if (m == null) return (host: s, port: 0);
+    final port = int.tryParse(m.group(2)!) ?? 0;
+    if (port < 1 || port > 65535) return null;
+    return (host: m.group(1)!, port: port);
+  }
+
   /// Reads a provisioning payload: a Medut-SDK account JSON (the same shape as
   /// the SDK's `account.json`), or a SIP URI like
   /// `sip:201:secret@pbx.example.com:5061;transport=tls`. Its `audio_codecs`
