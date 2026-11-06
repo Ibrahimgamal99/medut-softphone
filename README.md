@@ -1,7 +1,8 @@
 # Medut Softphone
 
 A softphone for any SIP PBX (Asterisk, FreeSWITCH, Kamailio, OpenSIPS, 3CX or
-a carrier SBC), built on [Medut-SDK](https://github.com/Ibrahimgamal99/Medut-SDK).
+a carrier SBC), built on [Medut-SDK](https://github.com/Ibrahimgamal99/Medut-SDK)
+2.0, which runs its own SIP and media stack on libre.
 The app is Flutter; on the phone the ringing and call screens are native. It
 runs on Android, iOS, Linux and Windows.
 
@@ -72,9 +73,10 @@ icon is its first hieroglyph, the staff 𓌃, with two sound waves.
   as a QR code. [docs/account-setup.md](docs/account-setup.md) gives the
   format, with examples.
 - *More options* covers the transport, encryption (SRTP SDES / DTLS-SRTP over
-  TLS and WSS only), auth user, outbound proxy, ICE and TURN. *All technical
-  settings* covers every SDK option, grouped into sections that show their
-  values. Saving tests the connection first.
+  TLS and WSS only), auth user, outbound proxy, ICE, TURN and the server
+  certificate check (per account, for TLS and WSS). *All technical settings*
+  covers every SDK option, grouped into sections that show their values.
+  Saving tests the connection first.
 - Any number of accounts, each with its live registration state: registered,
   reconnecting, or failed with the SIP code and a retry countdown. Dial rules
   pick the account for each number. Each account can set a dial prefix,
@@ -270,8 +272,8 @@ plugin at the Medut-SDK commit `pubspec.yaml` pins, and Flutter bundles the
 one for the target: an SDK fix reaches the desktop once the pin moves.
 
 **iOS** (on a Mac):
-1. Build `Medut.xcframework` in Medut-SDK (`scripts/build-ios.sh`). The SDK
-   repo does not ship it yet, and `pod install` reports it missing otherwise.
+1. `flutter pub get`. The medut pod brings the prebuilt `Medut.xcframework`
+   from the Medut-SDK commit pinned in `pubspec.yaml`.
 2. `cd ios && pod install`.
 3. In Xcode, set the team, enable *Push Notifications* and *Background Modes*
    (Voice over IP, Audio and Remote notifications are already in

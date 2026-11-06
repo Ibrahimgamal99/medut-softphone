@@ -595,7 +595,7 @@ class SipService extends ChangeNotifier with WidgetsBindingObserver {
     return at > 0 ? s.substring(0, at) : s;
   }
 
-  /// The Refer-To of a transfer to [target]: a full `sip:` URI. baresip
+  /// The Refer-To of a transfer to [target]: a full `sip:` URI. The SDK
   /// takes anything else for a user name, so `201@pbx` became
   /// `sip:201%40pbx@pbx` and every transfer went to a number that does not
   /// exist. (Native builds it: PhoneEngine.referUri.)

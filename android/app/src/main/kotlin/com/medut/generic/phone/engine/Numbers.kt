@@ -25,7 +25,7 @@ object Numbers {
         return if (port > 0) "$s@$domain:$port" else "$s@$domain"
     }
 
-    /** The Refer-To of a transfer: a full sip: URI (baresip takes anything else for a user name). */
+    /** The Refer-To of a transfer: a full sip: URI (the SDK takes anything else for a user name). */
     fun referUri(uri: String): String =
         if (Regex("^sips?:", RegexOption.IGNORE_CASE).containsMatchIn(uri)) uri else "sip:$uri"
 

@@ -73,7 +73,7 @@ sensitive.
 | `stun_server` | string | `""` | `stun:host:port`. |
 | `turn_server` | string | `""` | `turn:host:port`. Used only with ICE on. |
 | `turn_user`, `turn_pass` | string | `""` | TURN credentials. |
-| `verify_tls` | boolean | `true` | `false` accepts a self-signed server certificate. |
+| `verify_tls` | boolean | `true` | Check the server's certificate over `tls` and `wss`, for this account only. `false` accepts a self-signed certificate or one for another host name; use it only for a test server. |
 
 Things that break a JSON payload:
 
